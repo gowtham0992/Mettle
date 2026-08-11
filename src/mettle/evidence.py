@@ -55,6 +55,28 @@ _SAMPLES = {
             }
         ),
     ),
+    "framing_plates_complete": _EvidenceSample(
+        image_url="/static/evidence/framing-plates-complete.png",
+        capabilities=frozenset(
+            {
+                "close_view",
+                "protection_plate_visible",
+                "wide_view",
+                "wall_location_visible",
+            }
+        ),
+    ),
+    "mechanical_access_wide": _EvidenceSample(
+        image_url="/static/evidence/mechanical-access-wide.png",
+        capabilities=frozenset(
+            {
+                "wide_view",
+                "clearance_visible",
+                "equipment_clearance_visible",
+                "access_panel_open",
+            }
+        ),
+    ),
 }
 
 
@@ -75,6 +97,10 @@ def _required_capabilities(requirement: str) -> frozenset[str]:
         capabilities.add("protection_plate_visible")
     if "wall location" in normalized:
         capabilities.add("wall_location_visible")
+    if "equipment clearance" in normalized:
+        capabilities.add("equipment_clearance_visible")
+    if "access panel open" in normalized or "open access panel" in normalized:
+        capabilities.add("access_panel_open")
     return frozenset(capabilities)
 
 

@@ -46,3 +46,34 @@ def test_unrecognized_requirement_routes_to_manual_review() -> None:
 
     assert assessment.status is EvidenceStatus.MANUAL_REVIEW
     assert "cannot evaluate" in assessment.explanation.lower()
+
+
+def test_framing_and_mechanical_fixtures_cover_their_requirements() -> None:
+    framing = Citation(
+        citation_id="2",
+        code_reference="IRC R602.6",
+        notice_text="Protect bored framing members.",
+        trade=Trade.FRAMING,
+        evidence_requirements=[
+            "Close photo of each installed protection plate",
+            "Wide photo identifying each corrected wall location",
+        ],
+    )
+    mechanical = Citation(
+        citation_id="3",
+        code_reference="IMC 304.10",
+        notice_text="Provide clearance and service access.",
+        trade=Trade.MECHANICAL,
+        evidence_requirements=[
+            "Wide photo showing equipment clearance with the access panel open"
+        ],
+    )
+
+    assert assess_sample(
+        citation=framing,
+        sample_id="framing_plates_complete",
+    ).status is EvidenceStatus.ACCEPTED
+    assert assess_sample(
+        citation=mechanical,
+        sample_id="mechanical_access_wide",
+    ).status is EvidenceStatus.ACCEPTED

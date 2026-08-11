@@ -83,7 +83,7 @@
               <div><span class="section-index">03</span><h2>Evidence lab</h2></div>
               <span class="evidence-panel__mode">SYNTHETIC</span>
             </div>
-            <p class="panel__kicker">SIMULATE THE NEXT PHOTO FROM THE ELECTRICAL TRADE</p>
+            <p class="panel__kicker">RUN SYNTHETIC EVIDENCE FROM EACH TRADE</p>
             <div class="evidence-fixtures">
               <article class="evidence-fixture">
                 <img src="/static/evidence/panel-closeup-insufficient.png" alt="Synthetic close-up of an electrical panel that does not show working clearance">
@@ -94,6 +94,16 @@
                 <img src="/static/evidence/panel-wide-measured.png" alt="Synthetic wide view of an electrical panel with a tape measure showing clearance">
                 <div><strong>Wide + measured</strong><span>Full panel area and visible scale</span></div>
                 <button class="button evidence-submit" type="button" data-sample="panel_wide_measured">Assess wide photo</button>
+              </article>
+              <article class="evidence-fixture">
+                <img src="/static/evidence/framing-plates-complete.png" alt="Synthetic framing wall showing installed protection plates and wall context">
+                <div><strong>Framing plates</strong><span>Close detail + corrected wall context</span></div>
+                <button class="button evidence-submit" type="button" data-citation="2" data-sample="framing_plates_complete">Assess framing photo</button>
+              </article>
+              <article class="evidence-fixture">
+                <img src="/static/evidence/mechanical-access-wide.png" alt="Synthetic wide view of mechanical equipment with clear service access and open panel">
+                <div><strong>Mechanical access</strong><span>Wide clearance + open service panel</span></div>
+                <button class="button evidence-submit" type="button" data-citation="3" data-sample="mechanical_access_wide" data-requires-decision="true">Assess mechanical photo</button>
               </article>
             </div>
             <div class="evidence-result" id="evidence-result" aria-live="polite" hidden></div>
@@ -106,6 +116,7 @@
             </div>
             <div id="packet-list" class="packet-list"></div>
             <p class="packet-note">Assembles as evidence is accepted. Nothing reaches the inspector until you approve it.</p>
+            <button class="button packet-action" id="packet-action" type="button" hidden>Prepare packet for approval</button>
           </section>
 
           <section class="panel log-panel">

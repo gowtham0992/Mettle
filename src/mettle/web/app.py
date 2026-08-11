@@ -11,8 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from mettle.demo import DemoCampaign, DemoConflict, DemoNotFound, DemoStore
 from mettle.workflow import WorkflowConfigurationError
 from mettle.workflow_registry import (
+    ApprovePacketRequest,
     CreateWorkflowRequest,
     EvidenceSubmissionError,
+    PacketNotApproved,
+    PacketNotReady,
+    PreparePacketRequest,
     ResumeWorkflowRequest,
     SubmitEvidenceRequest,
     WorkflowCapacityReached,
@@ -158,6 +162,24 @@ def create_app(
             },
         )
 
+    @app.exception_handler(PacketNotReady)
+    async def packet_not_ready(_request: Request, exc: PacketNotReady):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {"code": "packet_not_ready", "message": str(exc)}
+            },
+        )
+
+    @app.exception_handler(PacketNotApproved)
+    async def packet_not_approved(_request: Request, exc: PacketNotApproved):
+        return JSONResponse(
+            status_code=409,
+            content={
+                "error": {"code": "packet_not_approved", "message": str(exc)}
+            },
+        )
+
     @app.get("/", include_in_schema=False)
     async def index() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
@@ -257,6 +279,62 @@ def create_app(
             workflow_id,
             payload,
             idempotency_key=idempotency_key,
+        )
+
+    @app.post(
+        "/api/workflows/{workflow_id}/packet/prepare",
+        response_model=WorkflowEnvelope,
+    )
+    def prepare_packet(
+        workflow_id: str,
+        _payload: PreparePacketRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        return request.app.state.workflows.prepare_packet(
+            workflow_id,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
+        "/api/workflows/{workflow_id}/packet/approve",
+        response_model=WorkflowEnvelope,
+    )
+    def approve_packet(
+        workflow_id: str,
+        payload: ApprovePacketRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        return request.app.state.workflows.approve_packet(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.get("/api/workflows/{workflow_id}/packet.pdf")
+    def download_packet(workflow_id: str, request: Request) -> Response:
+        pdf = request.app.state.workflows.render_packet(
+            workflow_id,
+            evidence_dir=STATIC_DIR / "evidence",
+        )
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": (
+                    'attachment; filename="mettle-reinspection-packet.pdf"'
+                ),
+                "Cache-Control": "no-store",
+            },
         )
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

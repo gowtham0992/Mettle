@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from hashlib import sha256
+from pathlib import Path
 from secrets import token_urlsafe
 from threading import Lock
 
@@ -10,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from mettle.communication import Recipient, RecordingMessenger
 from mettle.domain import Trade
 from mettle.evidence import EvidenceAssessment, EvidenceSampleNotFound, assess_sample
+from mettle.packet import PacketRecord, PacketStatus, render_packet_pdf
 from mettle.workflow import (
     RecoveryWorkflowSession,
     WorkflowSnapshot,
@@ -31,6 +33,14 @@ class WorkflowCapacityReached(RuntimeError):
 
 class EvidenceSubmissionError(RuntimeError):
     """Raised when evidence cannot be assessed for the selected workflow."""
+
+
+class PacketNotReady(RuntimeError):
+    """Raised when a packet cannot be prepared from incomplete evidence."""
+
+
+class PacketNotApproved(RuntimeError):
+    """Raised when a packet operation requires final contractor approval."""
 
 
 class WorkflowRosterEntry(BaseModel):
@@ -76,12 +86,24 @@ class SubmitEvidenceRequest(BaseModel):
     )
 
 
+class PreparePacketRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class ApprovePacketRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    approval_id: str = Field(min_length=1, max_length=64)
+    decision: str = Field(min_length=3, max_length=500)
+
+
 class WorkflowEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     workflow_id: str
     snapshot: WorkflowSnapshot
     evidence: list[EvidenceAssessment] = Field(default_factory=list)
+    packet: PacketRecord | None = None
 
 
 class _WorkflowEntry:
@@ -92,6 +114,9 @@ class _WorkflowEntry:
         self.resume_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
         self.evidence: list[EvidenceAssessment] = []
         self.evidence_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
+        self.packet: PacketRecord | None = None
+        self.packet_prepare_replays: dict[str, WorkflowEnvelope] = {}
+        self.packet_approval_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
 
 
 def _fingerprint(model: BaseModel) -> str:
@@ -229,9 +254,16 @@ class WorkflowRegistry:
             )
             if citation is None:
                 raise EvidenceSubmissionError("citation does not belong to this workflow")
+            effective_citation = citation
+            if not citation.evidence_requirements and entry.snapshot.contractor_decision:
+                effective_citation = citation.model_copy(
+                    update={
+                        "evidence_requirements": [entry.snapshot.contractor_decision]
+                    }
+                )
             try:
                 assessment = assess_sample(
-                    citation=citation,
+                    citation=effective_citation,
                     sample_id=payload.sample_id,
                     assessment_id=f"evidence-{token_urlsafe(9)}",
                 )
@@ -242,10 +274,120 @@ class WorkflowRegistry:
             entry.evidence_replays[idempotency_key] = (fingerprint, envelope)
             return envelope
 
+    def prepare_packet(
+        self,
+        workflow_id: str,
+        *,
+        idempotency_key: str,
+    ) -> WorkflowEnvelope:
+        with self._lock:
+            entry = self._entries.get(workflow_id)
+        if entry is None:
+            raise WorkflowNotFound("workflow does not exist")
+        with entry.lock:
+            replay = entry.packet_prepare_replays.get(idempotency_key)
+            if replay is not None:
+                return replay.model_copy(deep=True)
+            if entry.packet is not None:
+                raise WorkflowConflict("packet has already been prepared")
+            notice = entry.snapshot.notice
+            plan = entry.snapshot.plan
+            if notice is None or plan is None:
+                raise PacketNotReady("workflow notice and plan are not available")
+            latest = {item.citation_id: item for item in entry.evidence}
+            missing = [
+                citation.citation_id
+                for citation in notice.citations
+                if latest.get(citation.citation_id) is None
+                or latest[citation.citation_id].status.value != "accepted"
+            ]
+            if missing:
+                raise PacketNotReady(
+                    f"accepted evidence is required for citation(s): {', '.join(missing)}"
+                )
+            entry.packet = PacketRecord(
+                packet_id=f"packet-{token_urlsafe(9)}",
+                status=PacketStatus.AWAITING_APPROVAL,
+                prepared_on=plan.as_of,
+                citations_total=len(notice.citations),
+                citations_ready=len(notice.citations),
+                approval_id=f"approval-{token_urlsafe(9)}",
+            )
+            envelope = self._envelope(workflow_id, entry)
+            entry.packet_prepare_replays[idempotency_key] = envelope
+            return envelope
+
+    def approve_packet(
+        self,
+        workflow_id: str,
+        payload: ApprovePacketRequest,
+        *,
+        idempotency_key: str,
+    ) -> WorkflowEnvelope:
+        with self._lock:
+            entry = self._entries.get(workflow_id)
+        if entry is None:
+            raise WorkflowNotFound("workflow does not exist")
+        fingerprint = _fingerprint(payload)
+        with entry.lock:
+            replay = entry.packet_approval_replays.get(idempotency_key)
+            if replay is not None:
+                existing_fingerprint, envelope = replay
+                if existing_fingerprint != fingerprint:
+                    raise WorkflowConflict(
+                        "idempotency key was already used with a different approval"
+                    )
+                return envelope.model_copy(deep=True)
+            packet = entry.packet
+            if packet is None:
+                raise PacketNotReady("packet has not been prepared")
+            if packet.status is not PacketStatus.AWAITING_APPROVAL:
+                raise WorkflowConflict("packet is not awaiting approval")
+            if payload.approval_id != packet.approval_id:
+                raise WorkflowConflict("approval does not belong to this packet")
+            decision = " ".join(payload.decision.split())
+            entry.packet = packet.model_copy(
+                update={
+                    "status": PacketStatus.APPROVED,
+                    "approval_decision": decision,
+                }
+            )
+            envelope = self._envelope(workflow_id, entry)
+            entry.packet_approval_replays[idempotency_key] = (
+                fingerprint,
+                envelope,
+            )
+            return envelope
+
+    def render_packet(self, workflow_id: str, *, evidence_dir: Path) -> bytes:
+        with self._lock:
+            entry = self._entries.get(workflow_id)
+        if entry is None:
+            raise WorkflowNotFound("workflow does not exist")
+        with entry.lock:
+            notice = entry.snapshot.notice
+            plan = entry.snapshot.plan
+            packet = entry.packet
+            if packet is None or packet.status is not PacketStatus.APPROVED:
+                raise PacketNotApproved(
+                    "contractor approval is required before download"
+                )
+            if notice is None or plan is None:
+                raise PacketNotReady("workflow notice and plan are not available")
+            return render_packet_pdf(
+                notice=notice,
+                plan=plan,
+                evidence=[item.model_copy(deep=True) for item in entry.evidence],
+                deliveries=list(entry.snapshot.deliveries),
+                packet=packet,
+                evidence_dir=evidence_dir,
+            )
+
     @staticmethod
     def _envelope(workflow_id: str, entry: _WorkflowEntry) -> WorkflowEnvelope:
         return WorkflowEnvelope(
             workflow_id=workflow_id,
             snapshot=entry.snapshot.model_copy(deep=True),
             evidence=[item.model_copy(deep=True) for item in entry.evidence],
+            packet=entry.packet.model_copy(deep=True) if entry.packet else None,
         )

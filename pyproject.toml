@@ -11,6 +11,7 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
   "fastapi>=0.141,<0.142",
   "pydantic>=2.12,<3",
+  "reportlab>=4.4,<5",
   "strands-agents>=1.51,<2",
   "uvicorn>=0.52,<0.53",
 ]
@@ -34,3 +35,9 @@ mettle = ["web/static/*", "web/static/evidence/*"]
 addopts = "-q"
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pdfplumber>=0.11,<0.12",
+    "pypdf>=6.9,<7",
+]

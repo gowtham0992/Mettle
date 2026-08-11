@@ -24,6 +24,7 @@ const elements = {
   metrics: document.querySelector("#metrics-list"),
   packet: document.querySelector("#packet-status"),
   packetList: document.querySelector("#packet-list"),
+  packetAction: document.querySelector("#packet-action"),
   demoStep: document.querySelector("#demo-step"),
   advance: document.querySelector("#advance-button"),
   reset: document.querySelector("#reset-button"),
@@ -147,12 +148,34 @@ function workflowCampaign(envelope) {
       detail: assessment.explanation,
     });
   }
+  if (envelope.packet) {
+    events.push({
+      happened_at: timestamp(10, envelope.packet.status === "approved" ? 5 : 0),
+      kind: envelope.packet.status === "approved" ? "judgment_resolved" : "packet_prepared",
+      actor: envelope.packet.status === "approved" ? "Contractor" : "Mettle · packet builder",
+      title: envelope.packet.status === "approved" ? "Final packet approved" : "Reinspection packet assembled",
+      detail: envelope.packet.status === "approved"
+        ? envelope.packet.approval_decision
+        : "Download remains blocked until contractor approval.",
+    });
+  }
 
   const judgments = pendingJudgments.length && pendingInterrupt ? [{
     ...pendingJudgments[0],
     judgment_id: pendingInterrupt.interrupt_id,
     status: "pending",
   }] : [];
+  if (envelope.packet?.status === "awaiting_approval") {
+    judgments.push({
+      judgment_id: envelope.packet.approval_id,
+      kind: "final_packet_approval",
+      citation_id: null,
+      question: "Approve this packet for reinspection scheduling?",
+      reason: "All citations have accepted evidence. Download remains blocked until your final decision.",
+      status: "pending",
+      packet_approval: true,
+    });
+  }
 
   const citationsReady = [...evidenceByCitation.values()].filter((item) => item.status === "accepted").length;
   return {
@@ -165,15 +188,19 @@ function workflowCampaign(envelope) {
     priority: plan.priority,
     citations,
     evidence: envelope.evidence || [],
+    packet: envelope.packet,
     events,
     judgments,
-    packet_status: "blocked",
+    packet_status: envelope.packet?.status === "approved"
+      ? "approved"
+      : envelope.packet?.status === "awaiting_approval" ? "awaiting_approval" : "blocked",
     metrics: {
       citations_ready: citationsReady,
       citations_total: citations.length,
       messages_handled: snapshot.deliveries.length,
       automated_actions: 2 + snapshot.deliveries.length + (envelope.evidence || []).length,
-      contractor_decisions: snapshot.contractor_decision ? 1 : 0,
+      contractor_decisions: (snapshot.contractor_decision ? 1 : 0)
+        + (envelope.packet?.status === "approved" ? 1 : 0),
     },
     scenario_step: 0,
     scenario_complete: true,
@@ -290,7 +317,14 @@ function renderJudgment(judgment) {
     if (decision.length < 3) return;
     setBusy(button, true);
     try {
-      if (activeWorkflowId) {
+      if (activeWorkflowId && judgment.packet_approval) {
+        const envelope = await request(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/packet/approve`, {
+          method: "POST",
+          headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
+          body: JSON.stringify({ approval_id: judgment.judgment_id, decision }),
+        });
+        campaign = workflowCampaign(envelope);
+      } else if (activeWorkflowId) {
         const envelope = await request(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/resume`, {
           method: "POST",
           headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
@@ -304,7 +338,9 @@ function renderJudgment(judgment) {
         });
       }
       render(campaign);
-      showToast("Your decision is logged. Mettle resumed the recovery run.");
+      showToast(judgment.packet_approval
+        ? "Final approval recorded. The reinspection PDF is ready to download."
+        : "Your decision is logged. Mettle resumed the recovery run.");
     } catch (error) {
       input.setCustomValidity(error.message);
       input.reportValidity();
@@ -400,7 +436,20 @@ function render(data) {
         node("span", "", latestEvidence.explanation),
       );
     }
+    const contractorDecisionRecorded = data.events.some(
+      (event) => event.title === "Contractor decision recorded; graph resumed",
+    );
+    for (const button of elements.evidenceButtons) {
+      button.disabled = button.dataset.requiresDecision === "true" && !contractorDecisionRecorded;
+      button.title = button.disabled ? "Resolve the mechanical evidence specification first" : "";
+    }
   }
+  elements.packetAction.hidden = !isWorkflow
+    || (data.metrics.citations_ready < data.metrics.citations_total && data.packet_status !== "approved");
+  elements.packetAction.textContent = data.packet_status === "approved"
+    ? "Download approved PDF"
+    : data.packet_status === "awaiting_approval" ? "Awaiting your approval" : "Prepare packet for approval";
+  elements.packetAction.disabled = data.packet_status === "awaiting_approval";
   elements.demoStep.textContent = isWorkflow
     ? `STRANDS · ${data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH RESUMED"}`
     : `${data.scenario_step} · ${stepLabels[data.scenario_step] || "RECOVERY RUN"}`;
@@ -512,7 +561,10 @@ for (const button of elements.evidenceButtons) {
       const envelope = await request(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/evidence`, {
         method: "POST",
         headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
-        body: JSON.stringify({ citation_id: "1", sample_id: button.dataset.sample }),
+        body: JSON.stringify({
+          citation_id: button.dataset.citation || "1",
+          sample_id: button.dataset.sample,
+        }),
       });
       campaign = workflowCampaign(envelope);
       render(campaign);
@@ -527,6 +579,32 @@ for (const button of elements.evidenceButtons) {
     }
   });
 }
+
+elements.packetAction.addEventListener("click", async () => {
+  if (!activeWorkflowId) return;
+  if (campaign?.packet_status === "approved") {
+    window.location.assign(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/packet.pdf`);
+    return;
+  }
+  setBusy(elements.packetAction, true);
+  try {
+    const envelope = await request(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/packet/prepare`, {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
+      body: "{}",
+    });
+    campaign = workflowCampaign(envelope);
+    render(campaign);
+    document.querySelector(".judgment input")?.focus();
+    showToast("Packet assembled. Download remains blocked until your final approval.");
+  } catch (error) {
+    showError(error);
+  } finally {
+    if (campaign?.packet_status !== "awaiting_approval") {
+      setBusy(elements.packetAction, false);
+    }
+  }
+});
 
 document.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || elements.noticeDialog.open) return;

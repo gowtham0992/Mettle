@@ -25,3 +25,5 @@ Logo file and HTML usage.zip
 .aws/
 artifacts/
 data/private/
+output/
+tmp/

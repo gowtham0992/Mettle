@@ -14,15 +14,16 @@ The repository runs a complete notice-to-judgment slice without AWS credentials 
 - extract its citations without interpreting building code;
 - record citation-specific trade outreach through a safe local adapter;
 - increase urgency as the reinspection deadline approaches; and
-- pause at ambiguous requirements, accept the contractor's decision, and resume with contractor-directed outreach; and
-- reject an insufficient synthetic photo, explain what is missing, and accept a replacement only when it satisfies the notice's observable requirements.
+- pause at ambiguous requirements, accept the contractor's decision, and resume with contractor-directed outreach;
+- reject an insufficient synthetic photo, explain what is missing, and accept a replacement only when it satisfies the notice's observable requirements; and
+- assemble a four-page evidence packet, block download until final contractor approval, and produce a polished PDF with citation-to-evidence traceability.
 
 The product core now runs those steps as a real Strands graph. Deterministic
 policy nodes parse and plan the campaign, an idempotent communication port
 records trade outreach, and a Strands interrupt pauses the graph for contractor
 judgment before it resumes. No cloud model is invoked in this local mode.
 
-The command center has two modes. **Load notice** runs the real local Strands graph, preserves the workflow ID in the URL, and exposes a synthetic evidence lab for the notice's electrical citation. The **demo controls** drive a deterministic six-event judge scenario: accepted evidence, rejected evidence with a precise re-request, deadline escalation, human judgment, and a contractor-approved final packet.
+The command center has two modes. **Load notice** runs the real local Strands graph, preserves the workflow ID in the URL, and exposes a synthetic evidence lab for all three trades. The **demo controls** drive a deterministic six-event judge scenario: accepted evidence, rejected evidence with a precise re-request, deadline escalation, human judgment, and a contractor-approved final packet.
 
 The deterministic core is intentional. Strands and Bedrock will provide agentic extraction, communication, evidence review, and orchestration, while the domain rules remain testable without a model.
 
@@ -39,7 +40,7 @@ uv run pytest
 
 Open [http://127.0.0.1:4310](http://127.0.0.1:4310) after starting the server. The demo binds only to the local machine.
 
-Select **Load notice** to use the included synthetic notice and roster. The local communication adapter records every proposed message but never sends SMS. In **Evidence lab**, assess the tight close-up first and then the wide measured replacement to exercise the rejection and acceptance paths.
+Select **Load notice** to use the included synthetic notice and roster. The local communication adapter records every proposed message but never sends SMS. In **Evidence lab**, resolve the mechanical evidence specification, assess the electrical, framing, and mechanical fixtures, then prepare and approve the downloadable packet.
 
 Strands is installed as a core dependency, but no AWS credentials are needed
 for the example or tests. Bedrock and AgentCore adapters will be added behind

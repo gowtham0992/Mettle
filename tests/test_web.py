@@ -1,6 +1,8 @@
+from io import BytesIO
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from pypdf import PdfReader
 
 from mettle.demo import DemoStore
 from mettle.web.app import create_app
@@ -19,6 +21,40 @@ def workflow_payload(*, notice_text: str = NOTICE) -> dict:
             {"trade": "mechanical", "name": "Luis Vega", "phone": "+13035550103"},
         ],
     }
+
+
+def ready_workflow(browser: TestClient) -> tuple[str, dict]:
+    created = browser.post(
+        "/api/workflows",
+        json=workflow_payload(),
+        headers={"Idempotency-Key": "packet_workflow_123"},
+    ).json()
+    workflow_id = created["workflow_id"]
+    interrupt_id = created["snapshot"]["interrupts"][0]["interrupt_id"]
+    resumed = browser.post(
+        f"/api/workflows/{workflow_id}/resume",
+        json={
+            "interrupt_id": interrupt_id,
+            "decision": "Wide photo showing equipment clearance with the access panel open",
+        },
+        headers={"Idempotency-Key": "packet_resume_123"},
+    )
+    assert resumed.status_code == 200
+    for index, (citation_id, sample_id) in enumerate(
+        [
+            ("1", "panel_wide_measured"),
+            ("2", "framing_plates_complete"),
+            ("3", "mechanical_access_wide"),
+        ]
+    ):
+        response = browser.post(
+            f"/api/workflows/{workflow_id}/evidence",
+            json={"citation_id": citation_id, "sample_id": sample_id},
+            headers={"Idempotency-Key": f"packet_evidence_{index}_123"},
+        )
+        assert response.status_code == 200
+        assert response.json()["evidence"][-1]["status"] == "accepted"
+    return workflow_id, created
 
 
 def client() -> TestClient:
@@ -240,3 +276,65 @@ def test_evidence_replay_is_idempotent_and_changed_replay_conflicts() -> None:
     assert replay.json() == first.json()
     assert len(replay.json()["evidence"]) == 1
     assert changed.status_code == 409
+
+
+def test_packet_prepare_requires_every_citation_to_have_accepted_evidence() -> None:
+    with client() as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "packet_incomplete_123"},
+        ).json()
+        response = browser.post(
+            f"/api/workflows/{created['workflow_id']}/packet/prepare",
+            json={},
+            headers={"Idempotency-Key": "packet_prepare_incomplete_123"},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "packet_not_ready"
+    assert "1, 2, 3" in response.json()["error"]["message"]
+
+
+def test_packet_requires_final_approval_then_downloads_verified_pdf() -> None:
+    with client() as browser:
+        workflow_id, _created = ready_workflow(browser)
+        prepared = browser.post(
+            f"/api/workflows/{workflow_id}/packet/prepare",
+            json={},
+            headers={"Idempotency-Key": "packet_prepare_123"},
+        )
+        blocked_download = browser.get(f"/api/workflows/{workflow_id}/packet.pdf")
+        approval_id = prepared.json()["packet"]["approval_id"]
+        approved = browser.post(
+            f"/api/workflows/{workflow_id}/packet/approve",
+            json={
+                "approval_id": approval_id,
+                "decision": "Approve packet for reinspection scheduling",
+            },
+            headers={"Idempotency-Key": "packet_approve_123"},
+        )
+        approval_replay = browser.post(
+            f"/api/workflows/{workflow_id}/packet/approve",
+            json={
+                "approval_id": approval_id,
+                "decision": "Approve packet for reinspection scheduling",
+            },
+            headers={"Idempotency-Key": "packet_approve_123"},
+        )
+        pdf = browser.get(f"/api/workflows/{workflow_id}/packet.pdf")
+
+    assert prepared.status_code == 200
+    assert prepared.json()["packet"]["status"] == "awaiting_approval"
+    assert blocked_download.status_code == 409
+    assert approved.status_code == 200
+    assert approved.json()["packet"]["status"] == "approved"
+    assert approval_replay.json() == approved.json()
+    assert pdf.status_code == 200
+    assert pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content.startswith(b"%PDF-")
+    text = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(pdf.content)).pages)
+    normalized_text = " ".join(text.split())
+    assert "CR-2026-0417" in text
+    assert "APPROVED BY CONTRACTOR" in text
+    assert "does not certify code compliance" in normalized_text

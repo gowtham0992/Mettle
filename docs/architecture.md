@@ -23,13 +23,15 @@ Strands agents translate unstructured input into the domain contracts. Their str
 
 ### Orchestration
 
-The working Strands graph runs `intake -> plan -> coordinate -> judgment gate -> contractor-directed coordination -> finish`. A graph interrupt pauses before code interpretation, returns a judgment card to the contractor, and resumes without replaying the initial outreach. Evidence verification and packet nodes are the next graph extension.
+The working Strands graph runs `intake -> plan -> coordinate -> judgment gate -> contractor-directed coordination -> finish`. A graph interrupt pauses before code interpretation, returns a judgment card to the contractor, and resumes without replaying the initial outreach. The application then binds notice-anchored evidence assessment and contractor-approved packet assembly to that workflow state.
 
 ### External ports
 
 SMS, object storage, model providers, and packet rendering live behind small interfaces. The demo begins with recording fakes. Twilio, Amazon S3, Amazon Bedrock, and AgentCore can replace those fakes independently.
 
 The evidence lab uses a trusted catalog of synthetic photo fixtures. A deterministic adapter maps observable requirements in the notice to server-controlled capabilities, rejects missing views or scale, and routes unknown requirement language to manual review. This is a safe contract test for the future Bedrock vision adapter; it does not infer code compliance.
+
+Packet generation begins only when the latest evidence for every citation is accepted. A separate final approval record blocks PDF download until the contractor approves the assembled packet. ReportLab renders the notice, evidence requirements, synthetic images, safety boundary, and communication record from validated server state; client-provided paths or filenames never reach the renderer.
 
 ### Local application boundary
 
@@ -53,8 +55,8 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 2. **Local Strands orchestration:** run deterministic contract nodes, recorded outreach, and a resumable human interrupt. **Complete.**
 3. **Recorded communication loop:** receive simulated SMS events with retry and idempotency behavior.
 4. **Evidence assessment:** compare synthetic photos to notice-anchored requirements and produce a specific re-request. **Local adapter complete.**
-5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval.
-6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF.
+5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
+6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF. **Complete.**
 7. **AWS deployment:** move the graph to AgentCore and add Bedrock, storage, memory, and observability.
 
 ## Decisions we can reverse later
