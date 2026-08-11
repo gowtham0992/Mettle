@@ -24,6 +24,14 @@ const elements = {
   demoStep: document.querySelector("#demo-step"),
   advance: document.querySelector("#advance-button"),
   reset: document.querySelector("#reset-button"),
+  loadNotice: document.querySelector("#load-notice-button"),
+  noticeDialog: document.querySelector("#notice-dialog"),
+  noticeForm: document.querySelector("#notice-form"),
+  noticeText: document.querySelector("#notice-text"),
+  workflowAsOf: document.querySelector("#workflow-as-of"),
+  workflowError: document.querySelector("#workflow-form-error"),
+  startWorkflow: document.querySelector("#start-workflow-button"),
+  closeNotice: document.querySelector("#close-notice-button"),
   retry: document.querySelector("#retry-button"),
   toast: document.querySelector("#toast"),
 };
@@ -39,6 +47,7 @@ const stepLabels = [
 ];
 
 let campaign = null;
+let activeWorkflowId = null;
 let toastTimer = null;
 
 function node(tag, className, text) {
@@ -60,6 +69,95 @@ function formatDate(value) {
 function formatTime(value) {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })
     .format(new Date(value));
+}
+
+function workflowCampaign(envelope) {
+  const snapshot = envelope.snapshot;
+  const notice = snapshot.notice;
+  const plan = snapshot.plan;
+  if (!notice || !plan) throw new Error("The workflow did not produce a notice and recovery plan.");
+
+  const deliveries = new Map(snapshot.deliveries.map((item) => [item.citation_id, item]));
+  const pendingInterrupt = snapshot.interrupts[0] || null;
+  const pendingJudgments = pendingInterrupt?.reason?.judgments || [];
+  const judgmentByCitation = new Map(pendingJudgments.map((item) => [item.citation_id, item]));
+  const timestamp = (hour, minute = 0) => `${plan.as_of}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00Z`;
+
+  const citations = notice.citations.map((citation) => {
+    const delivery = deliveries.get(citation.citation_id);
+    const needsJudgment = judgmentByCitation.has(citation.citation_id);
+    return {
+      ...citation,
+      assignee: delivery ? `${delivery.recipient.name} · ${delivery.recipient.phone}` : null,
+      evidence_note: needsJudgment
+        ? "Mettle needs an evidence-spec decision before outreach"
+        : delivery?.message_id.endsWith("-decision")
+          ? "Contractor-directed request recorded locally"
+          : delivery ? "Initial request recorded locally" : "No outreach until contractor review",
+      stage: needsJudgment ? "needs_judgment" : "awaiting_evidence",
+    };
+  });
+
+  const events = [
+    {
+      happened_at: timestamp(8, 14), kind: "notice_parsed", actor: "Mettle · intake",
+      title: `Parsed ${notice.citations.length} notice-anchored citations`,
+      detail: "The correction notice became the recovery docket without project setup.",
+    },
+    {
+      happened_at: timestamp(8, 15), kind: "plan_created", actor: "Mettle · planner",
+      title: `Built ${plan.actions.length} autonomous outreach actions`,
+      detail: `Cadence is anchored to the ${formatDate(notice.reinspection_due_on)} reinspection deadline.`,
+    },
+    ...snapshot.deliveries.map((delivery, index) => ({
+      happened_at: timestamp(8, 16 + index), kind: "message_recorded", actor: "Mettle · coordinator",
+      title: `${delivery.message_id.endsWith("-decision") ? "Recorded contractor-directed" : "Recorded"} C${delivery.citation_id} request for ${delivery.recipient.name}`,
+      detail: "Local delivery adapter used; no live SMS was sent.",
+    })),
+  ];
+  if (pendingInterrupt) {
+    events.push({
+      happened_at: timestamp(8, 19), kind: "judgment_requested", actor: "Mettle · judgment gate",
+      title: "Paused at contractor judgment",
+      detail: "Code interpretation stays with the licensed contractor.",
+    });
+  }
+  if (snapshot.contractor_decision) {
+    events.push({
+      happened_at: timestamp(8, 20), kind: "judgment_resolved", actor: "Contractor",
+      title: "Contractor decision recorded; graph resumed",
+      detail: snapshot.contractor_decision,
+    });
+  }
+
+  const judgments = pendingJudgments.length && pendingInterrupt ? [{
+    ...pendingJudgments[0],
+    judgment_id: pendingInterrupt.interrupt_id,
+    status: "pending",
+  }] : [];
+
+  return {
+    source_mode: "workflow",
+    workflow_status: snapshot.status,
+    notice_id: notice.notice_id,
+    property_label: notice.property_label,
+    as_of: plan.as_of,
+    days_remaining: plan.days_remaining,
+    priority: plan.priority,
+    citations,
+    events,
+    judgments,
+    packet_status: "blocked",
+    metrics: {
+      citations_ready: 0,
+      citations_total: citations.length,
+      messages_handled: snapshot.deliveries.length,
+      automated_actions: 2 + snapshot.deliveries.length,
+      contractor_decisions: snapshot.contractor_decision ? 1 : 0,
+    },
+    scenario_step: 0,
+    scenario_complete: true,
+  };
 }
 
 async function request(path, options = {}) {
@@ -172,10 +270,19 @@ function renderJudgment(judgment) {
     if (decision.length < 3) return;
     setBusy(button, true);
     try {
-      campaign = await request(`/api/judgments/${encodeURIComponent(judgment.judgment_id)}/resolve`, {
-        method: "POST",
-        body: JSON.stringify({ decision }),
-      });
+      if (activeWorkflowId) {
+        const envelope = await request(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/resume`, {
+          method: "POST",
+          headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
+          body: JSON.stringify({ interrupt_id: judgment.judgment_id, decision }),
+        });
+        campaign = workflowCampaign(envelope);
+      } else {
+        campaign = await request(`/api/judgments/${encodeURIComponent(judgment.judgment_id)}/resolve`, {
+          method: "POST",
+          body: JSON.stringify({ decision }),
+        });
+      }
       render(campaign);
       showToast("Your decision is logged. Mettle resumed the recovery run.");
     } catch (error) {
@@ -261,16 +368,29 @@ function render(data) {
 
   renderMetrics(data.metrics);
   renderPacket(data);
-  elements.demoStep.textContent = `${data.scenario_step} · ${stepLabels[data.scenario_step] || "RECOVERY RUN"}`;
-  elements.advance.disabled = data.scenario_complete;
+  const isWorkflow = data.source_mode === "workflow";
+  elements.demoStep.textContent = isWorkflow
+    ? `STRANDS · ${data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH RESUMED"}`
+    : `${data.scenario_step} · ${stepLabels[data.scenario_step] || "RECOVERY RUN"}`;
+  elements.advance.disabled = isWorkflow || data.scenario_complete;
   const advanceLabels = elements.advance.querySelectorAll("span");
-  advanceLabels[0].textContent = data.scenario_complete ? "Scenario complete" : "Run next agent event";
-  advanceLabels[1].textContent = data.scenario_complete ? "DONE ✓" : "NEXT ▸";
+  advanceLabels[0].textContent = isWorkflow ? "Real workflow active" : data.scenario_complete ? "Scenario complete" : "Run next agent event";
+  advanceLabels[1].textContent = isWorkflow ? "LIVE" : data.scenario_complete ? "DONE ✓" : "NEXT ▸";
+  elements.reset.querySelector("span").textContent = isWorkflow ? "RETURN TO DEMO" : "RESET";
 }
 
 async function loadCampaign() {
   elements.error.hidden = true;
-  try { render(await request("/api/campaign")); } catch (error) { showError(error); }
+  const workflowId = new URLSearchParams(window.location.search).get("workflow");
+  try {
+    if (workflowId) {
+      activeWorkflowId = workflowId;
+      render(workflowCampaign(await request(`/api/workflows/${encodeURIComponent(workflowId)}`)));
+    } else {
+      activeWorkflowId = null;
+      render(await request("/api/campaign"));
+    }
+  } catch (error) { showError(error); }
 }
 
 elements.advance.addEventListener("click", async () => {
@@ -298,6 +418,10 @@ elements.advance.addEventListener("click", async () => {
 elements.reset.addEventListener("click", async () => {
   setBusy(elements.reset, true);
   try {
+    if (activeWorkflowId) {
+      activeWorkflowId = null;
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     render(await request("/api/demo/reset", { method: "POST", body: "{}" }));
     showToast("Recovery run reset to the opening campaign.");
   } catch (error) {
@@ -307,8 +431,49 @@ elements.reset.addEventListener("click", async () => {
   }
 });
 
+elements.loadNotice.addEventListener("click", () => {
+  elements.workflowError.hidden = true;
+  elements.noticeDialog.showModal();
+  elements.noticeText.focus();
+});
+
+elements.closeNotice.addEventListener("click", () => elements.noticeDialog.close());
+
+elements.noticeForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const noticeText = elements.noticeText.value.trim();
+  if (!noticeText) return;
+  setBusy(elements.startWorkflow, true);
+  elements.workflowError.hidden = true;
+  try {
+    const envelope = await request("/api/workflows", {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
+      body: JSON.stringify({
+        notice_text: noticeText,
+        as_of: elements.workflowAsOf.value,
+        roster: [
+          { trade: "electrical", name: "Mike Alvarez", phone: "+13035550101" },
+          { trade: "framing", name: "Jen Ortiz", phone: "+13035550102" },
+          { trade: "mechanical", name: "Luis Vega", phone: "+13035550103" },
+        ],
+      }),
+    });
+    activeWorkflowId = envelope.workflow_id;
+    window.history.replaceState({}, "", `${window.location.pathname}?workflow=${encodeURIComponent(activeWorkflowId)}`);
+    render(workflowCampaign(envelope));
+    elements.noticeDialog.close();
+    showToast("Strands parsed the notice, recorded outreach, and paused only for your judgment.");
+  } catch (error) {
+    elements.workflowError.textContent = error.message;
+    elements.workflowError.hidden = false;
+  } finally {
+    setBusy(elements.startWorkflow, false);
+  }
+});
+
 document.addEventListener("keydown", (event) => {
-  if (event.target instanceof HTMLInputElement) return;
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || elements.noticeDialog.open) return;
   if (event.key === "ArrowRight" && !elements.advance.disabled) elements.advance.click();
   if (event.key.toLowerCase() === "r") elements.reset.click();
 });

@@ -103,9 +103,70 @@
     <div class="demo-driver" aria-label="Demo controls">
       <span class="demo-driver__tag">DEMO</span>
       <span id="demo-step">0 · OPENING CAMPAIGN</span>
+      <button class="demo-button" id="load-notice-button" type="button">＋ <span>LOAD NOTICE</span></button>
       <button class="demo-button" id="reset-button" type="button" title="Reset demo (R)">↺ <span>RESET</span></button>
       <button class="demo-button demo-button--next" id="advance-button" type="button"><span>Run next agent event</span><span aria-hidden="true">NEXT ▸</span></button>
     </div>
+
+    <dialog class="notice-dialog" id="notice-dialog" aria-labelledby="notice-dialog-title">
+      <form id="notice-form">
+        <div class="notice-dialog__header">
+          <div>
+            <p class="mono-label">NEW RECOVERY RUN · LOCAL STRANDS GRAPH</p>
+            <h2 id="notice-dialog-title">Load a failed-inspection notice</h2>
+          </div>
+          <button class="dialog-close" id="close-notice-button" type="button" aria-label="Close notice loader">×</button>
+        </div>
+        <p class="notice-dialog__intro">Mettle derives the citation docket and outreach plan directly from the notice. Messages are recorded locally—nothing is sent.</p>
+
+        <label class="field field--notice">
+          <span>CORRECTION NOTICE · PLAIN TEXT</span>
+          <textarea id="notice-text" name="notice_text" required maxlength="100000" spellcheck="false">NOTICE ID: CR-2026-0417
+ISSUED: 2026-08-07
+REINSPECTION DEADLINE: 2026-08-17
+PROPERTY: 100 Demo Way, Castle Pines, CO
+
+CITATION 1
+CODE: NEC 110.26
+TRADE: Electrical
+FINDING: Maintain the required working clearance in front of the service panel.
+EVIDENCE: Wide photo showing the complete service panel area; photo with a tape measure showing the clearance
+END CITATION
+
+CITATION 2
+CODE: IRC R602.6
+TRADE: Framing
+FINDING: Protect bored framing members where the edge distance is less than required.
+EVIDENCE: Close photo of each installed protection plate; wide photo identifying each corrected wall location
+END CITATION
+
+CITATION 3
+CODE: IMC 304.10
+TRADE: Mechanical
+FINDING: Provide clearance and service access at the installed mechanical equipment.
+END CITATION</textarea>
+        </label>
+
+        <div class="run-settings">
+          <label class="field">
+            <span>CAMPAIGN AS-OF</span>
+            <input id="workflow-as-of" name="as_of" type="date" value="2026-08-10" required>
+          </label>
+          <div class="roster-summary" aria-label="Synthetic trade roster">
+            <span class="roster-summary__label">SYNTHETIC TRADE ROSTER</span>
+            <span><b>Electrical</b> Mike Alvarez · +1 303 555 0101</span>
+            <span><b>Framing</b> Jen Ortiz · +1 303 555 0102</span>
+            <span><b>Mechanical</b> Luis Vega · +1 303 555 0103</span>
+          </div>
+        </div>
+
+        <p class="form-error" id="workflow-form-error" role="alert" hidden></p>
+        <div class="notice-dialog__footer">
+          <span>ZERO CONFIGURATION · NO LIVE SMS</span>
+          <button class="button button--orange" id="start-workflow-button" type="submit">Parse notice &amp; start recovery</button>
+        </div>
+      </form>
+    </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   </body>

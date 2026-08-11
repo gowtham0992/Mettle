@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from datetime import date
 from enum import StrEnum
+from hashlib import blake2s
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -213,15 +214,23 @@ class RecoveryWorkflowSession:
             "judgment_gate",
         )
         builder.add_node(
+            DeterministicNode(
+                name="coordinate_decision",
+                function=self._coordinate_decision,
+            ),
+            "coordinate_decision",
+        )
+        builder.add_node(
             DeterministicNode(name="finish", function=self._finish),
             "finish",
         )
         builder.add_edge("intake", "plan")
         builder.add_edge("plan", "coordinate")
         builder.add_edge("coordinate", "judgment_gate")
-        builder.add_edge("judgment_gate", "finish")
+        builder.add_edge("judgment_gate", "coordinate_decision")
+        builder.add_edge("coordinate_decision", "finish")
         builder.set_entry_point("intake")
-        builder.set_max_node_executions(5)
+        builder.set_max_node_executions(6)
         builder.set_execution_timeout(15)
         builder.set_hook_providers([ContractorJudgmentHook()])
         return builder.build()
@@ -272,14 +281,18 @@ class RecoveryWorkflowSession:
         deliveries: list[RecordedDelivery] = []
         for action in plan.actions:
             recipient = roster[action.trade]
+            delivery_token = blake2s(
+                f"{plan.notice_id}\0{action.citation_id}".encode("utf-8"),
+                digest_size=10,
+            ).hexdigest()
             delivery = messenger.send(
                 OutboundMessage(
-                    message_id=f"msg-{plan.notice_id}-c{action.citation_id}-initial",
+                    message_id=f"msg-{delivery_token}-initial",
                     notice_id=plan.notice_id,
                     citation_id=action.citation_id,
                     recipient=recipient,
                     body=action.message,
-                    idempotency_key=f"{plan.notice_id}:c{action.citation_id}:initial",
+                    idempotency_key=f"delivery:{delivery_token}:initial",
                     scheduled_on=action.due_on,
                 )
             )
@@ -292,6 +305,64 @@ class RecoveryWorkflowSession:
         _task: str | list[dict[str, Any]], state: dict[str, Any]
     ) -> str:
         return "Contractor judgment recorded." if state.get("contractor_decision") else "No judgment required."
+
+    @staticmethod
+    def _coordinate_decision(
+        _task: str | list[dict[str, Any]], state: dict[str, Any]
+    ) -> str:
+        decision = state.get("contractor_decision")
+        plan = state.get("plan")
+        notice = state.get("notice")
+        roster = state.get("roster")
+        messenger = state.get("messenger")
+        if not decision:
+            return "No contractor-directed outreach required."
+        if (
+            not isinstance(plan, CampaignPlan)
+            or not isinstance(notice, InspectionNotice)
+            or not isinstance(roster, dict)
+            or messenger is None
+        ):
+            raise WorkflowConfigurationError("decision coordination state is incomplete")
+
+        citations = {citation.citation_id: citation for citation in notice.citations}
+        deliveries = list(state.get("deliveries", []))
+        recorded = 0
+        for judgment in plan.judgments:
+            if judgment.citation_id is None:
+                continue
+            citation = citations.get(judgment.citation_id)
+            if citation is None:
+                raise WorkflowConfigurationError("judgment citation is missing from notice")
+            recipient = roster.get(citation.trade)
+            if recipient is None:
+                raise WorkflowConfigurationError(
+                    f"missing recipient for trade(s): {citation.trade.value}"
+                )
+            delivery_token = blake2s(
+                f"{plan.notice_id}\0{citation.citation_id}\0decision".encode("utf-8"),
+                digest_size=10,
+            ).hexdigest()
+            delivery = messenger.send(
+                OutboundMessage(
+                    message_id=f"msg-{delivery_token}-decision",
+                    notice_id=plan.notice_id,
+                    citation_id=citation.citation_id,
+                    recipient=recipient,
+                    body=(
+                        f'Notice: "{citation.notice_text}" '
+                        f'Contractor direction: "{decision}" '
+                        f"Reinspection target: {notice.reinspection_due_on.isoformat()}. "
+                        "Reply with the requested photos; Mettle does not certify compliance."
+                    ),
+                    idempotency_key=f"delivery:{delivery_token}:decision",
+                    scheduled_on=plan.as_of,
+                )
+            )
+            deliveries.append(delivery)
+            recorded += 1
+        state["deliveries"] = deliveries
+        return f"Recorded {recorded} contractor-directed trade messages."
 
     @staticmethod
     def _finish(_task: str | list[dict[str, Any]], state: dict[str, Any]) -> str:

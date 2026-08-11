@@ -2,13 +2,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Header, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from mettle.demo import DemoCampaign, DemoConflict, DemoNotFound, DemoStore
+from mettle.workflow import WorkflowConfigurationError
+from mettle.workflow_registry import (
+    CreateWorkflowRequest,
+    ResumeWorkflowRequest,
+    WorkflowCapacityReached,
+    WorkflowConflict,
+    WorkflowEnvelope,
+    WorkflowNotFound,
+    WorkflowRegistry,
+)
 
 
 STATIC_DIR = Path(__file__).with_name("static")
@@ -34,7 +44,11 @@ class ResolveJudgmentRequest(BaseModel):
         return normalized
 
 
-def create_app(*, store: DemoStore | None = None) -> FastAPI:
+def create_app(
+    *,
+    store: DemoStore | None = None,
+    workflows: WorkflowRegistry | None = None,
+) -> FastAPI:
     app = FastAPI(
         title="Mettle local demo",
         docs_url=None,
@@ -42,6 +56,7 @@ def create_app(*, store: DemoStore | None = None) -> FastAPI:
         openapi_url=None,
     )
     app.state.store = store or DemoStore()
+    app.state.workflows = workflows or WorkflowRegistry()
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -83,6 +98,49 @@ def create_app(*, store: DemoStore | None = None) -> FastAPI:
             content={"error": {"code": "conflict", "message": str(exc)}},
         )
 
+    @app.exception_handler(WorkflowNotFound)
+    async def workflow_not_found(_request: Request, exc: WorkflowNotFound):
+        return JSONResponse(
+            status_code=404,
+            content={
+                "error": {"code": "workflow_not_found", "message": str(exc)}
+            },
+        )
+
+    @app.exception_handler(WorkflowConflict)
+    async def workflow_conflict(_request: Request, exc: WorkflowConflict):
+        return JSONResponse(
+            status_code=409,
+            content={
+                "error": {"code": "idempotency_conflict", "message": str(exc)}
+            },
+        )
+
+    @app.exception_handler(WorkflowCapacityReached)
+    async def workflow_capacity(_request: Request, exc: WorkflowCapacityReached):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": {"code": "workflow_capacity_reached", "message": str(exc)}
+            },
+            headers={"Retry-After": "60"},
+        )
+
+    @app.exception_handler(WorkflowConfigurationError)
+    async def workflow_configuration(
+        _request: Request,
+        exc: WorkflowConfigurationError,
+    ):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "code": "workflow_configuration_error",
+                    "message": str(exc),
+                }
+            },
+        )
+
     @app.get("/", include_in_schema=False)
     async def index() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
@@ -114,6 +172,52 @@ def create_app(*, store: DemoStore | None = None) -> FastAPI:
         return request.app.state.store.resolve_judgment(
             judgment_id,
             decision=payload.decision,
+        )
+
+    @app.post("/api/workflows", response_model=WorkflowEnvelope)
+    def create_workflow(
+        payload: CreateWorkflowRequest,
+        request: Request,
+        response: Response,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        envelope, replayed = request.app.state.workflows.create(
+            payload,
+            idempotency_key=idempotency_key,
+        )
+        response.status_code = 200 if replayed else 201
+        return envelope
+
+    @app.get("/api/workflows/{workflow_id}", response_model=WorkflowEnvelope)
+    def get_workflow(workflow_id: str, request: Request) -> WorkflowEnvelope:
+        if not workflow_id or len(workflow_id) > 64:
+            raise WorkflowNotFound("workflow does not exist")
+        return request.app.state.workflows.get(workflow_id)
+
+    @app.post(
+        "/api/workflows/{workflow_id}/resume",
+        response_model=WorkflowEnvelope,
+    )
+    def resume_workflow(
+        workflow_id: str,
+        payload: ResumeWorkflowRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        if not workflow_id or len(workflow_id) > 64:
+            raise WorkflowNotFound("workflow does not exist")
+        return request.app.state.workflows.resume(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
         )
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

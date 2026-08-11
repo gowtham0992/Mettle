@@ -23,11 +23,15 @@ Strands agents translate unstructured input into the domain contracts. Their str
 
 ### Orchestration
 
-A Strands graph will run `intake -> plan -> coordinate -> verify -> packet`. Before code interpretation and final approval nodes, graph interrupts pause execution and return a judgment card to the contractor.
+The working Strands graph runs `intake -> plan -> coordinate -> judgment gate -> contractor-directed coordination -> finish`. A graph interrupt pauses before code interpretation, returns a judgment card to the contractor, and resumes without replaying the initial outreach. Evidence verification and packet nodes are the next graph extension.
 
 ### External ports
 
 SMS, object storage, model providers, and packet rendering live behind small interfaces. The demo begins with recording fakes. Twilio, Amazon S3, Amazon Bedrock, and AgentCore can replace those fakes independently.
+
+### Local application boundary
+
+FastAPI exposes bounded workflow creation, retrieval, and resume endpoints to the command center. A thread-safe in-memory registry owns each stateful Strands session, caps the number of runs, and protects create and resume operations with idempotency keys. It is a development boundary, not durable production storage.
 
 ## Why this structure
 
@@ -44,8 +48,8 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 ## Risk-ordered build slices
 
 1. **Notice to campaign plan:** prove traceable extraction, deadline behavior, and judgment routing without a model.
-2. **Strands intake:** replace deterministic extraction with validated structured output while retaining the same contract.
-3. **Recorded communication loop:** send and receive simulated SMS events with retry and idempotency behavior.
+2. **Local Strands orchestration:** run deterministic contract nodes, recorded outreach, and a resumable human interrupt. **Complete.**
+3. **Recorded communication loop:** receive simulated SMS events with retry and idempotency behavior.
 4. **Evidence assessment:** compare synthetic photos to notice-anchored requirements and produce a specific re-request.
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval.
 6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF.
@@ -53,4 +57,4 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 
 ## Decisions we can reverse later
 
-The web framework, database, SMS provider, and frontend stack are intentionally undecided. They do not affect the first slice's domain contract. We will select them when a vertical slice needs them rather than pre-building infrastructure.
+The database, SMS provider, and production frontend hosting remain intentionally undecided. FastAPI and the dependency-free browser interface are established for the local demo, but neither constrains the external ports.
