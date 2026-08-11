@@ -1,0 +1,1 @@
+"""Local Mettle demo application."""

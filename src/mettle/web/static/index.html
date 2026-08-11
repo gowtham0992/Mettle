@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#191d20">
+    <title>Mettle · Recovery command center</title>
+    <link rel="icon" href="/static/mettle-icon.png" type="image/png">
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to campaign</a>
+
+    <header class="command-band">
+      <a class="brand" href="/" aria-label="Mettle home">
+        <img src="/static/mettle-icon.png" alt="" width="44" height="44">
+        <span>Mettle</span>
+      </a>
+      <div class="job-identity">
+        <span class="mono-label">FAILED INSPECTION RECOVERY</span>
+        <strong id="property-label">Loading campaign…</strong>
+        <span id="notice-id">—</span>
+      </div>
+      <div class="condition" aria-live="polite">
+        <span class="condition__dot"></span>
+        <span id="condition-label">READING NOTICE</span>
+      </div>
+      <div class="countdown" aria-live="polite">
+        <span class="countdown__number" id="days-remaining">—</span>
+        <span class="countdown__copy">DAYS<br>TO REINSPECTION</span>
+      </div>
+    </header>
+
+    <section class="campaign-strip" aria-label="Campaign status">
+      <div>
+        <span class="campaign-strip__dot"></span>
+        <span id="cadence-label">NORMAL FOLLOW-UP · DAILY CHECK-INS</span>
+      </div>
+      <div class="progress-block">
+        <span id="progress-label">Loading progress</span>
+        <div class="progress-track" aria-hidden="true"><span id="progress-bar"></span></div>
+      </div>
+      <span id="as-of-date">—</span>
+    </section>
+
+    <main id="main" class="shell">
+      <div id="error-banner" class="error-banner" role="alert" hidden>
+        <div><strong>Campaign connection interrupted</strong><p id="error-message">The local API did not respond.</p></div>
+        <button class="button button--outline" id="retry-button" type="button">Retry</button>
+      </div>
+
+      <div id="loading-state" class="loading-grid" aria-label="Loading campaign">
+        <div class="skeleton skeleton--wide"></div><div class="skeleton"></div>
+      </div>
+
+      <div id="dashboard" class="dashboard" hidden>
+        <section class="main-column" aria-labelledby="docket-title">
+          <div class="section-heading">
+            <div><span class="section-index">01</span><h1 id="docket-title">Citation dockets</h1></div>
+            <span class="section-heading__meta">NOTICE-ANCHORED · ZERO PROJECT SETUP</span>
+          </div>
+          <div id="citation-list" class="citation-list"></div>
+
+          <section class="absorbed" aria-labelledby="absorbed-title">
+            <p class="mono-label" id="absorbed-title">WHAT METTLE ABSORBED — THIS RECOVERY RUN</p>
+            <dl id="metrics-list" class="metrics-list"></dl>
+          </section>
+        </section>
+
+        <aside class="side-column" aria-label="Decisions, packet, and recovery log">
+          <section class="panel judgment-panel">
+            <div class="panel__header">
+              <div><span class="section-index">02</span><h2>Needs you</h2></div>
+              <span class="count-badge" id="judgment-count">0</span>
+            </div>
+            <p class="panel__kicker">JUDGMENT INBOX · METTLE INTERRUPTS ONLY WHEN IT MUST</p>
+            <div id="judgment-list" class="judgment-list"></div>
+          </section>
+
+          <section class="panel packet-panel">
+            <div class="panel__header">
+              <div><span class="section-index">03</span><h2>Reinspection packet</h2></div>
+              <strong id="packet-status" class="packet-stamp">LOCKED</strong>
+            </div>
+            <div id="packet-list" class="packet-list"></div>
+            <p class="packet-note">Assembles as evidence is accepted. Nothing reaches the inspector until you approve it.</p>
+          </section>
+
+          <section class="panel log-panel">
+            <div class="panel__header">
+              <div><span class="section-index">04</span><h2>Recovery log</h2></div>
+            </div>
+            <p class="panel__kicker">WHAT METTLE DID, AND WHY</p>
+            <ol id="event-list" class="event-list"></ol>
+          </section>
+
+          <p class="safety-note"><span aria-hidden="true">◆</span>Mettle cites the notice. It never certifies code compliance or contacts the inspector without approval.</p>
+        </aside>
+      </div>
+    </main>
+
+    <div class="demo-driver" aria-label="Demo controls">
+      <span class="demo-driver__tag">DEMO</span>
+      <span id="demo-step">0 · OPENING CAMPAIGN</span>
+      <button class="demo-button" id="reset-button" type="button" title="Reset demo (R)">↺ <span>RESET</span></button>
+      <button class="demo-button demo-button--next" id="advance-button" type="button"><span>Run next agent event</span><span aria-hidden="true">NEXT ▸</span></button>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

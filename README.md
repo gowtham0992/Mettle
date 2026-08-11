@@ -16,6 +16,8 @@ The repository currently runs without AWS credentials or paid model calls. It ca
 - increase urgency as the reinspection deadline approaches; and
 - route missing or ambiguous requirements to a judgment queue.
 
+It also includes a local recovery command center with a deterministic, six-event demo scenario: accepted evidence, rejected evidence with a precise re-request, deadline escalation, human judgment, and a contractor-approved final packet.
+
 The deterministic core is intentional. Strands and Bedrock will provide agentic extraction, communication, evidence review, and orchestration, while the domain rules remain testable without a model.
 
 ## Run it locally
@@ -25,8 +27,11 @@ Use Python 3.12 and [`uv`](https://docs.astral.sh/uv/):
 ```bash
 uv sync --extra dev
 uv run mettle ingest examples/notices/failed-rough-in.txt --as-of 2026-08-10
+uv run mettle serve
 uv run pytest
 ```
+
+Open [http://127.0.0.1:4310](http://127.0.0.1:4310) after starting the server. The demo binds only to the local machine.
 
 AWS integration is optional until credits arrive:
 

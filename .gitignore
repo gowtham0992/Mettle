@@ -18,6 +18,9 @@ build/
 devpost-submission.md
 docs/hackathon-build/
 
+# Local design-source export; production assets are imported under web/static
+Logo file and HTML usage.zip
+
 # Credentials and local runtime artifacts
 .aws/
 artifacts/
