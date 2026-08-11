@@ -29,6 +29,8 @@ The working Strands graph runs `intake -> plan -> coordinate -> judgment gate ->
 
 SMS, object storage, model providers, and packet rendering live behind small interfaces. The demo begins with recording fakes. Twilio, Amazon S3, Amazon Bedrock, and AgentCore can replace those fakes independently.
 
+The evidence lab uses a trusted catalog of synthetic photo fixtures. A deterministic adapter maps observable requirements in the notice to server-controlled capabilities, rejects missing views or scale, and routes unknown requirement language to manual review. This is a safe contract test for the future Bedrock vision adapter; it does not infer code compliance.
+
 ### Local application boundary
 
 FastAPI exposes bounded workflow creation, retrieval, and resume endpoints to the command center. A thread-safe in-memory registry owns each stateful Strands session, caps the number of runs, and protects create and resume operations with idempotency keys. It is a development boundary, not durable production storage.
@@ -50,7 +52,7 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 1. **Notice to campaign plan:** prove traceable extraction, deadline behavior, and judgment routing without a model.
 2. **Local Strands orchestration:** run deterministic contract nodes, recorded outreach, and a resumable human interrupt. **Complete.**
 3. **Recorded communication loop:** receive simulated SMS events with retry and idempotency behavior.
-4. **Evidence assessment:** compare synthetic photos to notice-anchored requirements and produce a specific re-request.
+4. **Evidence assessment:** compare synthetic photos to notice-anchored requirements and produce a specific re-request. **Local adapter complete.**
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval.
 6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF.
 7. **AWS deployment:** move the graph to AgentCore and add Bedrock, storage, memory, and observability.

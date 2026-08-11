@@ -130,6 +130,18 @@ h2 { font-size: 13px; font-weight: 900; }
 .button--orange:hover:not(:disabled) { background: var(--charcoal); color: var(--paper); }
 .judgment--resolved { border-top-color: var(--moss); background: var(--moss-wash); }
 .judgment--resolved p { margin-bottom: 0; color: var(--moss); font-weight: 700; }
+.evidence-panel__mode { padding: 4px 6px; border-radius: 2px; background: var(--amber-wash); color: var(--amber); font: 700 8px/1 var(--mono); letter-spacing: 1px; }
+.evidence-fixtures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.evidence-fixture { overflow: hidden; display: grid; align-content: start; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.evidence-fixture img { width: 100%; height: 132px; display: block; object-fit: cover; background: var(--well); }
+.evidence-fixture > div { min-height: 69px; display: grid; align-content: start; gap: 4px; padding: 10px; }
+.evidence-fixture strong { font-size: 11px; }
+.evidence-fixture span { color: var(--faint); font: 9px/1.45 var(--mono); }
+.evidence-fixture .button { min-height: 36px; margin: 0 9px 9px; padding: 7px; font-size: 10px; }
+.evidence-result { margin-top: 10px; padding: 11px 12px; border-left: 3px solid var(--moss); background: var(--moss-wash); color: var(--moss); font-size: 11px; line-height: 1.45; }
+.evidence-result--rejected { border-left-color: var(--oxide); background: var(--oxide-wash); color: var(--oxide); }
+.evidence-result--manual_review { border-left-color: var(--amber); background: var(--amber-wash); color: var(--amber); }
+.evidence-result strong { display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .6px; }
 .empty-state { padding: 20px 16px; border: 1.5px dashed #c4bfa8; border-radius: var(--radius); background: #f1ede0; text-align: center; }
 .empty-state::before { content: ""; display: block; width: 9px; height: 9px; margin: 0 auto 8px; border-radius: 50%; background: var(--moss); }
 .empty-state strong { display: block; margin-bottom: 5px; font-size: 13px; }
@@ -263,6 +275,9 @@ h2 { font-size: 13px; font-weight: 900; }
   .demo-driver__tag { display: none; }
   .notice-dialog__footer { align-items: stretch; flex-direction: column; }
   .notice-dialog__footer .button { width: 100%; }
+  .evidence-fixtures { grid-template-columns: 1fr; }
+  .evidence-fixture { grid-template-columns: 105px minmax(0, 1fr); }
+  .evidence-fixture img { height: 100%; min-height: 125px; grid-row: 1 / span 2; }
 }
 
 @media (prefers-reduced-motion: reduce) {

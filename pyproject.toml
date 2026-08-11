@@ -28,7 +28,7 @@ mettle = "mettle.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-mettle = ["web/static/*"]
+mettle = ["web/static/*", "web/static/evidence/*"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

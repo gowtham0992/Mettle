@@ -12,7 +12,9 @@ from mettle.demo import DemoCampaign, DemoConflict, DemoNotFound, DemoStore
 from mettle.workflow import WorkflowConfigurationError
 from mettle.workflow_registry import (
     CreateWorkflowRequest,
+    EvidenceSubmissionError,
     ResumeWorkflowRequest,
+    SubmitEvidenceRequest,
     WorkflowCapacityReached,
     WorkflowConflict,
     WorkflowEnvelope,
@@ -141,6 +143,21 @@ def create_app(
             },
         )
 
+    @app.exception_handler(EvidenceSubmissionError)
+    async def evidence_submission(
+        _request: Request,
+        exc: EvidenceSubmissionError,
+    ):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "code": "invalid_evidence_submission",
+                    "message": str(exc),
+                }
+            },
+        )
+
     @app.get("/", include_in_schema=False)
     async def index() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
@@ -215,6 +232,28 @@ def create_app(
         if not workflow_id or len(workflow_id) > 64:
             raise WorkflowNotFound("workflow does not exist")
         return request.app.state.workflows.resume(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
+        "/api/workflows/{workflow_id}/evidence",
+        response_model=WorkflowEnvelope,
+    )
+    def submit_evidence(
+        workflow_id: str,
+        payload: SubmitEvidenceRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        if not workflow_id or len(workflow_id) > 64:
+            raise WorkflowNotFound("workflow does not exist")
+        return request.app.state.workflows.submit_evidence(
             workflow_id,
             payload,
             idempotency_key=idempotency_key,

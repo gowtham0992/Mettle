@@ -78,9 +78,30 @@
             <div id="judgment-list" class="judgment-list"></div>
           </section>
 
+          <section class="panel evidence-panel" id="evidence-panel" hidden>
+            <div class="panel__header">
+              <div><span class="section-index">03</span><h2>Evidence lab</h2></div>
+              <span class="evidence-panel__mode">SYNTHETIC</span>
+            </div>
+            <p class="panel__kicker">SIMULATE THE NEXT PHOTO FROM THE ELECTRICAL TRADE</p>
+            <div class="evidence-fixtures">
+              <article class="evidence-fixture">
+                <img src="/static/evidence/panel-closeup-insufficient.png" alt="Synthetic close-up of an electrical panel that does not show working clearance">
+                <div><strong>Tight close-up</strong><span>No scale or full working area</span></div>
+                <button class="button button--outline evidence-submit" type="button" data-sample="panel_closeup_insufficient">Assess close-up</button>
+              </article>
+              <article class="evidence-fixture">
+                <img src="/static/evidence/panel-wide-measured.png" alt="Synthetic wide view of an electrical panel with a tape measure showing clearance">
+                <div><strong>Wide + measured</strong><span>Full panel area and visible scale</span></div>
+                <button class="button evidence-submit" type="button" data-sample="panel_wide_measured">Assess wide photo</button>
+              </article>
+            </div>
+            <div class="evidence-result" id="evidence-result" aria-live="polite" hidden></div>
+          </section>
+
           <section class="panel packet-panel">
             <div class="panel__header">
-              <div><span class="section-index">03</span><h2>Reinspection packet</h2></div>
+              <div><span class="section-index">04</span><h2>Reinspection packet</h2></div>
               <strong id="packet-status" class="packet-stamp">LOCKED</strong>
             </div>
             <div id="packet-list" class="packet-list"></div>
@@ -89,7 +110,7 @@
 
           <section class="panel log-panel">
             <div class="panel__header">
-              <div><span class="section-index">04</span><h2>Recovery log</h2></div>
+              <div><span class="section-index">05</span><h2>Recovery log</h2></div>
             </div>
             <p class="panel__kicker">WHAT METTLE DID, AND WHY</p>
             <ol id="event-list" class="event-list"></ol>

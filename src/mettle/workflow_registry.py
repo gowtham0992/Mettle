@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from mettle.communication import Recipient, RecordingMessenger
 from mettle.domain import Trade
+from mettle.evidence import EvidenceAssessment, EvidenceSampleNotFound, assess_sample
 from mettle.workflow import (
     RecoveryWorkflowSession,
     WorkflowSnapshot,
@@ -26,6 +27,10 @@ class WorkflowConflict(RuntimeError):
 
 class WorkflowCapacityReached(RuntimeError):
     """Raised when the bounded local registry is full."""
+
+
+class EvidenceSubmissionError(RuntimeError):
+    """Raised when evidence cannot be assessed for the selected workflow."""
 
 
 class WorkflowRosterEntry(BaseModel):
@@ -60,11 +65,23 @@ class ResumeWorkflowRequest(BaseModel):
     decision: str = Field(min_length=3, max_length=500)
 
 
+class SubmitEvidenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    citation_id: str = Field(min_length=1, max_length=50)
+    sample_id: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z0-9_]+$",
+    )
+
+
 class WorkflowEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     workflow_id: str
     snapshot: WorkflowSnapshot
+    evidence: list[EvidenceAssessment] = Field(default_factory=list)
 
 
 class _WorkflowEntry:
@@ -72,7 +89,9 @@ class _WorkflowEntry:
         self.session = session
         self.snapshot = snapshot
         self.lock = Lock()
-        self.resume_replays: dict[str, tuple[str, WorkflowSnapshot]] = {}
+        self.resume_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
+        self.evidence: list[EvidenceAssessment] = []
+        self.evidence_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
 
 
 def _fingerprint(model: BaseModel) -> str:
@@ -89,7 +108,7 @@ class WorkflowRegistry:
         self._capacity = capacity
         self._lock = Lock()
         self._entries: dict[str, _WorkflowEntry] = {}
-        self._create_replays: dict[str, tuple[str, str]] = {}
+        self._create_replays: dict[str, tuple[str, str, WorkflowEnvelope]] = {}
 
     def create(
         self,
@@ -101,13 +120,12 @@ class WorkflowRegistry:
         with self._lock:
             replay = self._create_replays.get(idempotency_key)
             if replay is not None:
-                existing_fingerprint, workflow_id = replay
+                existing_fingerprint, workflow_id, envelope = replay
                 if existing_fingerprint != fingerprint:
                     raise WorkflowConflict(
                         "idempotency key was already used with a different workflow request"
                     )
-                entry = self._entries[workflow_id]
-                return self._envelope(workflow_id, entry.snapshot), True
+                return envelope.model_copy(deep=True), True
 
             if len(self._entries) >= self._capacity:
                 raise WorkflowCapacityReached("local workflow capacity has been reached")
@@ -125,15 +143,20 @@ class WorkflowRegistry:
             snapshot = session.start()
             workflow_id = token_urlsafe(12)
             self._entries[workflow_id] = _WorkflowEntry(session, snapshot)
-            self._create_replays[idempotency_key] = (fingerprint, workflow_id)
-            return self._envelope(workflow_id, snapshot), False
+            envelope = self._envelope(workflow_id, self._entries[workflow_id])
+            self._create_replays[idempotency_key] = (
+                fingerprint,
+                workflow_id,
+                envelope,
+            )
+            return envelope, False
 
     def get(self, workflow_id: str) -> WorkflowEnvelope:
         with self._lock:
             entry = self._entries.get(workflow_id)
             if entry is None:
                 raise WorkflowNotFound("workflow does not exist")
-            return self._envelope(workflow_id, entry.snapshot)
+            return self._envelope(workflow_id, entry)
 
     def resume(
         self,
@@ -151,12 +174,12 @@ class WorkflowRegistry:
         with entry.lock:
             replay = entry.resume_replays.get(idempotency_key)
             if replay is not None:
-                existing_fingerprint, snapshot = replay
+                existing_fingerprint, envelope = replay
                 if existing_fingerprint != fingerprint:
                     raise WorkflowConflict(
                         "idempotency key was already used with a different resume request"
                     )
-                return self._envelope(workflow_id, snapshot)
+                return envelope.model_copy(deep=True)
 
             try:
                 snapshot = entry.session.resume(
@@ -166,12 +189,63 @@ class WorkflowRegistry:
             except WorkflowStateError as exc:
                 raise WorkflowConflict(str(exc)) from exc
             entry.snapshot = snapshot
-            entry.resume_replays[idempotency_key] = (fingerprint, snapshot)
-            return self._envelope(workflow_id, snapshot)
+            envelope = self._envelope(workflow_id, entry)
+            entry.resume_replays[idempotency_key] = (fingerprint, envelope)
+            return envelope
+
+    def submit_evidence(
+        self,
+        workflow_id: str,
+        payload: SubmitEvidenceRequest,
+        *,
+        idempotency_key: str,
+    ) -> WorkflowEnvelope:
+        with self._lock:
+            entry = self._entries.get(workflow_id)
+        if entry is None:
+            raise WorkflowNotFound("workflow does not exist")
+
+        fingerprint = _fingerprint(payload)
+        with entry.lock:
+            replay = entry.evidence_replays.get(idempotency_key)
+            if replay is not None:
+                existing_fingerprint, envelope = replay
+                if existing_fingerprint != fingerprint:
+                    raise WorkflowConflict(
+                        "idempotency key was already used with different evidence"
+                    )
+                return envelope.model_copy(deep=True)
+
+            notice = entry.snapshot.notice
+            if notice is None:
+                raise EvidenceSubmissionError("workflow notice is not available")
+            citation = next(
+                (
+                    item
+                    for item in notice.citations
+                    if item.citation_id == payload.citation_id
+                ),
+                None,
+            )
+            if citation is None:
+                raise EvidenceSubmissionError("citation does not belong to this workflow")
+            try:
+                assessment = assess_sample(
+                    citation=citation,
+                    sample_id=payload.sample_id,
+                    assessment_id=f"evidence-{token_urlsafe(9)}",
+                )
+            except EvidenceSampleNotFound as exc:
+                raise EvidenceSubmissionError(str(exc)) from exc
+            entry.evidence.append(assessment)
+            envelope = self._envelope(workflow_id, entry)
+            entry.evidence_replays[idempotency_key] = (fingerprint, envelope)
+            return envelope
 
     @staticmethod
-    def _envelope(workflow_id: str, snapshot: WorkflowSnapshot) -> WorkflowEnvelope:
+    def _envelope(workflow_id: str, entry: _WorkflowEntry) -> WorkflowEnvelope:
         return WorkflowEnvelope(
             workflow_id=workflow_id,
-            snapshot=snapshot.model_copy(deep=True),
+            snapshot=entry.snapshot.model_copy(deep=True),
+            evidence=[item.model_copy(deep=True) for item in entry.evidence],
         )

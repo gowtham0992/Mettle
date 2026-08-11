@@ -181,3 +181,62 @@ def test_workflow_api_explains_missing_trade_configuration() -> None:
         "code": "workflow_configuration_error",
         "message": "missing recipient for trade(s): framing",
     }
+
+
+def test_evidence_api_rejects_then_accepts_notice_anchored_samples() -> None:
+    with client() as browser:
+        create_headers = {"Idempotency-Key": "evidence_workflow_123"}
+        created_response = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers=create_headers,
+        )
+        created = created_response.json()
+        workflow_id = created["workflow_id"]
+        rejected = browser.post(
+            f"/api/workflows/{workflow_id}/evidence",
+            json={"citation_id": "1", "sample_id": "panel_closeup_insufficient"},
+            headers={"Idempotency-Key": "evidence_closeup_123"},
+        )
+        accepted = browser.post(
+            f"/api/workflows/{workflow_id}/evidence",
+            json={"citation_id": "1", "sample_id": "panel_wide_measured"},
+            headers={"Idempotency-Key": "evidence_wide_123"},
+        )
+        create_replay = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers=create_headers,
+        )
+
+    assert rejected.status_code == 200
+    assert rejected.json()["evidence"][-1]["status"] == "rejected"
+    assert len(rejected.json()["evidence"][-1]["missing_requirements"]) == 2
+    assert accepted.status_code == 200
+    assert accepted.json()["evidence"][-1]["status"] == "accepted"
+    assert accepted.json()["evidence"][-1]["missing_requirements"] == []
+    assert create_replay.json() == created_response.json()
+    assert create_replay.json()["evidence"] == []
+
+
+def test_evidence_replay_is_idempotent_and_changed_replay_conflicts() -> None:
+    with client() as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "evidence_workflow_456"},
+        ).json()
+        path = f"/api/workflows/{created['workflow_id']}/evidence"
+        headers = {"Idempotency-Key": "evidence_replay_456"}
+        payload = {"citation_id": "1", "sample_id": "panel_closeup_insufficient"}
+        first = browser.post(path, json=payload, headers=headers)
+        replay = browser.post(path, json=payload, headers=headers)
+        changed = browser.post(
+            path,
+            json={"citation_id": "1", "sample_id": "panel_wide_measured"},
+            headers=headers,
+        )
+
+    assert replay.json() == first.json()
+    assert len(replay.json()["evidence"]) == 1
+    assert changed.status_code == 409

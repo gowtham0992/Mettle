@@ -18,6 +18,9 @@ const elements = {
   events: document.querySelector("#event-list"),
   judgments: document.querySelector("#judgment-list"),
   judgmentCount: document.querySelector("#judgment-count"),
+  evidencePanel: document.querySelector("#evidence-panel"),
+  evidenceResult: document.querySelector("#evidence-result"),
+  evidenceButtons: [...document.querySelectorAll(".evidence-submit")],
   metrics: document.querySelector("#metrics-list"),
   packet: document.querySelector("#packet-status"),
   packetList: document.querySelector("#packet-list"),
@@ -78,6 +81,8 @@ function workflowCampaign(envelope) {
   if (!notice || !plan) throw new Error("The workflow did not produce a notice and recovery plan.");
 
   const deliveries = new Map(snapshot.deliveries.map((item) => [item.citation_id, item]));
+  const evidenceByCitation = new Map();
+  for (const assessment of envelope.evidence || []) evidenceByCitation.set(assessment.citation_id, assessment);
   const pendingInterrupt = snapshot.interrupts[0] || null;
   const pendingJudgments = pendingInterrupt?.reason?.judgments || [];
   const judgmentByCitation = new Map(pendingJudgments.map((item) => [item.citation_id, item]));
@@ -85,16 +90,20 @@ function workflowCampaign(envelope) {
 
   const citations = notice.citations.map((citation) => {
     const delivery = deliveries.get(citation.citation_id);
+    const assessment = evidenceByCitation.get(citation.citation_id);
     const needsJudgment = judgmentByCitation.has(citation.citation_id);
+    const assessedStage = assessment?.status === "accepted"
+      ? "ready"
+      : assessment?.status === "rejected" ? "evidence_rejected" : null;
     return {
       ...citation,
       assignee: delivery ? `${delivery.recipient.name} · ${delivery.recipient.phone}` : null,
-      evidence_note: needsJudgment
+      evidence_note: assessment?.explanation || (needsJudgment
         ? "Mettle needs an evidence-spec decision before outreach"
         : delivery?.message_id.endsWith("-decision")
           ? "Contractor-directed request recorded locally"
-          : delivery ? "Initial request recorded locally" : "No outreach until contractor review",
-      stage: needsJudgment ? "needs_judgment" : "awaiting_evidence",
+          : delivery ? "Initial request recorded locally" : "No outreach until contractor review"),
+      stage: assessedStage || (needsJudgment ? "needs_judgment" : "awaiting_evidence"),
     };
   });
 
@@ -129,6 +138,15 @@ function workflowCampaign(envelope) {
       detail: snapshot.contractor_decision,
     });
   }
+  for (const [index, assessment] of (envelope.evidence || []).entries()) {
+    events.push({
+      happened_at: timestamp(9, index),
+      kind: `evidence_${assessment.status}`,
+      actor: "Mettle · evidence assessor",
+      title: `${assessment.status === "accepted" ? "Accepted" : assessment.status === "rejected" ? "Rejected" : "Held"} C${assessment.citation_id} photo evidence`,
+      detail: assessment.explanation,
+    });
+  }
 
   const judgments = pendingJudgments.length && pendingInterrupt ? [{
     ...pendingJudgments[0],
@@ -136,6 +154,7 @@ function workflowCampaign(envelope) {
     status: "pending",
   }] : [];
 
+  const citationsReady = [...evidenceByCitation.values()].filter((item) => item.status === "accepted").length;
   return {
     source_mode: "workflow",
     workflow_status: snapshot.status,
@@ -145,14 +164,15 @@ function workflowCampaign(envelope) {
     days_remaining: plan.days_remaining,
     priority: plan.priority,
     citations,
+    evidence: envelope.evidence || [],
     events,
     judgments,
     packet_status: "blocked",
     metrics: {
-      citations_ready: 0,
+      citations_ready: citationsReady,
       citations_total: citations.length,
       messages_handled: snapshot.deliveries.length,
-      automated_actions: 2 + snapshot.deliveries.length,
+      automated_actions: 2 + snapshot.deliveries.length + (envelope.evidence || []).length,
       contractor_decisions: snapshot.contractor_decision ? 1 : 0,
     },
     scenario_step: 0,
@@ -369,6 +389,18 @@ function render(data) {
   renderMetrics(data.metrics);
   renderPacket(data);
   const isWorkflow = data.source_mode === "workflow";
+  elements.evidencePanel.hidden = !isWorkflow;
+  if (isWorkflow) {
+    const latestEvidence = data.evidence.at(-1);
+    elements.evidenceResult.hidden = !latestEvidence;
+    if (latestEvidence) {
+      elements.evidenceResult.className = `evidence-result evidence-result--${latestEvidence.status}`;
+      elements.evidenceResult.replaceChildren(
+        node("strong", "", latestEvidence.status.replaceAll("_", " ")),
+        node("span", "", latestEvidence.explanation),
+      );
+    }
+  }
   elements.demoStep.textContent = isWorkflow
     ? `STRANDS · ${data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH RESUMED"}`
     : `${data.scenario_step} · ${stepLabels[data.scenario_step] || "RECOVERY RUN"}`;
@@ -471,6 +503,30 @@ elements.noticeForm.addEventListener("submit", async (event) => {
     setBusy(elements.startWorkflow, false);
   }
 });
+
+for (const button of elements.evidenceButtons) {
+  button.addEventListener("click", async () => {
+    if (!activeWorkflowId) return;
+    setBusy(button, true);
+    try {
+      const envelope = await request(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/evidence`, {
+        method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
+        body: JSON.stringify({ citation_id: "1", sample_id: button.dataset.sample }),
+      });
+      campaign = workflowCampaign(envelope);
+      render(campaign);
+      const result = envelope.evidence.at(-1);
+      showToast(result.status === "accepted"
+        ? "Evidence accepted for sufficiency. Mettle still does not certify compliance."
+        : "Evidence rejected. Mettle produced a notice-specific re-request.");
+    } catch (error) {
+      showError(error);
+    } finally {
+      setBusy(button, false);
+    }
+  });
+}
 
 document.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || elements.noticeDialog.open) return;
