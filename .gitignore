@@ -1,0 +1,24 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Local hackathon workflow state and private submission drafts
+.devpost-hackathon-state.json
+devpost-submission.md
+docs/hackathon-build/
+
+# Credentials and local runtime artifacts
+.aws/
+artifacts/
+data/private/

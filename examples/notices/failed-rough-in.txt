@@ -1,0 +1,24 @@
+NOTICE ID: CR-2026-0417
+ISSUED: 2026-08-07
+REINSPECTION DEADLINE: 2026-08-17
+PROPERTY: 100 Demo Way, Castle Pines, CO
+
+CITATION 1
+CODE: NEC 110.26
+TRADE: Electrical
+FINDING: Maintain the required working clearance in front of the service panel.
+EVIDENCE: Wide photo showing the complete service panel area; photo with a tape measure showing the clearance
+END CITATION
+
+CITATION 2
+CODE: IRC R602.6
+TRADE: Framing
+FINDING: Protect bored framing members where the edge distance is less than required.
+EVIDENCE: Close photo of each installed protection plate; wide photo identifying each corrected wall location
+END CITATION
+
+CITATION 3
+CODE: IMC 304.10
+TRADE: Mechanical
+FINDING: Provide clearance and service access at the installed mechanical equipment.
+END CITATION
