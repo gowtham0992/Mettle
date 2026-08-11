@@ -16,6 +16,11 @@ The repository currently runs without AWS credentials or paid model calls. It ca
 - increase urgency as the reinspection deadline approaches; and
 - route missing or ambiguous requirements to a judgment queue.
 
+The product core now runs those steps as a real Strands graph. Deterministic
+policy nodes parse and plan the campaign, an idempotent communication port
+records trade outreach, and a Strands interrupt pauses the graph for contractor
+judgment before it resumes. No cloud model is invoked in this local mode.
+
 It also includes a local recovery command center with a deterministic, six-event demo scenario: accepted evidence, rejected evidence with a precise re-request, deadline escalation, human judgment, and a contractor-approved final packet.
 
 The deterministic core is intentional. Strands and Bedrock will provide agentic extraction, communication, evidence review, and orchestration, while the domain rules remain testable without a model.
@@ -33,13 +38,9 @@ uv run pytest
 
 Open [http://127.0.0.1:4310](http://127.0.0.1:4310) after starting the server. The demo binds only to the local machine.
 
-AWS integration is optional until credits arrive:
-
-```bash
-uv sync --extra aws --extra dev
-```
-
-No AWS credentials are needed for the example or tests.
+Strands is installed as a core dependency, but no AWS credentials are needed
+for the example or tests. Bedrock and AgentCore adapters will be added behind
+the same workflow contracts once credits are available.
 
 ## Product boundary
 

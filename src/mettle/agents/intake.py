@@ -20,7 +20,7 @@ def create_intake_agent(*, model: Any | None = None) -> Any:
         from strands import Agent
     except ImportError as exc:
         raise RuntimeError(
-            "Strands is not installed. Run `uv sync --extra aws --extra dev`."
+            "Strands is not installed. Run `uv sync --extra dev`."
         ) from exc
 
     return Agent(model=model, system_prompt=SYSTEM_PROMPT, callback_handler=None)

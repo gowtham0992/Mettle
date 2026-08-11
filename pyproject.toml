@@ -11,13 +11,11 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
   "fastapi>=0.141,<0.142",
   "pydantic>=2.12,<3",
+  "strands-agents>=1.51,<2",
   "uvicorn>=0.52,<0.53",
 ]
 
 [project.optional-dependencies]
-aws = [
-  "strands-agents>=1.51,<2",
-]
 dev = [
   "httpx2>=2.10,<3",
   "pytest>=9,<10",
