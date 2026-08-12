@@ -462,6 +462,7 @@ def test_live_bedrock_workflow_runs_inside_graph_and_replays_without_second_call
         "bedrock_intake": True,
         "agentcore_runtime": False,
         "photo_evidence": False,
+        "max_photo_bytes": 5_000_000,
     }
     assert first.status_code == 201
     assert replay.status_code == 200
@@ -484,6 +485,7 @@ def test_live_bedrock_workflow_fails_closed_when_server_has_not_enabled_it() -> 
         "bedrock_intake": False,
         "agentcore_runtime": False,
         "photo_evidence": False,
+        "max_photo_bytes": 5_000_000,
     }
     assert response.status_code == 422
     assert response.json()["error"] == {
@@ -569,6 +571,7 @@ def test_agentcore_http_boundary_starts_restores_and_resumes_cloud_workflow() ->
         "bedrock_intake": False,
         "agentcore_runtime": True,
         "photo_evidence": True,
+        "max_photo_bytes": 5_000_000,
     }
     assert created.status_code == 201
     assert restored.json() == created.json()

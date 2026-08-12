@@ -425,6 +425,18 @@ wheels = [
 ]
 
 [[package]]
+name = "mangum"
+version = "0.20.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/04/76/03462d8f745a12b40d96b674c6d9c4182594571edc28b47d6ddd9a819ed5/mangum-0.20.0.tar.gz", hash = "sha256:0050447b60d832dcc45cc9d917c9e0f4e9174e2d9630f621d567510d51d286bd", size = 128418, upload-time = "2025-12-27T08:48:37.423Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/67/9398a64b5a97a9125fac1b168917cfa7f9d81eddc23bf50dacd4ff999aed/mangum-0.20.0-py3-none-any.whl", hash = "sha256:c945eadc41916f73b6086c0c69935ef4b1d23d27de8dc74ed47b20e204335407", size = 18024, upload-time = "2025-12-27T08:48:35.686Z" },
+]
+
+[[package]]
 name = "mcp"
 version = "1.29.0"
 source = { registry = "https://pypi.org/simple" }
@@ -458,6 +470,7 @@ dependencies = [
     { name = "boto3" },
     { name = "botocore", extra = ["crt"] },
     { name = "fastapi" },
+    { name = "mangum" },
     { name = "pillow" },
     { name = "pydantic" },
     { name = "reportlab" },
@@ -469,6 +482,7 @@ dependencies = [
 dev = [
     { name = "httpx2" },
     { name = "pytest" },
+    { name = "pyyaml" },
 ]
 
 [package.dev-dependencies]
@@ -484,9 +498,11 @@ requires-dist = [
     { name = "botocore", extras = ["crt"], specifier = ">=1.43,<2" },
     { name = "fastapi", specifier = ">=0.141,<0.142" },
     { name = "httpx2", marker = "extra == 'dev'", specifier = ">=2.10,<3" },
+    { name = "mangum", specifier = ">=0.20,<0.21" },
     { name = "pillow", specifier = ">=12.2,<13" },
     { name = "pydantic", specifier = ">=2.12,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9,<10" },
+    { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0,<7" },
     { name = "reportlab", specifier = ">=4.4,<5" },
     { name = "strands-agents", specifier = ">=1.51,<2" },
     { name = "uvicorn", specifier = ">=0.52,<0.53" },

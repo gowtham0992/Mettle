@@ -13,6 +13,7 @@ dependencies = [
   "boto3>=1.43,<2",
   "botocore[crt]>=1.43,<2",
   "fastapi>=0.141,<0.142",
+  "mangum>=0.20,<0.21",
   "pillow>=12.2,<13",
   "pydantic>=2.12,<3",
   "reportlab>=4.4,<5",
@@ -23,6 +24,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "httpx2>=2.10,<3",
+  "pyyaml>=6.0,<7",
   "pytest>=9,<10",
 ]
 

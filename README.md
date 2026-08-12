@@ -154,11 +154,32 @@ contractor-approved download.
 `MettleHackathonDeveloper` role. It can invoke only the approved Nova models but cannot administer
 IAM or invoke more expensive models. See [AWS access and teardown](docs/aws-access.md).
 
-Workflow state is intentionally session-local in this phase. Restarting the
-local dashboard server clears its private mapping from Mettle workflow IDs to
-AgentCore sessions; AgentCore itself keeps the graph only while the isolated
-runtime session is alive. Durable storage and live communication remain later
-slices.
+Workflow state is intentionally session-local when using the loopback server.
+The public serverless boundary below stores user-scoped session mappings for
+the AgentCore session's eight-hour lifetime; live communication remains a later
+slice.
+
+## Deploy the public dashboard securely
+
+The public stack keeps the judge-facing deterministic demo open while requiring
+an admin-created Cognito account for every credit-metered AgentCore route. It
+uses a private S3/CloudFront frontend, HTTP API + Lambda, user-scoped DynamoDB
+session records, a private one-day packet bucket, WAF, throttling, and an exact
+AgentCore invocation grant. The browser never receives AWS credentials.
+
+Build and deploy only after authenticating an infrastructure administrator:
+
+```bash
+scripts/deploy_web.sh mettle mettle-agentcore-artifacts-123456789012-us-east-1
+```
+
+The deploy script builds Linux Lambda dependencies in the official Lambda
+Python container, packages CloudFormation into the existing private artifact
+bucket, deploys the stack, fixes the Cognito PKCE callback to the resulting
+CloudFront URL, uploads the static UI, and invalidates the edge cache. Cognito
+self-registration is deliberately disabled; create only the demo-owner account
+after deployment. See `infra/web/template.yaml` for the complete permission and
+retention boundary.
 
 ## Product boundary
 

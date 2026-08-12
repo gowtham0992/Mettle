@@ -25,9 +25,15 @@ from mettle.agentcore_gateway import (
     AgentCoreGatewayError,
     AgentCoreWorkflowGateway,
 )
+from mettle.durable_agentcore_gateway import DurableAgentCoreWorkflowGateway
 from mettle.demo import DemoCampaign, DemoConflict, DemoNotFound, DemoStore
 from mettle.workflow import WorkflowConfigurationError
 from mettle.photo_upload import MAX_UPLOAD_BYTES, PhotoUploadError, normalize_photo
+from mettle.request_identity import (
+    AuthenticationRequired,
+    reset_principal,
+    set_principal,
+)
 from mettle.workflow_registry import (
     ApprovePacketRequest,
     CreateWorkflowRequest,
@@ -77,6 +83,14 @@ class CapabilitiesResponse(BaseModel):
     bedrock_intake: bool
     agentcore_runtime: bool
     photo_evidence: bool
+    max_photo_bytes: int
+
+
+class PublicConfigResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    cognito_domain: str | None
+    cognito_client_id: str | None
 
 
 def configured_workflow_registry() -> WorkflowRegistry:
@@ -107,7 +121,7 @@ def configured_workflow_registry() -> WorkflowRegistry:
     )
 
 
-def configured_agentcore_gateway() -> AgentCoreWorkflowGateway | None:
+def configured_agentcore_gateway() -> AgentCoreWorkflowGateway | DurableAgentCoreWorkflowGateway | None:
     """Build the paid cloud boundary only after an explicit server opt-in."""
     if os.getenv("METTLE_AGENTCORE_ENABLED") != "1":
         return None
@@ -119,10 +133,30 @@ def configured_agentcore_gateway() -> AgentCoreWorkflowGateway | None:
     region = os.getenv("METTLE_AWS_REGION", "us-east-1")
     profile = os.getenv("METTLE_AWS_PROFILE") or None
     session = boto3.Session(profile_name=profile, region_name=region)
-    return AgentCoreWorkflowGateway(
-        client=session.client("bedrock-agentcore"),
-        runtime_arn=runtime_arn,
-    )
+    table_name = os.getenv("METTLE_DYNAMODB_TABLE")
+    packet_bucket_name = os.getenv("METTLE_PACKET_BUCKET")
+    if table_name and packet_bucket_name:
+        return DurableAgentCoreWorkflowGateway(
+            client=session.client("bedrock-agentcore"),
+            runtime_arn=runtime_arn,
+            table=session.resource("dynamodb").Table(table_name),
+            packet_bucket=session.resource("s3").Bucket(packet_bucket_name),
+        )
+    return AgentCoreWorkflowGateway(client=session.client("bedrock-agentcore"), runtime_arn=runtime_arn)
+
+
+def _verified_subject(request: Request) -> str | None:
+    event = request.scope.get("aws.event")
+    if not isinstance(event, dict):
+        return None
+    request_context = event.get("requestContext")
+    authorizer = request_context.get("authorizer") if isinstance(request_context, dict) else None
+    jwt = authorizer.get("jwt") if isinstance(authorizer, dict) else None
+    claims = jwt.get("claims") if isinstance(jwt, dict) else None
+    subject = claims.get("sub") if isinstance(claims, dict) else None
+    if isinstance(subject, str) and 1 <= len(subject) <= 128:
+        return subject
+    return None
 
 
 def create_app(
@@ -143,15 +177,30 @@ def create_app(
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
-        response = await call_next(request)
+        principal_token = set_principal(_verified_subject(request))
+        try:
+            response = await call_next(request)
+        finally:
+            reset_principal(principal_token)
+        cognito_domain = os.getenv("METTLE_COGNITO_DOMAIN", "").rstrip("/")
+        connect_sources = "'self'" + (f" {cognito_domain}" if cognito_domain else "")
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; img-src 'self' data:; style-src 'self'; "
-            "script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+            f"script-src 'self'; connect-src {connect_sources}; base-uri 'none'; "
+            "frame-ancestors 'none'; form-action 'self'"
         )
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         return response
+
+    @app.exception_handler(AuthenticationRequired)
+    async def authentication_required(_request: Request, exc: AuthenticationRequired):
+        return JSONResponse(
+            status_code=401,
+            content={"error": {"code": "authentication_required", "message": str(exc)}},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(_request: Request, exc: RequestValidationError):
@@ -319,24 +368,43 @@ def create_app(
                 request.app.state.workflows.vision_enabled
                 or request.app.state.agentcore is not None
             ),
+            max_photo_bytes=min(
+                MAX_UPLOAD_BYTES,
+                int(os.getenv("METTLE_MAX_UPLOAD_BYTES", str(MAX_UPLOAD_BYTES))),
+            ),
         )
 
+    @app.get("/api/config", response_model=PublicConfigResponse)
+    async def get_public_config() -> PublicConfigResponse:
+        return PublicConfigResponse(
+            cognito_domain=os.getenv("METTLE_COGNITO_DOMAIN") or None,
+            cognito_client_id=os.getenv("METTLE_COGNITO_CLIENT_ID") or None,
+        )
+
+    @app.get("/api/health")
+    async def health() -> dict[str, str]:
+        return {"status": "ok"}
+
     async def read_photo(request: Request) -> bytes:
+        upload_limit = min(
+            MAX_UPLOAD_BYTES,
+            int(os.getenv("METTLE_MAX_UPLOAD_BYTES", str(MAX_UPLOAD_BYTES))),
+        )
         content_type = request.headers.get("content-type", "").split(";", 1)[0].lower()
         if content_type not in {"image/jpeg", "image/png"}:
             raise PhotoUploadError("photo must be uploaded as image/jpeg or image/png")
         declared = request.headers.get("content-length")
         if declared is not None:
             try:
-                if int(declared) > MAX_UPLOAD_BYTES:
-                    raise PhotoUploadError("photo exceeds the 5 MB upload limit")
+                if int(declared) > upload_limit:
+                    raise PhotoUploadError("photo exceeds the configured upload limit")
             except ValueError as exc:
                 raise PhotoUploadError("photo has an invalid content length") from exc
         body = bytearray()
         async for chunk in request.stream():
             body.extend(chunk)
-            if len(body) > MAX_UPLOAD_BYTES:
-                raise PhotoUploadError("photo exceeds the 5 MB upload limit")
+            if len(body) > upload_limit:
+                raise PhotoUploadError("photo exceeds the configured upload limit")
         return await run_in_threadpool(normalize_photo, bytes(body))
 
     @app.post("/api/demo/advance", response_model=DemoCampaign)
@@ -587,6 +655,16 @@ def create_app(
                 "Cache-Control": "no-store",
             },
         )
+
+    @app.get("/api/agentcore/workflows/{workflow_id}/packet-url")
+    def get_agentcore_packet_url(workflow_id: str, request: Request) -> dict[str, str]:
+        gateway = require_agentcore(request)
+        packet_download_url = getattr(gateway, "packet_download_url", None)
+        if not callable(packet_download_url):
+            raise WorkflowConfigurationError(
+                "Private packet links are available only on the serverless deployment"
+            )
+        return {"download_url": packet_download_url(workflow_id)}
 
     @app.post(
         "/api/workflows/{workflow_id}/evidence",

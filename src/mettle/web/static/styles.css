@@ -42,7 +42,7 @@ button { cursor: pointer; }
 .command-band {
   min-height: 92px;
   display: grid;
-  grid-template-columns: 200px minmax(260px, 1fr) auto auto;
+  grid-template-columns: 200px minmax(260px, 1fr) auto auto auto;
   align-items: stretch;
   background: var(--charcoal);
   color: var(--paper);
@@ -226,6 +226,8 @@ h2 { font-size: 13px; font-weight: 900; }
 .notice-dialog__header h2 { font-size: 17px; }
 .dialog-close { width: 34px; height: 34px; flex: 0 0 auto; padding: 0; border: 1px solid #51575a; border-radius: 2px; background: transparent; color: var(--paper); font-size: 25px; line-height: 1; }
 .dialog-close:hover { border-color: var(--orange); color: var(--orange); }
+.auth-control { min-height: 34px; margin: 0 12px; padding: 7px 10px; border: 1px solid #51575a; border-radius: 2px; background: transparent; color: var(--paper); font: 700 8px/1.2 var(--mono); letter-spacing: .7px; text-transform: uppercase; }
+.auth-control:hover { border-color: var(--orange); color: var(--orange); }
 .notice-dialog__intro { max-width: 72ch; margin: 0; padding: 18px 26px 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .field { display: grid; gap: 7px; }
 .field--notice { padding: 18px 26px 0; }
@@ -253,6 +255,7 @@ h2 { font-size: 13px; font-weight: 900; }
   .command-band { grid-template-columns: 175px minmax(240px, 1fr) auto; }
   .brand { padding-inline: 18px; }
   .condition { display: none; }
+  .auth-control { display: none; }
   .campaign-strip { grid-template-columns: 1fr auto; gap: 10px 20px; padding: 8px 18px; }
   .campaign-strip .progress-block { grid-column: 1 / -1; grid-row: 2; }
   .dashboard, .loading-grid { grid-template-columns: 1fr; }

@@ -12,6 +12,7 @@ __pycache__/
 htmlcov/
 dist/
 build/
+infra/web/.aws-sam/
 *.egg-info/
 
 # Local hackathon workflow state and private submission drafts

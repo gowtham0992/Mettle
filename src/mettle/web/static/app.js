@@ -51,6 +51,7 @@ const elements = {
   closeNotice: document.querySelector("#close-notice-button"),
   retry: document.querySelector("#retry-button"),
   toast: document.querySelector("#toast"),
+  auth: document.querySelector("#auth-button"),
 };
 
 const stepLabels = [
@@ -72,6 +73,107 @@ let agentCoreEnabled = false;
 let photoEvidenceEnabled = false;
 let workflowCreateKey = null;
 let workflowCreateProvider = null;
+let authConfig = null;
+let accessToken = sessionStorage.getItem("mettle_access_token");
+
+function base64Url(bytes) {
+  return btoa(String.fromCharCode(...new Uint8Array(bytes)))
+    .replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function tokenIsCurrent(token) {
+  if (!token) return false;
+  try {
+    const encoded = token.split(".")[1].replaceAll("-", "+").replaceAll("_", "/");
+    const padded = encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=");
+    const payload = JSON.parse(atob(padded));
+    return Number(payload.exp || 0) > Math.floor(Date.now() / 1000) + 30;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function clearAuth() {
+  accessToken = null;
+  sessionStorage.removeItem("mettle_access_token");
+  updateAuthControl();
+}
+
+function updateAuthControl() {
+  if (!authConfig?.cognito_domain || !authConfig?.cognito_client_id) {
+    elements.auth.hidden = true;
+    return;
+  }
+  if (accessToken && !tokenIsCurrent(accessToken)) {
+    clearAuth();
+    return;
+  }
+  elements.auth.hidden = false;
+  elements.auth.textContent = accessToken ? "Sign out" : "Sign in for live run";
+}
+
+async function beginLogin() {
+  if (!authConfig?.cognito_domain || !authConfig?.cognito_client_id) {
+    throw new Error("Live sign-in is not configured on this deployment.");
+  }
+  const verifier = base64Url(crypto.getRandomValues(new Uint8Array(48)));
+  const challenge = base64Url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  const state = base64Url(crypto.getRandomValues(new Uint8Array(24)));
+  sessionStorage.setItem("mettle_pkce_verifier", verifier);
+  sessionStorage.setItem("mettle_oauth_state", state);
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: authConfig.cognito_client_id,
+    redirect_uri: `${window.location.origin}/`,
+    scope: "openid email",
+    state,
+    code_challenge_method: "S256",
+    code_challenge: challenge,
+  });
+  window.location.assign(`${authConfig.cognito_domain}/oauth2/authorize?${params}`);
+}
+
+async function finishLogin() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  if (!code) return;
+  const expectedState = sessionStorage.getItem("mettle_oauth_state");
+  const verifier = sessionStorage.getItem("mettle_pkce_verifier");
+  if (!expectedState || params.get("state") !== expectedState || !verifier) {
+    throw new Error("The sign-in response could not be verified. Please try again.");
+  }
+  const response = await fetch(`${authConfig.cognito_domain}/oauth2/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: authConfig.cognito_client_id,
+      code,
+      redirect_uri: `${window.location.origin}/`,
+      code_verifier: verifier,
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok || !tokenIsCurrent(payload.access_token)) {
+    throw new Error("Sign-in did not return a usable access token.");
+  }
+  accessToken = payload.access_token;
+  sessionStorage.setItem("mettle_access_token", accessToken);
+  sessionStorage.removeItem("mettle_oauth_state");
+  sessionStorage.removeItem("mettle_pkce_verifier");
+  window.history.replaceState({}, "", window.location.pathname);
+}
+
+async function initializeAuth() {
+  try {
+    const response = await fetch("/api/config", { headers: { Accept: "application/json" } });
+    authConfig = response.ok ? await response.json() : null;
+    await finishLogin();
+  } catch (error) {
+    showError(error);
+  }
+  updateAuthControl();
+}
 
 function node(tag, className, text) {
   const item = document.createElement(tag);
@@ -261,6 +363,13 @@ function workflowCampaign(envelope, executionTarget = "local") {
 
 async function request(path, options = {}) {
   const headers = { ...(options.headers || {}) };
+  if (path.startsWith("/api/agentcore")) {
+    if (!tokenIsCurrent(accessToken)) {
+      clearAuth();
+      throw new Error("Sign in before using the live AgentCore runtime.");
+    }
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
   if (!Object.keys(headers).some((key) => key.toLowerCase() === "content-type")) {
     headers["Content-Type"] = "application/json";
   }
@@ -717,6 +826,10 @@ elements.noticeForm.addEventListener("submit", async (event) => {
   const provider = event.submitter?.value === "local" ? "local" : "bedrock";
   if (provider === "bedrock" && executionTarget === "local" && !bedrockEnabled) return;
   if (executionTarget === "agentcore" && !agentCoreEnabled) return;
+  if (executionTarget === "agentcore" && !tokenIsCurrent(accessToken)) {
+    await beginLogin();
+    return;
+  }
   const createMode = `${executionTarget}:${provider}`;
   if (!workflowCreateKey || workflowCreateProvider !== createMode) {
     workflowCreateKey = crypto.randomUUID().replaceAll("-", "_");
@@ -838,7 +951,12 @@ elements.packetAction.addEventListener("click", async () => {
     ? "/api/agentcore/workflows"
     : "/api/workflows";
   if (campaign?.packet_status === "approved") {
-    window.location.assign(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/packet.pdf`);
+    if (activeWorkflowTarget === "agentcore") {
+      const link = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/packet-url`);
+      window.location.assign(link.download_url);
+    } else {
+      window.location.assign(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/packet.pdf`);
+    }
     return;
   }
   setBusy(elements.packetAction, true);
@@ -868,5 +986,15 @@ document.addEventListener("keydown", (event) => {
 });
 
 elements.retry.addEventListener("click", loadCampaign);
-loadCapabilities();
-loadCampaign();
+elements.auth.addEventListener("click", async () => {
+  if (accessToken) {
+    clearAuth();
+    showToast("Signed out. The deterministic demo remains available.");
+  } else {
+    await beginLogin();
+  }
+});
+initializeAuth().then(() => {
+  loadCapabilities();
+  loadCampaign();
+});

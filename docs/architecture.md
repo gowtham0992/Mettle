@@ -73,6 +73,33 @@ resume calls from racing one stateful runtime session. It is not an internet-
 facing authorization design: the server binds to loopback and AgentCore is
 disabled unless the operator explicitly enables it at startup.
 
+### Public serverless boundary
+
+The public dashboard keeps static assets in a private S3 bucket readable only
+through CloudFront Origin Access Control. CloudFront terminates TLS, applies
+security headers and AWS WAF, and forwards `/api/*` to an HTTP API backed by
+Lambda. Deterministic demo routes remain public; API
+Gateway requires a Cognito access-token JWT for every `/api/agentcore/*` route.
+Self-registration is disabled, the browser uses authorization code with PKCE,
+and no browser receives AWS credentials.
+
+The Lambda never uses deployment credentials. Its execution role can invoke
+only the exact Mettle AgentCore runtime ARN, read and conditionally update one
+DynamoDB table, and write contractor-approved packets beneath one private S3
+bucket. It cannot create or update runtimes, list either bucket, scan the table,
+or call IAM. DynamoDB keys contain only a hash of the verified Cognito subject;
+each workflow and idempotency attempt is therefore caller-scoped without
+persisting an email address or access token. Records expire with the AgentCore
+session after eight hours.
+
+Generated PDFs are integrity-checked, stored encrypted for at most one day,
+and returned through a 60-second presigned download. Internet photo bodies are
+capped at 3.5 MB before the existing decode, pixel-bound, metadata-strip, and
+JPEG re-encode boundary. Tight route-level API Gateway throttling and WAF rate
+limiting cap both abuse and accidental model spend. Reserved concurrency is
+intentionally omitted because this account's regional concurrency quota is too
+small to reserve safely without impairing other functions.
+
 The deployment boundary uses direct CodeZip deployment rather than the CLI's
 default CDK bootstrap. A private, versioned S3 object holds the artifact. The
 runtime role can invoke only Nova Micro for text, Nova Lite for vision, and publish AgentCore telemetry. A
@@ -105,10 +132,14 @@ Putting all behavior inside agent prompts would produce an impressive but untest
    exercised on the real demo runtime, and live acceptance covers start,
    resume, vision, T−3/T−2 chase behavior, replay safety, approval, and PDF
    integrity in one AgentCore session.**
-8. **Durability and live integrations:** add durable workflow storage, AgentCore
-   Memory where it creates demonstrable value, and an SMS adapter after the
-   deployed recovery loop is verified.
+8. **Public durability:** user-scoped AgentCore session mapping, idempotency,
+   private packet storage, Cognito authentication, and a CloudFront/Lambda edge.
+   **Implemented and locally verified; AWS deployment pending.**
+9. **Live integrations:** add AgentCore Memory where it creates demonstrable
+   value and an SMS adapter only after partner validation.
 
 ## Decisions we can reverse later
 
-The database, SMS provider, and production frontend hosting remain intentionally undecided. FastAPI and the dependency-free browser interface are established for the local demo, but neither constrains the external ports.
+The SMS provider remains intentionally undecided. The public demo uses
+DynamoDB, private S3, CloudFront, API Gateway, Lambda, Cognito, and WAF; the
+local FastAPI path remains independent for offline rehearsals.
