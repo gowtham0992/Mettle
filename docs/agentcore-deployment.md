@@ -9,7 +9,7 @@ profile during normal development.
 
 - Runtime: `MettleRecovery-example`
 - ARN: `arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/MettleRecovery-example`
-- Version and status: `2`, `READY`
+- Version and status: `3`, `READY`
 - Artifact: `runtime/MettleRecovery-example.zip`, S3 version
   `EXAMPLE_OBJECT_VERSION`
 - Artifact SHA-256:
@@ -18,11 +18,17 @@ profile during normal development.
 - Log group: `/aws/bedrock-agentcore/runtimes/MettleRecovery-example-DEFAULT`,
   14-day retention
 
-The live acceptance workflow `DW8bsBrz77Q4Noa9` started with two recorded
-trade deliveries and one contractor judgment, then resumed in the same
-AgentCore session to `completed` with three deliveries. The successful log
-stream contains completion metadata only; it does not contain the synthetic
-notice or credentials.
+The version 3 acceptance workflow `gC2tCVUproqzcjpu` ran the entire recovery
+inside one AgentCore session: Nova Micro intake, two initial trade deliveries,
+one contractor judgment, a third delivery after resume, three accepted
+evidence records, packet preparation, final contractor approval, and a
+four-page PDF. The 7,605,783-byte packet passed a SHA-256 integrity check.
+
+The version 2 acceptance workflow `DW8bsBrz77Q4Noa9` established that runtime
+logs contain completion metadata only, without the synthetic notice or
+credentials. The deployer and bootstrap identities intentionally cannot read
+CloudWatch logs, so version 3 post-deploy log inspection was not broadened at
+the expense of least privilege.
 
 The rollback canary `MettleRecoveryCanary-gNWaC24tLN` reached `READY`, was
 deleted, and returned `ResourceNotFound` on verification. Its retained log
@@ -33,8 +39,9 @@ version was permanently removed.
 
 ## Proven locally
 
-- The official AgentCore development server completes `start -> Strands
-  interrupt -> resume` in one runtime session.
+- The strict runtime contract completes `start -> Strands interrupt -> resume
+  -> evidence -> packet preparation -> final approval -> PDF` in one runtime
+  session.
 - Replaying the same start idempotency key does not repeat the Bedrock intake.
 - `npx agentcore validate --json` succeeds.
 - `scripts/prune_agentcore_zip.sh` strips repository-only files after packaging
@@ -131,13 +138,17 @@ time in a local ignored file. No notice data belongs in deployment state.
 3. Confirm the response is interrupted with exactly one judgment request.
 4. Invoke `resume` with the same runtime session ID and returned workflow and
    interrupt IDs.
-5. Confirm the graph completes and that the first outreach was not replayed.
-6. Check CloudWatch logs for the hashed session reference and absence of notice
-   text.
-7. Verify the execution role cannot invoke a model other than Nova Micro.
+5. Submit accepted synthetic evidence for all three citations.
+6. Prepare the packet, approve it through the contractor judgment gate, and
+   render the PDF.
+7. Verify the PDF type, SHA-256 digest, and four-page structure.
+8. Confirm the graph completes and that the first outreach was not replayed.
+9. Check CloudWatch logs for the hashed session reference and absence of notice
+   text when using an authorized observability identity.
+10. Verify the execution role cannot invoke a model other than Nova Micro.
 
-The paid start/resume check is scripted and prints only workflow metadata, not
-the notice or model response:
+The paid end-to-end check is scripted and prints only workflow and packet
+metadata, not the notice or model response:
 
 ```bash
 uv run python scripts/agentcore_smoke.py \

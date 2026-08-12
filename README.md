@@ -110,9 +110,11 @@ allow only Nova Micro plus AgentCore telemetry and restrict deployment to
 Project-tagged Mettle runtimes. See
 [AgentCore deployment and rollback](docs/agentcore-deployment.md).
 
-The cloud runtime is deployed in `us-east-1` as `MettleRecovery` version 2.
-Its tested path runs the live Bedrock intake inside Strands, pauses for the
-contractor's judgment, and resumes the same AgentCore session to completion.
+The cloud runtime is deployed in `us-east-1` as `MettleRecovery` version 3.
+Its tested path runs live Bedrock intake inside Strands, pauses for contractor
+judgment, resumes the same AgentCore session, assesses all three synthetic
+evidence submissions, gates packet approval, and returns the verified
+four-page PDF.
 
 To expose **Run on AgentCore** in the command center, start the loopback-only
 server with the deployed runtime fixed in server configuration:
@@ -127,10 +129,10 @@ uv run mettle serve \
 
 The browser can neither select a runtime nor access AWS credentials. The local
 gateway owns the AgentCore session ID, reuses it for safe retries and resume,
-caps process state, and sends only validated `start` and `resume` operations.
-Cloud workflow state can be restored while this local server remains running.
-The synthetic evidence lab and packet builder stay on the complete local demo
-path until those operations are added to the deployed runtime contract.
+caps process state, and sends only validated workflow operations. Cloud
+workflow state can be restored while this local server remains running. The
+server gateway verifies the returned PDF type and digest before offering the
+contractor-approved download.
 
 `mettle-dev` assumes the one-hour, least-privilege
 `MettleHackathonDeveloper` role. It can invoke Nova Micro but cannot administer
