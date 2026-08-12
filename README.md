@@ -47,10 +47,9 @@ for the example or tests. Amazon Bedrock intake is deliberately opt-in, so
 normal development and the dashboard never consume credits:
 
 ```bash
-aws login --profile mettle
 uv run mettle ingest examples/notices/failed-rough-in.txt \
   --provider bedrock \
-  --aws-profile mettle \
+  --aws-profile mettle-dev \
   --aws-region us-east-1 \
   --model-id amazon.nova-micro-v1:0 \
   --as-of 2026-08-10
@@ -62,6 +61,10 @@ total attempts. The intake CLI refuses model IDs outside the approved Nova
 Micro allowlist. Model output must validate as Mettle's bounded notice schema
 before it can enter campaign state. AgentCore deployment will follow after
 this live intake path is verified.
+
+`mettle-dev` assumes the one-hour, least-privilege
+`MettleHackathonDeveloper` role. It can invoke Nova Micro but cannot administer
+IAM or invoke more expensive models. See [AWS access and teardown](docs/aws-access.md).
 
 Workflow state is intentionally process-local in this phase. Restarting the server clears created runs; durable storage, authentication, and live communication belong to the deployment slice.
 

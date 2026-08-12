@@ -3,14 +3,15 @@ from datetime import date
 import pytest
 from botocore.exceptions import ClientError
 
+import mettle.agents.bedrock as bedrock_module
 from mettle.agents.bedrock import (
     BedrockIntakeError,
     BedrockIntakeSettings,
     create_bedrock_model,
     extract_notice_with_bedrock,
 )
-from mettle.domain import Citation, InspectionNotice, Trade
 from mettle.agents.intake import reconcile_explicit_citation_ids
+from mettle.domain import Citation, InspectionNotice, Trade
 
 
 NOTICE = InspectionNotice(
@@ -41,6 +42,35 @@ def test_bedrock_model_has_explicit_cost_and_network_bounds() -> None:
     assert model.client.meta.config.connect_timeout == 5
     assert model.client.meta.config.read_timeout == 45
     assert model.client.meta.config.retries["total_max_attempts"] == 2
+
+
+def test_named_profile_puts_region_on_session_not_bedrock_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: dict[str, object] = {}
+    session = object()
+
+    def fake_session(**kwargs: object) -> object:
+        observed["session_kwargs"] = kwargs
+        return session
+
+    def fake_model(**kwargs: object) -> object:
+        observed["model_kwargs"] = kwargs
+        return object()
+
+    monkeypatch.setattr(bedrock_module.boto3, "Session", fake_session)
+    monkeypatch.setattr(bedrock_module, "BedrockModel", fake_model)
+
+    create_bedrock_model(BedrockIntakeSettings(profile="mettle-dev"))
+
+    assert observed["session_kwargs"] == {
+        "profile_name": "mettle-dev",
+        "region_name": "us-east-1",
+    }
+    model_kwargs = observed["model_kwargs"]
+    assert isinstance(model_kwargs, dict)
+    assert model_kwargs["boto_session"] is session
+    assert "region_name" not in model_kwargs
 
 
 def test_bedrock_settings_reject_more_expensive_models() -> None:

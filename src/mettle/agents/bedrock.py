@@ -64,15 +64,19 @@ def create_bedrock_model(settings: BedrockIntakeSettings) -> BedrockModel:
         read_timeout=45,
         retries={"total_max_attempts": 2, "mode": "standard"},
     )
-    session = (
-        boto3.Session(profile_name=settings.profile)
-        if settings.profile is not None
-        else None
-    )
+    connection: dict[str, Any]
+    if settings.profile is not None:
+        connection = {
+            "boto_session": boto3.Session(
+                profile_name=settings.profile,
+                region_name=settings.region,
+            )
+        }
+    else:
+        connection = {"region_name": settings.region}
     return BedrockModel(
-        boto_session=session,
+        **connection,
         model_id=settings.model_id,
-        region_name=settings.region,
         boto_client_config=client_config,
         max_tokens=settings.max_output_tokens,
         temperature=0.0,
