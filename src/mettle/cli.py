@@ -28,6 +28,10 @@ def main(argv: list[str] | None = None) -> int:
         help="intake provider; Bedrock is opt-in and consumes AWS credits",
     )
     ingest.add_argument("--aws-region", default="us-east-1")
+    ingest.add_argument(
+        "--aws-profile",
+        help="named AWS profile; recommended when multiple accounts are configured",
+    )
     ingest.add_argument("--model-id", default="amazon.nova-micro-v1:0")
     ingest.add_argument(
         "--as-of",
@@ -55,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
                 settings=BedrockIntakeSettings(
                     region=args.aws_region,
                     model_id=args.model_id,
+                    profile=args.aws_profile,
                 ),
             )
         else:

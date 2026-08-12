@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import boto3
 from botocore.config import Config as BotocoreConfig
 from botocore.exceptions import BotoCoreError, ClientError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -31,6 +32,12 @@ class BedrockIntakeSettings(BaseModel):
         max_length=200,
         pattern=r"^[A-Za-z0-9._:/-]+$",
     )
+    profile: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9._-]+$",
+    )
     max_input_characters: int = Field(default=30_000, ge=1_000, le=100_000)
     max_output_tokens: int = Field(default=2_048, ge=256, le=4_096)
 
@@ -57,7 +64,13 @@ def create_bedrock_model(settings: BedrockIntakeSettings) -> BedrockModel:
         read_timeout=45,
         retries={"total_max_attempts": 2, "mode": "standard"},
     )
+    session = (
+        boto3.Session(profile_name=settings.profile)
+        if settings.profile is not None
+        else None
+    )
     return BedrockModel(
+        boto_session=session,
         model_id=settings.model_id,
         region_name=settings.region,
         boto_client_config=client_config,

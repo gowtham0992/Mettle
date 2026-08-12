@@ -47,9 +47,10 @@ for the example or tests. Amazon Bedrock intake is deliberately opt-in, so
 normal development and the dashboard never consume credits:
 
 ```bash
-aws login
+aws login --profile mettle
 uv run mettle ingest examples/notices/failed-rough-in.txt \
   --provider bedrock \
+  --aws-profile mettle \
   --aws-region us-east-1 \
   --model-id amazon.nova-micro-v1:0 \
   --as-of 2026-08-10

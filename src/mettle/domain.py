@@ -38,6 +38,25 @@ class Citation(BaseModel):
     evidence_requirements: list[str] = Field(default_factory=list, max_length=10)
     ambiguity_reason: str | None = Field(default=None, max_length=500)
 
+    @model_validator(mode="after")
+    def require_human_judgment_for_incomplete_work(self) -> Citation:
+        reasons: list[str] = []
+        if self.trade is Trade.UNKNOWN:
+            reasons.append("the notice does not identify a recognized trade")
+        if not self.evidence_requirements:
+            reasons.append(
+                "the notice does not state observable evidence requirements"
+            )
+        if not reasons:
+            return self
+
+        existing = self.ambiguity_reason or ""
+        missing = [reason for reason in reasons if reason not in existing]
+        if missing:
+            combined = "; ".join(filter(None, [existing, *missing]))
+            self.ambiguity_reason = combined
+        return self
+
 
 class InspectionNotice(BaseModel):
     model_config = ConfigDict(extra="forbid")

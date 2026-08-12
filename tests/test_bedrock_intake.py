@@ -10,6 +10,7 @@ from mettle.agents.bedrock import (
     extract_notice_with_bedrock,
 )
 from mettle.domain import Citation, InspectionNotice, Trade
+from mettle.agents.intake import reconcile_explicit_citation_ids
 
 
 NOTICE = InspectionNotice(
@@ -48,7 +49,7 @@ def test_bedrock_settings_reject_more_expensive_models() -> None:
 
 
 def test_bedrock_intake_injects_bounded_model_and_returns_validated_notice() -> None:
-    settings = BedrockIntakeSettings(region="us-west-2")
+    settings = BedrockIntakeSettings(region="us-west-2", profile="mettle")
     observed: dict[str, object] = {}
 
     def model_factory(received: BedrockIntakeSettings) -> object:
@@ -70,6 +71,11 @@ def test_bedrock_intake_injects_bounded_model_and_returns_validated_notice() -> 
     assert result == NOTICE
     assert observed["settings"] == settings
     assert observed["text"] == "synthetic notice"
+
+
+def test_bedrock_settings_reject_unsafe_profile_names() -> None:
+    with pytest.raises(ValueError):
+        BedrockIntakeSettings(profile="../../credentials")
 
 
 def test_bedrock_intake_rejects_oversized_notice_before_creating_model() -> None:
@@ -121,6 +127,46 @@ def test_notice_contract_rejects_duplicate_citation_ids_and_reversed_dates() -> 
     with pytest.raises(ValueError, match="identifiers must be unique"):
         NOTICE.model_copy(update={"citations": [NOTICE.citations[0], duplicate]}).model_validate(
             NOTICE.model_copy(update={"citations": [NOTICE.citations[0], duplicate]}).model_dump()
+        )
+
+
+def test_notice_contract_routes_missing_model_evidence_to_human_judgment() -> None:
+    citation = Citation(
+        citation_id="CITATION3",
+        code_reference="IMC 304.10",
+        notice_text="Provide clearance and service access.",
+        trade=Trade.MECHANICAL,
+        evidence_requirements=[],
+        ambiguity_reason=None,
+    )
+
+    assert citation.ambiguity_reason == (
+        "the notice does not state observable evidence requirements"
+    )
+
+
+def test_explicit_source_citation_ids_override_model_formatting_drift() -> None:
+    model_notice = NOTICE.model_copy(
+        update={
+            "citations": [
+                NOTICE.citations[0].model_copy(update={"citation_id": "CITATION1"})
+            ]
+        }
+    )
+
+    reconciled = reconcile_explicit_citation_ids(
+        "CITATION 1\nCODE: NEC 110.26\nEND CITATION",
+        model_notice,
+    )
+
+    assert reconciled.citations[0].citation_id == "1"
+
+
+def test_explicit_source_and_model_citation_counts_must_match() -> None:
+    with pytest.raises(ValueError, match="count does not match"):
+        reconcile_explicit_citation_ids(
+            "CITATION 1\nEND CITATION\nCITATION 2\nEND CITATION",
+            NOTICE,
         )
 
     with pytest.raises(ValueError, match="cannot precede"):
