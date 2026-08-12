@@ -170,7 +170,9 @@ After the hackathon:
 3. delete the artifact bucket;
 4. delete inline policies from `MettleAgentCoreRuntime` and
    `MettleAgentCoreDeployer`, then delete both roles; and
-5. remove the AgentCore deployer role from the bootstrap user's assume-role
+5. after every AgentCore Runtime in the account is gone, delete the AWS-owned
+   `AWSServiceRoleForBedrockAgentCoreRuntimeIdentity` service-linked role; and
+6. remove the AgentCore deployer role from the bootstrap user's assume-role
    policy and local AWS config.
 
 CloudWatch log groups may outlive the runtime. List only
