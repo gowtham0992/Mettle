@@ -21,6 +21,11 @@ Pydantic models represent notices, citations, recovery actions, and judgment req
 
 Strands agents translate unstructured input into the domain contracts. Their structured output is validated before it enters campaign state. The first adapter is the notice-intake agent; communication and evidence agents follow as separate nodes.
 
+The opt-in Bedrock intake adapter configures Nova Micro with explicit region,
+token, timeout, retry, and input limits. AWS errors are reduced to a service
+code and request ID; upstream messages and notice contents are never copied
+into caller-facing failures. The deterministic parser remains the default.
+
 ### Orchestration
 
 The working Strands graph runs `intake -> plan -> coordinate -> judgment gate -> contractor-directed coordination -> finish`. A graph interrupt pauses before code interpretation, returns a judgment card to the contractor, and resumes without replaying the initial outreach. The application then binds notice-anchored evidence assessment and contractor-approved packet assembly to that workflow state.
@@ -57,7 +62,7 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 4. **Evidence assessment:** compare synthetic photos to notice-anchored requirements and produce a specific re-request. **Local adapter complete.**
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
 6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF. **Complete.**
-7. **AWS deployment:** move the graph to AgentCore and add Bedrock, storage, memory, and observability.
+7. **AWS deployment:** move the graph to AgentCore and add Bedrock, storage, memory, and observability. **Bedrock intake adapter complete; live verification and AgentCore remain.**
 
 ## Decisions we can reverse later
 

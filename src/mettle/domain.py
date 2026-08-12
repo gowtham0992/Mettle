@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Trade(StrEnum):
@@ -31,22 +31,34 @@ class JudgmentKind(StrEnum):
 class Citation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    citation_id: str = Field(min_length=1)
-    code_reference: str = Field(min_length=1)
-    notice_text: str = Field(min_length=1)
+    citation_id: str = Field(min_length=1, max_length=64)
+    code_reference: str = Field(min_length=1, max_length=120)
+    notice_text: str = Field(min_length=1, max_length=2_000)
     trade: Trade = Trade.UNKNOWN
-    evidence_requirements: list[str] = Field(default_factory=list)
-    ambiguity_reason: str | None = None
+    evidence_requirements: list[str] = Field(default_factory=list, max_length=10)
+    ambiguity_reason: str | None = Field(default=None, max_length=500)
 
 
 class InspectionNotice(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    notice_id: str = Field(min_length=1)
+    notice_id: str = Field(min_length=1, max_length=120)
     issued_on: date
     reinspection_due_on: date
-    property_label: str = Field(min_length=1)
-    citations: list[Citation] = Field(min_length=1)
+    property_label: str = Field(min_length=1, max_length=240)
+    citations: list[Citation] = Field(min_length=1, max_length=50)
+
+    @model_validator(mode="after")
+    def validate_notice_invariants(self) -> InspectionNotice:
+        if self.reinspection_due_on < self.issued_on:
+            raise ValueError("reinspection deadline cannot precede issue date")
+        citation_ids = [citation.citation_id for citation in self.citations]
+        if len(citation_ids) != len(set(citation_ids)):
+            raise ValueError("citation identifiers must be unique within a notice")
+        for citation in self.citations:
+            if any(len(item) > 500 for item in citation.evidence_requirements):
+                raise ValueError("evidence requirements may not exceed 500 characters")
+        return self
 
 
 class FollowUpAction(BaseModel):

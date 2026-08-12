@@ -43,8 +43,24 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310) after starting the server. T
 Select **Load notice** to use the included synthetic notice and roster. The local communication adapter records every proposed message but never sends SMS. In **Evidence lab**, resolve the mechanical evidence specification, assess the electrical, framing, and mechanical fixtures, then prepare and approve the downloadable packet.
 
 Strands is installed as a core dependency, but no AWS credentials are needed
-for the example or tests. Bedrock and AgentCore adapters will be added behind
-the same workflow contracts once credits are available.
+for the example or tests. Amazon Bedrock intake is deliberately opt-in, so
+normal development and the dashboard never consume credits:
+
+```bash
+aws login
+uv run mettle ingest examples/notices/failed-rough-in.txt \
+  --provider bedrock \
+  --aws-region us-east-1 \
+  --model-id amazon.nova-micro-v1:0 \
+  --as-of 2026-08-10
+```
+
+The Bedrock boundary uses a low-cost Nova Micro model, a 30,000-character
+input ceiling, a 2,048-token output ceiling, short timeouts, and at most two
+total attempts. The intake CLI refuses model IDs outside the approved Nova
+Micro allowlist. Model output must validate as Mettle's bounded notice schema
+before it can enter campaign state. AgentCore deployment will follow after
+this live intake path is verified.
 
 Workflow state is intentionally process-local in this phase. Restarting the server clears created runs; durable storage, authentication, and live communication belong to the deployment slice.
 

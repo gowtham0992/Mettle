@@ -9,6 +9,8 @@ description = "Deadline-driven failed-inspection recovery for small residential 
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
+  "boto3>=1.43,<2",
+  "botocore[crt]>=1.43,<2",
   "fastapi>=0.141,<0.142",
   "pydantic>=2.12,<3",
   "reportlab>=4.4,<5",
