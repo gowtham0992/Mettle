@@ -56,6 +56,23 @@ graph. This is not durable persistence: the state disappears when the session
 expires or the runtime stops. Mettle exposes that limitation instead of
 pretending AgentCore Memory has already been integrated.
 
+### Dashboard-to-AgentCore boundary
+
+The FastAPI server exposes a separate, opt-in AgentCore workflow surface. The
+browser submits the same bounded Mettle request but cannot provide a runtime
+ARN, AWS profile, region, or AgentCore session ID. A process-local gateway
+generates and owns each session ID, caches the latest validated workflow
+envelope, and maps only the public Mettle workflow ID back to the cloud
+session.
+
+The gateway serializes cloud operations for this single-operator demo, caps
+both successful and retryable creation attempts, rejects changed idempotency
+replays before invocation, and reuses the original session after an uncertain
+transport failure. This limits duplicate model spend and prevents concurrent
+resume calls from racing one stateful runtime session. It is not an internet-
+facing authorization design: the server binds to loopback and AgentCore is
+disabled unless the operator explicitly enables it at startup.
+
 The deployment boundary uses direct CodeZip deployment rather than the CLI's
 default CDK bootstrap. A private, versioned S3 object holds the artifact. The
 runtime role can invoke only Nova Micro and publish AgentCore telemetry. A
@@ -85,7 +102,8 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,
    package it as CodeZip, and define least-privilege deployment and rollback.
    **Complete: runtime version 2 is deployed, rollback was exercised on a
-   disposable canary, and live start/resume acceptance passed.**
+   disposable canary, and the command center passed live start, resume, and
+   refresh acceptance through its server-side gateway.**
 8. **Durability and live integrations:** add durable workflow storage, AgentCore
    Memory where it creates demonstrable value, and an SMS adapter after the
    deployed recovery loop is verified.

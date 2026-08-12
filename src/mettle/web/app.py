@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import boto3
 from fastapi import FastAPI, Header, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
@@ -14,12 +15,17 @@ from mettle.agents.bedrock import (
     BedrockIntakeSettings,
     extract_notice_with_bedrock,
 )
+from mettle.agentcore_gateway import (
+    AgentCoreGatewayError,
+    AgentCoreWorkflowGateway,
+)
 from mettle.demo import DemoCampaign, DemoConflict, DemoNotFound, DemoStore
 from mettle.workflow import WorkflowConfigurationError
 from mettle.workflow_registry import (
     ApprovePacketRequest,
     CreateWorkflowRequest,
     EvidenceSubmissionError,
+    IntakeProvider,
     PacketNotApproved,
     PacketNotReady,
     PreparePacketRequest,
@@ -60,6 +66,7 @@ class CapabilitiesResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     bedrock_intake: bool
+    agentcore_runtime: bool
 
 
 def configured_workflow_registry() -> WorkflowRegistry:
@@ -79,10 +86,29 @@ def configured_workflow_registry() -> WorkflowRegistry:
     return WorkflowRegistry(bedrock_intake=bedrock_intake)
 
 
+def configured_agentcore_gateway() -> AgentCoreWorkflowGateway | None:
+    """Build the paid cloud boundary only after an explicit server opt-in."""
+    if os.getenv("METTLE_AGENTCORE_ENABLED") != "1":
+        return None
+    runtime_arn = os.getenv("METTLE_AGENTCORE_RUNTIME_ARN", "")
+    if not runtime_arn:
+        raise ValueError(
+            "METTLE_AGENTCORE_RUNTIME_ARN is required when AgentCore is enabled"
+        )
+    region = os.getenv("METTLE_AWS_REGION", "us-east-1")
+    profile = os.getenv("METTLE_AWS_PROFILE") or None
+    session = boto3.Session(profile_name=profile, region_name=region)
+    return AgentCoreWorkflowGateway(
+        client=session.client("bedrock-agentcore"),
+        runtime_arn=runtime_arn,
+    )
+
+
 def create_app(
     *,
     store: DemoStore | None = None,
     workflows: WorkflowRegistry | None = None,
+    agentcore: AgentCoreWorkflowGateway | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="Mettle local demo",
@@ -92,6 +118,7 @@ def create_app(
     )
     app.state.store = store or DemoStore()
     app.state.workflows = workflows or configured_workflow_registry()
+    app.state.agentcore = agentcore or configured_agentcore_gateway()
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -189,6 +216,19 @@ def create_app(
             headers={"Retry-After": "5"},
         )
 
+    @app.exception_handler(AgentCoreGatewayError)
+    async def agentcore_gateway_error(_request: Request, exc: AgentCoreGatewayError):
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": {
+                    "code": "agentcore_invocation_failed",
+                    "message": str(exc),
+                }
+            },
+            headers={"Retry-After": "5"},
+        )
+
     @app.exception_handler(EvidenceSubmissionError)
     async def evidence_submission(
         _request: Request,
@@ -237,7 +277,8 @@ def create_app(
     @app.get("/api/capabilities", response_model=CapabilitiesResponse)
     async def get_capabilities(request: Request) -> CapabilitiesResponse:
         return CapabilitiesResponse(
-            bedrock_intake=request.app.state.workflows.bedrock_enabled
+            bedrock_intake=request.app.state.workflows.bedrock_enabled,
+            agentcore_runtime=request.app.state.agentcore is not None,
         )
 
     @app.post("/api/demo/advance", response_model=DemoCampaign)
@@ -302,6 +343,70 @@ def create_app(
         if not workflow_id or len(workflow_id) > 64:
             raise WorkflowNotFound("workflow does not exist")
         return request.app.state.workflows.resume(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
+    def require_agentcore(request: Request) -> AgentCoreWorkflowGateway:
+        gateway = request.app.state.agentcore
+        if gateway is None:
+            raise WorkflowConfigurationError(
+                "AgentCore execution is not enabled on this server"
+            )
+        return gateway
+
+    @app.post("/api/agentcore/workflows", response_model=WorkflowEnvelope)
+    def create_agentcore_workflow(
+        payload: CreateWorkflowRequest,
+        request: Request,
+        response: Response,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        if payload.intake_provider is not IntakeProvider.BEDROCK:
+            raise WorkflowConfigurationError(
+                "AgentCore execution requires live Bedrock notice intake"
+            )
+        envelope, replayed = require_agentcore(request).create(
+            payload,
+            idempotency_key=idempotency_key,
+        )
+        response.status_code = 200 if replayed else 201
+        return envelope
+
+    @app.get(
+        "/api/agentcore/workflows/{workflow_id}",
+        response_model=WorkflowEnvelope,
+    )
+    def get_agentcore_workflow(
+        workflow_id: str,
+        request: Request,
+    ) -> WorkflowEnvelope:
+        if not workflow_id or len(workflow_id) > 64:
+            raise WorkflowNotFound("AgentCore workflow does not exist on this server")
+        return require_agentcore(request).get(workflow_id)
+
+    @app.post(
+        "/api/agentcore/workflows/{workflow_id}/resume",
+        response_model=WorkflowEnvelope,
+    )
+    def resume_agentcore_workflow(
+        workflow_id: str,
+        payload: ResumeWorkflowRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        if not workflow_id or len(workflow_id) > 64:
+            raise WorkflowNotFound("AgentCore workflow does not exist on this server")
+        return require_agentcore(request).resume(
             workflow_id,
             payload,
             idempotency_key=idempotency_key,

@@ -61,8 +61,10 @@ def ready_workflow(browser: TestClient) -> tuple[str, dict]:
     return workflow_id, created
 
 
-def client(*, workflows: WorkflowRegistry | None = None) -> TestClient:
-    return TestClient(create_app(store=DemoStore(), workflows=workflows))
+def client(*, workflows: WorkflowRegistry | None = None, agentcore=None) -> TestClient:
+    return TestClient(
+        create_app(store=DemoStore(), workflows=workflows, agentcore=agentcore)
+    )
 
 
 def test_dashboard_and_campaign_api_load() -> None:
@@ -73,6 +75,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert page.status_code == 200
     assert "Recovery command center" in page.text
     assert "Load a failed-inspection notice" in page.text
+    assert "Run on AgentCore" in page.text
     assert page.headers["content-security-policy"].startswith("default-src 'self'")
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"
@@ -174,7 +177,10 @@ def test_live_bedrock_workflow_runs_inside_graph_and_replays_without_second_call
         first = browser.post("/api/workflows", json=payload, headers=headers)
         replay = browser.post("/api/workflows", json=payload, headers=headers)
 
-    assert capabilities.json() == {"bedrock_intake": True}
+    assert capabilities.json() == {
+        "bedrock_intake": True,
+        "agentcore_runtime": False,
+    }
     assert first.status_code == 201
     assert replay.status_code == 200
     assert replay.json() == first.json()
@@ -192,7 +198,10 @@ def test_live_bedrock_workflow_fails_closed_when_server_has_not_enabled_it() -> 
             headers={"Idempotency-Key": "bedrock_disabled_123"},
         )
 
-    assert capabilities.json() == {"bedrock_intake": False}
+    assert capabilities.json() == {
+        "bedrock_intake": False,
+        "agentcore_runtime": False,
+    }
     assert response.status_code == 422
     assert response.json()["error"] == {
         "code": "workflow_configuration_error",
@@ -218,6 +227,63 @@ def test_live_bedrock_failure_is_safe_and_retryable() -> None:
         "code": "bedrock_intake_failed",
         "message": "Bedrock could not be reached with the current AWS configuration",
     }
+
+
+def test_agentcore_http_boundary_starts_restores_and_resumes_cloud_workflow() -> None:
+    cloud = WorkflowRegistry(bedrock_intake=parse_notice)
+    payload = workflow_payload(intake_provider="bedrock")
+    with client(agentcore=cloud) as browser:
+        capabilities = browser.get("/api/capabilities")
+        created = browser.post(
+            "/api/agentcore/workflows",
+            json=payload,
+            headers={"Idempotency-Key": "agentcore_create_123"},
+        )
+        workflow_id = created.json()["workflow_id"]
+        restored = browser.get(f"/api/agentcore/workflows/{workflow_id}")
+        interrupt_id = created.json()["snapshot"]["interrupts"][0]["interrupt_id"]
+        resumed = browser.post(
+            f"/api/agentcore/workflows/{workflow_id}/resume",
+            json={
+                "interrupt_id": interrupt_id,
+                "decision": "Use a wide equipment-clearance photo with the panel open",
+            },
+            headers={"Idempotency-Key": "agentcore_resume_123"},
+        )
+
+    assert capabilities.json() == {
+        "bedrock_intake": False,
+        "agentcore_runtime": True,
+    }
+    assert created.status_code == 201
+    assert restored.json() == created.json()
+    assert resumed.status_code == 200
+    assert resumed.json()["snapshot"]["status"] == "completed"
+    assert len(resumed.json()["snapshot"]["deliveries"]) == 3
+
+
+def test_agentcore_http_boundary_fails_closed_without_explicit_server_enablement() -> None:
+    with client() as browser:
+        disabled = browser.post(
+            "/api/agentcore/workflows",
+            json=workflow_payload(intake_provider="bedrock"),
+            headers={"Idempotency-Key": "agentcore_disabled_123"},
+        )
+        wrong_provider = browser.post(
+            "/api/agentcore/workflows",
+            json=workflow_payload(intake_provider="local"),
+            headers={"Idempotency-Key": "agentcore_provider_123"},
+        )
+
+    assert disabled.status_code == 422
+    assert disabled.json()["error"] == {
+        "code": "workflow_configuration_error",
+        "message": "AgentCore execution is not enabled on this server",
+    }
+    assert wrong_provider.status_code == 422
+    assert wrong_provider.json()["error"]["message"] == (
+        "AgentCore execution requires live Bedrock notice intake"
+    )
 
 
 def test_workflow_resume_is_idempotent_and_does_not_duplicate_outreach() -> None:

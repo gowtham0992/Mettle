@@ -50,7 +50,16 @@ def main(argv: list[str] | None = None) -> int:
     serve.add_argument("--aws-region", default="us-east-1")
     serve.add_argument(
         "--aws-profile",
-        help="server-side named AWS profile used only for live Bedrock intake",
+        help="server-side named AWS profile used for enabled AWS execution",
+    )
+    serve.add_argument(
+        "--enable-agentcore",
+        action="store_true",
+        help="enable deployed AgentCore execution; consumes AWS credits",
+    )
+    serve.add_argument(
+        "--agentcore-runtime-arn",
+        help="deployed Bedrock AgentCore runtime ARN (kept server-side)",
     )
     args = parser.parse_args(argv)
 
@@ -67,6 +76,20 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError as exc:
                 parser.error(str(exc))
             os.environ["METTLE_BEDROCK_ENABLED"] = "1"
+            os.environ["METTLE_AWS_REGION"] = args.aws_region
+            if args.aws_profile:
+                os.environ["METTLE_AWS_PROFILE"] = args.aws_profile
+        if args.enable_agentcore:
+            if not args.agentcore_runtime_arn:
+                parser.error(
+                    "--agentcore-runtime-arn is required with --enable-agentcore"
+                )
+            if not args.agentcore_runtime_arn.startswith(
+                "arn:aws:bedrock-agentcore:"
+            ):
+                parser.error("--agentcore-runtime-arn must be an AgentCore ARN")
+            os.environ["METTLE_AGENTCORE_ENABLED"] = "1"
+            os.environ["METTLE_AGENTCORE_RUNTIME_ARN"] = args.agentcore_runtime_arn
             os.environ["METTLE_AWS_REGION"] = args.aws_region
             if args.aws_profile:
                 os.environ["METTLE_AWS_PROFILE"] = args.aws_profile

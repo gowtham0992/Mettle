@@ -215,7 +215,7 @@ h2 { font-size: 13px; font-weight: 900; }
 .notice-dialog__footer > span { color: var(--faint); font: 700 9px/1.2 var(--mono); letter-spacing: 1px; }
 .notice-dialog__actions { display: flex; align-items: stretch; gap: 8px; }
 .notice-dialog__actions .button { min-height: 44px; }
-.notice-dialog__actions .button--orange { display: grid; gap: 3px; text-align: left; }
+.notice-dialog__actions .button:not(:first-child) { display: grid; gap: 3px; text-align: left; }
 .notice-dialog__actions small { font: 700 7px/1 var(--mono); letter-spacing: .7px; opacity: .68; }
 
 @keyframes pulse { 50% { opacity: .35; } }
@@ -280,7 +280,7 @@ h2 { font-size: 13px; font-weight: 900; }
   .demo-driver__tag { display: none; }
   .notice-dialog__footer { align-items: stretch; flex-direction: column; }
   .field textarea { min-height: 240px; }
-  .notice-dialog__actions { display: grid; grid-template-columns: .9fr 1.1fr; }
+  .notice-dialog__actions { display: grid; grid-template-columns: 1fr; }
   .notice-dialog__footer .button { width: 100%; justify-items: center; text-align: center; }
   .evidence-fixtures { grid-template-columns: 1fr; }
   .evidence-fixture { grid-template-columns: 105px minmax(0, 1fr); }

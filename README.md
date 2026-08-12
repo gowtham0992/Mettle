@@ -25,7 +25,12 @@ policy nodes parse and plan the campaign, an idempotent communication port
 records trade outreach, and a Strands interrupt pauses the graph for contractor
 judgment before it resumes. No cloud model is invoked in this local mode.
 
-The command center has two modes. **Load notice** runs the real local Strands graph, preserves the workflow ID in the URL, and exposes a synthetic evidence lab for all three trades. The **demo controls** drive a deterministic six-event judge scenario: accepted evidence, rejected evidence with a precise re-request, deadline escalation, human judgment, and a contractor-approved final packet.
+The command center exposes three execution choices under **Load notice**:
+free local execution, local Strands with live Bedrock intake, and the deployed
+AgentCore runtime. The deterministic **demo controls** remain the complete
+six-event judge scenario: accepted evidence, rejected evidence with a precise
+re-request, deadline escalation, human judgment, and a contractor-approved
+final packet.
 
 The deterministic core is intentional. Strands orchestrates the recovery graph, while Bedrock can replace only the intake node. Domain rules remain testable without a model.
 
@@ -109,14 +114,33 @@ The cloud runtime is deployed in `us-east-1` as `MettleRecovery` version 2.
 Its tested path runs the live Bedrock intake inside Strands, pauses for the
 contractor's judgment, and resumes the same AgentCore session to completion.
 
+To expose **Run on AgentCore** in the command center, start the loopback-only
+server with the deployed runtime fixed in server configuration:
+
+```bash
+uv run mettle serve \
+  --enable-agentcore \
+  --agentcore-runtime-arn arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/MettleRecovery-example \
+  --aws-profile mettle-agentcore \
+  --aws-region us-east-1
+```
+
+The browser can neither select a runtime nor access AWS credentials. The local
+gateway owns the AgentCore session ID, reuses it for safe retries and resume,
+caps process state, and sends only validated `start` and `resume` operations.
+Cloud workflow state can be restored while this local server remains running.
+The synthetic evidence lab and packet builder stay on the complete local demo
+path until those operations are added to the deployed runtime contract.
+
 `mettle-dev` assumes the one-hour, least-privilege
 `MettleHackathonDeveloper` role. It can invoke Nova Micro but cannot administer
 IAM or invoke more expensive models. See [AWS access and teardown](docs/aws-access.md).
 
 Workflow state is intentionally session-local in this phase. Restarting the
-local server clears created runs; a deployed AgentCore session keeps the graph
-only while its isolated runtime session is alive. Durable storage and live
-communication remain later slices.
+local dashboard server clears its private mapping from Mettle workflow IDs to
+AgentCore sessions; AgentCore itself keeps the graph only while the isolated
+runtime session is alive. Durable storage and live communication remain later
+slices.
 
 ## Product boundary
 

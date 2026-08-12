@@ -24,6 +24,7 @@ const elements = {
   metrics: document.querySelector("#metrics-list"),
   packet: document.querySelector("#packet-status"),
   packetList: document.querySelector("#packet-list"),
+  packetNote: document.querySelector("#packet-note"),
   packetAction: document.querySelector("#packet-action"),
   demoStep: document.querySelector("#demo-step"),
   advance: document.querySelector("#advance-button"),
@@ -36,6 +37,7 @@ const elements = {
   workflowError: document.querySelector("#workflow-form-error"),
   startWorkflow: document.querySelector("#start-workflow-button"),
   startBedrock: document.querySelector("#start-bedrock-button"),
+  startAgentCore: document.querySelector("#start-agentcore-button"),
   closeNotice: document.querySelector("#close-notice-button"),
   retry: document.querySelector("#retry-button"),
   toast: document.querySelector("#toast"),
@@ -53,8 +55,10 @@ const stepLabels = [
 
 let campaign = null;
 let activeWorkflowId = null;
+let activeWorkflowTarget = "local";
 let toastTimer = null;
 let bedrockEnabled = false;
+let agentCoreEnabled = false;
 let workflowCreateKey = null;
 let workflowCreateProvider = null;
 
@@ -79,7 +83,7 @@ function formatTime(value) {
     .format(new Date(value));
 }
 
-function workflowCampaign(envelope) {
+function workflowCampaign(envelope, executionTarget = "local") {
   const snapshot = envelope.snapshot;
   const notice = snapshot.notice;
   const plan = snapshot.plan;
@@ -184,6 +188,7 @@ function workflowCampaign(envelope) {
   const citationsReady = [...evidenceByCitation.values()].filter((item) => item.status === "accepted").length;
   return {
     source_mode: "workflow",
+    execution_target: executionTarget,
     intake_provider: envelope.intake_provider || "local",
     workflow_status: snapshot.status,
     notice_id: notice.notice_id,
@@ -330,12 +335,15 @@ function renderJudgment(judgment) {
         });
         campaign = workflowCampaign(envelope);
       } else if (activeWorkflowId) {
-        const envelope = await request(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/resume`, {
+        const workflowRoot = activeWorkflowTarget === "agentcore"
+          ? "/api/agentcore/workflows"
+          : "/api/workflows";
+        const envelope = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/resume`, {
           method: "POST",
           headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
           body: JSON.stringify({ interrupt_id: judgment.judgment_id, decision }),
         });
-        campaign = workflowCampaign(envelope);
+        campaign = workflowCampaign(envelope, activeWorkflowTarget);
       } else {
         campaign = await request(`/api/judgments/${encodeURIComponent(judgment.judgment_id)}/resolve`, {
           method: "POST",
@@ -430,8 +438,9 @@ function render(data) {
   renderMetrics(data.metrics);
   renderPacket(data);
   const isWorkflow = data.source_mode === "workflow";
-  elements.evidencePanel.hidden = !isWorkflow;
-  if (isWorkflow) {
+  const isAgentCore = isWorkflow && data.execution_target === "agentcore";
+  elements.evidencePanel.hidden = !isWorkflow || isAgentCore;
+  if (isWorkflow && !isAgentCore) {
     const latestEvidence = data.evidence.at(-1);
     elements.evidenceResult.hidden = !latestEvidence;
     if (latestEvidence) {
@@ -449,14 +458,17 @@ function render(data) {
       button.title = button.disabled ? "Resolve the mechanical evidence specification first" : "";
     }
   }
-  elements.packetAction.hidden = !isWorkflow
+  elements.packetAction.hidden = !isWorkflow || isAgentCore
     || (data.metrics.citations_ready < data.metrics.citations_total && data.packet_status !== "approved");
   elements.packetAction.textContent = data.packet_status === "approved"
     ? "Download approved PDF"
     : data.packet_status === "awaiting_approval" ? "Awaiting your approval" : "Prepare packet for approval";
   elements.packetAction.disabled = data.packet_status === "awaiting_approval";
+  elements.packetNote.textContent = isAgentCore
+    ? "AgentCore completed notice intake, outreach, and contractor judgment. Continue the full evidence-to-packet scenario in local demo mode."
+    : "Assembles as evidence is accepted. Nothing reaches the inspector until you approve it.";
   elements.demoStep.textContent = isWorkflow
-    ? `${data.intake_provider === "bedrock" ? "BEDROCK + " : ""}STRANDS · ${data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH RESUMED"}`
+    ? `${isAgentCore ? "AGENTCORE + " : ""}${data.intake_provider === "bedrock" ? "BEDROCK + " : ""}STRANDS · ${data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH COMPLETE"}`
     : `${data.scenario_step} · ${stepLabels[data.scenario_step] || "RECOVERY RUN"}`;
   elements.advance.disabled = isWorkflow || data.scenario_complete;
   const advanceLabels = elements.advance.querySelectorAll("span");
@@ -468,12 +480,23 @@ function render(data) {
 async function loadCampaign() {
   elements.error.hidden = true;
   const workflowId = new URLSearchParams(window.location.search).get("workflow");
+  const workflowTarget = new URLSearchParams(window.location.search).get("runtime") === "agentcore"
+    ? "agentcore"
+    : "local";
   try {
     if (workflowId) {
       activeWorkflowId = workflowId;
-      render(workflowCampaign(await request(`/api/workflows/${encodeURIComponent(workflowId)}`)));
+      activeWorkflowTarget = workflowTarget;
+      const workflowRoot = workflowTarget === "agentcore"
+        ? "/api/agentcore/workflows"
+        : "/api/workflows";
+      render(workflowCampaign(
+        await request(`${workflowRoot}/${encodeURIComponent(workflowId)}`),
+        workflowTarget,
+      ));
     } else {
       activeWorkflowId = null;
+      activeWorkflowTarget = "local";
       render(await request("/api/campaign"));
     }
   } catch (error) { showError(error); }
@@ -483,13 +506,19 @@ async function loadCapabilities() {
   try {
     const capabilities = await request("/api/capabilities");
     bedrockEnabled = capabilities.bedrock_intake === true;
+    agentCoreEnabled = capabilities.agentcore_runtime === true;
   } catch (_error) {
     bedrockEnabled = false;
+    agentCoreEnabled = false;
   }
   elements.startBedrock.disabled = !bedrockEnabled;
   elements.startBedrock.title = bedrockEnabled
     ? "Run notice intake on Amazon Nova Micro; this consumes AWS credit"
     : "Start the server with Bedrock enabled to use live intake";
+  elements.startAgentCore.disabled = !agentCoreEnabled;
+  elements.startAgentCore.title = agentCoreEnabled
+    ? "Run the Strands graph on the deployed AgentCore runtime; this consumes AWS credit"
+    : "Start the server with AgentCore enabled to use the deployed runtime";
 }
 
 elements.advance.addEventListener("click", async () => {
@@ -519,6 +548,7 @@ elements.reset.addEventListener("click", async () => {
   try {
     if (activeWorkflowId) {
       activeWorkflowId = null;
+      activeWorkflowTarget = "local";
       window.history.replaceState({}, "", window.location.pathname);
     }
     render(await request("/api/demo/reset", { method: "POST", body: "{}" }));
@@ -542,18 +572,25 @@ elements.noticeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const noticeText = elements.noticeText.value.trim();
   if (!noticeText) return;
-  const provider = event.submitter?.value === "bedrock" ? "bedrock" : "local";
-  if (provider === "bedrock" && !bedrockEnabled) return;
-  if (!workflowCreateKey || workflowCreateProvider !== provider) {
+  const executionTarget = event.submitter?.value === "agentcore" ? "agentcore" : "local";
+  const provider = event.submitter?.value === "local" ? "local" : "bedrock";
+  if (provider === "bedrock" && executionTarget === "local" && !bedrockEnabled) return;
+  if (executionTarget === "agentcore" && !agentCoreEnabled) return;
+  const createMode = `${executionTarget}:${provider}`;
+  if (!workflowCreateKey || workflowCreateProvider !== createMode) {
     workflowCreateKey = crypto.randomUUID().replaceAll("-", "_");
-    workflowCreateProvider = provider;
+    workflowCreateProvider = createMode;
   }
   const submittedKey = workflowCreateKey;
   setBusy(elements.startWorkflow, true);
   setBusy(elements.startBedrock, true);
+  setBusy(elements.startAgentCore, true);
   elements.workflowError.hidden = true;
   try {
-    const envelope = await request("/api/workflows", {
+    const workflowRoot = executionTarget === "agentcore"
+      ? "/api/agentcore/workflows"
+      : "/api/workflows";
+    const envelope = await request(workflowRoot, {
       method: "POST",
       headers: { "Idempotency-Key": submittedKey },
       body: JSON.stringify({
@@ -568,13 +605,17 @@ elements.noticeForm.addEventListener("submit", async (event) => {
       }),
     });
     activeWorkflowId = envelope.workflow_id;
-    window.history.replaceState({}, "", `${window.location.pathname}?workflow=${encodeURIComponent(activeWorkflowId)}`);
-    render(workflowCampaign(envelope));
+    activeWorkflowTarget = executionTarget;
+    const targetQuery = executionTarget === "agentcore" ? "&runtime=agentcore" : "";
+    window.history.replaceState({}, "", `${window.location.pathname}?workflow=${encodeURIComponent(activeWorkflowId)}${targetQuery}`);
+    render(workflowCampaign(envelope, executionTarget));
     elements.noticeDialog.close();
     workflowCreateKey = null;
     workflowCreateProvider = null;
-    showToast(provider === "bedrock"
-      ? "Nova Micro grounded the notice; Strands ran recovery and paused only for your judgment."
+    showToast(executionTarget === "agentcore"
+      ? "AgentCore ran the deployed Strands recovery graph and paused only for your judgment."
+      : provider === "bedrock"
+        ? "Nova Micro grounded the notice; Strands ran recovery and paused only for your judgment."
       : "Local intake and Strands ran recovery, then paused only for your judgment.");
   } catch (error) {
     elements.workflowError.textContent = error.message;
@@ -583,6 +624,8 @@ elements.noticeForm.addEventListener("submit", async (event) => {
     setBusy(elements.startWorkflow, false);
     elements.startBedrock.disabled = !bedrockEnabled;
     elements.startBedrock.setAttribute("aria-busy", "false");
+    elements.startAgentCore.disabled = !agentCoreEnabled;
+    elements.startAgentCore.setAttribute("aria-busy", "false");
   }
 });
 
