@@ -116,3 +116,70 @@ def test_strands_workflow_uses_injected_intake_without_changing_later_nodes() ->
     assert extracted == [NOTICE]
     assert snapshot.status is WorkflowStatus.INTERRUPTED
     assert [item.citation_id for item in messenger.deliveries] == ["1", "2"]
+
+
+def _completed_session() -> tuple[RecoveryWorkflowSession, RecordingMessenger]:
+    messenger = RecordingMessenger()
+    session = RecoveryWorkflowSession(
+        notice_text=NOTICE,
+        as_of=date(2026, 8, 10),
+        roster=ROSTER,
+        messenger=messenger,
+    )
+    interrupted = session.start()
+    session.resume(
+        interrupt_id=interrupted.interrupts[0].interrupt_id,
+        decision="Request a wide equipment-clearance photo with the access panel open.",
+    )
+    return session, messenger
+
+
+def test_chase_graph_replans_open_citations_at_the_next_checkpoint() -> None:
+    session, messenger = _completed_session()
+
+    snapshot = session.run_next_check(
+        accepted_citation_ids={"1"},
+        evidence_feedback={"2": "The close photo did not show the corrected wall location."},
+    )
+
+    assert snapshot.status is WorkflowStatus.COMPLETED
+    assert snapshot.plan.as_of == date(2026, 8, 14)
+    assert snapshot.plan.priority.value == "urgent"
+    assert [item.citation_id for item in snapshot.plan.actions] == ["2", "3"]
+    assert len(messenger.deliveries) == 5
+    assert [item.citation_id for item in messenger.deliveries[-2:]] == ["2", "3"]
+    assert all(item.scheduled_on == date(2026, 8, 14) for item in messenger.deliveries[-2:])
+    assert "corrected wall location" in messenger.deliveries[-2].body
+
+
+def test_chase_graph_interrupts_only_at_deadline_tradeoff() -> None:
+    session, messenger = _completed_session()
+    first = session.run_next_check(accepted_citation_ids=set())
+    assert first.status is WorkflowStatus.COMPLETED
+
+    critical = session.run_next_check(accepted_citation_ids={"1"})
+
+    assert critical.status is WorkflowStatus.INTERRUPTED
+    assert critical.plan.as_of == date(2026, 8, 15)
+    assert critical.interrupts[0].name == "deadline-tradeoff"
+    assert critical.interrupts[0].reason["open_citation_ids"] == ["2", "3"]
+    assert len(messenger.deliveries) == 8
+
+    resumed = session.resume(
+        interrupt_id=critical.interrupts[0].interrupt_id,
+        decision="Keep the current reinspection date and continue critical follow-ups.",
+    )
+    assert resumed.status is WorkflowStatus.COMPLETED
+    assert resumed.deadline_decision.startswith("Keep the current")
+
+
+def test_chase_graph_stops_all_outreach_when_every_citation_is_accepted() -> None:
+    session, messenger = _completed_session()
+    initial_count = len(messenger.deliveries)
+
+    snapshot = session.run_next_check(accepted_citation_ids={"1", "2", "3"})
+
+    assert snapshot.status is WorkflowStatus.COMPLETED
+    assert snapshot.plan.actions == []
+    assert snapshot.interrupts == []
+    assert len(messenger.deliveries) == initial_count

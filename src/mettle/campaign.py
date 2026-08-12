@@ -69,6 +69,14 @@ def build_campaign_plan(notice: InspectionNotice, *, as_of: date) -> CampaignPla
     )
 
 
+def next_campaign_check(current: date, deadline: date) -> date:
+    """Return the next meaningful recovery checkpoint selected by policy."""
+    if current >= deadline:
+        raise ValueError("the reinspection deadline has been reached")
+    checkpoints = [deadline - timedelta(days=offset) for offset in (7, 3, 2, 1, 0)]
+    return next(checkpoint for checkpoint in checkpoints if checkpoint > current)
+
+
 def _priority_for(days_remaining: int) -> Priority:
     if days_remaining <= 2:
         return Priority.CRITICAL

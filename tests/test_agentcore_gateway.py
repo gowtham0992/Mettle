@@ -15,6 +15,7 @@ from mettle.workflow_registry import (
     CreateWorkflowRequest,
     PreparePacketRequest,
     ResumeWorkflowRequest,
+    RunNextCheckRequest,
     SubmitEvidenceRequest,
     SubmitPhotoEvidenceRequest,
     WorkflowConflict,
@@ -191,6 +192,24 @@ def test_photo_evidence_is_base64_encoded_inside_the_private_agentcore_request()
     request_body = json.loads(client.requests[1]["payload"])
     assert request_body["operation"] == "submit_photo_evidence"
     assert request_body["payload"]["image_base64"] == b64encode(b"normalized-jpeg").decode("ascii")
+
+
+def test_recovery_check_uses_the_existing_private_agentcore_session() -> None:
+    created = interrupted_envelope()
+    checked = created.model_copy(deep=True)
+    client = QueueClient([success(created), success(checked)])
+    gateway = AgentCoreWorkflowGateway(client=client, runtime_arn=RUNTIME_ARN)
+    gateway.create(create_payload(), idempotency_key="cloud_check_create_123")
+
+    gateway.run_next_check(
+        created.workflow_id,
+        RunNextCheckRequest(),
+        idempotency_key="cloud_check_tick_123",
+    )
+
+    request_body = json.loads(client.requests[1]["payload"])
+    assert request_body["operation"] == "run_next_check"
+    assert client.requests[1]["runtimeSessionId"] == client.requests[0]["runtimeSessionId"]
 
 
 def test_runtime_error_is_mapped_without_exposing_untrusted_details() -> None:

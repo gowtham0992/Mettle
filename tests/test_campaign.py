@@ -1,6 +1,8 @@
 from datetime import date
 
-from mettle.campaign import build_campaign_plan
+import pytest
+
+from mettle.campaign import build_campaign_plan, next_campaign_check
 from mettle.domain import JudgmentKind, Priority
 from mettle.notice_parser import parse_notice
 
@@ -55,3 +57,14 @@ def test_campaign_never_turns_ambiguous_citation_into_trade_instruction() -> Non
     assert judgment.kind is JudgmentKind.CODE_INTERPRETATION
     assert "recognized trade" in judgment.reason
     assert "evidence requirements" in judgment.reason
+
+
+def test_next_campaign_check_moves_between_meaningful_deadline_thresholds() -> None:
+    deadline = date(2026, 8, 17)
+
+    assert next_campaign_check(date(2026, 8, 10), deadline) == date(2026, 8, 14)
+    assert next_campaign_check(date(2026, 8, 14), deadline) == date(2026, 8, 15)
+    assert next_campaign_check(date(2026, 8, 15), deadline) == date(2026, 8, 16)
+    assert next_campaign_check(date(2026, 8, 16), deadline) == deadline
+    with pytest.raises(ValueError, match="deadline has been reached"):
+        next_campaign_check(deadline, deadline)

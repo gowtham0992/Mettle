@@ -15,7 +15,9 @@ intake. It can:
 - load a realistic text-form correction notice from the command center;
 - extract its citations without interpreting building code;
 - record citation-specific trade outreach through a safe local adapter;
-- increase urgency as the reinspection deadline approaches; and
+- advance through server-selected T−7, T−3, T−2, T−1, and deadline checkpoints;
+- replan only open citations, stop follow-ups when evidence is accepted, and increase urgency as the reinspection deadline approaches;
+- pause at T−2 for the contractor's keep-date-or-reschedule judgment; and
 - pause at ambiguous requirements, accept the contractor's decision, and resume with contractor-directed outreach;
 - securely normalize a real JPEG/PNG photo, use Nova Lite to check only visible notice requirements, and accept, re-request, or reserve ambiguity for the contractor;
 - retain synthetic fixtures as a deterministic, zero-cost demo fallback; and
@@ -24,7 +26,9 @@ intake. It can:
 The product core now runs those steps as a real Strands graph. Deterministic
 policy nodes parse and plan the campaign, an idempotent communication port
 records trade outreach, and a Strands interrupt pauses the graph for contractor
-judgment before it resumes. No cloud model is invoked in this local mode.
+judgment before it resumes. A second Strands chase graph runs each scheduled
+recovery check, including the T−2 deadline interrupt. No cloud model is invoked
+in this local mode.
 
 The command center exposes three execution choices under **Load notice**:
 free local execution, local Strands with live Bedrock intake, and the deployed
@@ -48,7 +52,7 @@ uv run pytest
 
 Open [http://127.0.0.1:4310](http://127.0.0.1:4310) after starting the server. The demo binds only to the local machine.
 
-Select **Load notice** to use the included synthetic notice and roster. The local communication adapter records every proposed message but never sends SMS. In **Evidence lab**, resolve the mechanical evidence specification, assess the electrical, framing, and mechanical fixtures, then prepare and approve the downloadable packet.
+Select **Load notice** to use the included synthetic notice and roster. The local communication adapter records every proposed message but never sends SMS. Resolve the mechanical evidence specification, accept or reject evidence in **Evidence lab**, and use **Recovery clock** to compress the next server-selected scheduled check into the demo. At T−2 Mettle asks whether to keep the current date; once all evidence is accepted, the chase loop stands down automatically. Then prepare and approve the downloadable packet.
 
 Strands is installed as a core dependency, but no AWS credentials are needed
 for the example or tests. Amazon Bedrock intake is deliberately opt-in, so
@@ -94,8 +98,9 @@ manual-review status; the model is never asked to certify code compliance.
 
 ## Run the AgentCore boundary locally
 
-The official AgentCore app lives at `agentcore_app.py`. It accepts only the
-bounded `start` and `resume` operations, preserves the Strands workflow in the
+The official AgentCore app lives at `agentcore_app.py`. It accepts only bounded,
+discriminated workflow operations—including `start`, `resume`, evidence,
+packet, and `run_next_check`—preserves the Strands workflow in the
 AgentCore session, and does not let callers select an AWS profile, region, or
 model. Start the local runtime without deploying anything:
 
@@ -125,6 +130,11 @@ with Nova Lite plus two deterministic fallback fixtures, gates packet approval,
 and returns the verified four-page PDF. The previous version 3 artifact was
 successfully redeployed and tested during a rollback drill before the exact
 vision artifact was restored.
+
+The deadline chase graph described above is implemented and verified locally
+through the same AgentCore invocation contract. It is not part of deployed
+version 6 yet; deploy the next immutable artifact before demonstrating that
+specific control through **Run on AgentCore**.
 
 To expose **Run on AgentCore** in the command center, start the loopback-only
 server with the deployed runtime fixed in server configuration:

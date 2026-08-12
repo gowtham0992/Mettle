@@ -105,6 +105,10 @@ class SubmitPhotoEvidenceRequest(BaseModel):
     citation_id: str = Field(min_length=1, max_length=50)
 
 
+class RunNextCheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
 class AgentCorePhotoEvidenceRequest(SubmitPhotoEvidenceRequest):
     image_base64: str = Field(min_length=4, max_length=6_700_000)
 
@@ -144,6 +148,7 @@ class _WorkflowEntry:
         self.resume_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
         self.evidence: list[EvidenceAssessment] = []
         self.evidence_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
+        self.check_replays: dict[str, WorkflowEnvelope] = {}
         self.uploaded_photos: dict[str, bytes] = {}
         self.packet: PacketRecord | None = None
         self.packet_prepare_replays: dict[str, WorkflowEnvelope] = {}
@@ -370,6 +375,45 @@ class WorkflowRegistry:
             entry.uploaded_photos[assessment_id] = bytes(image)
             envelope = self._envelope(workflow_id, entry)
             entry.evidence_replays[idempotency_key] = (fingerprint, envelope)
+            return envelope
+
+    def run_next_check(
+        self,
+        workflow_id: str,
+        *,
+        idempotency_key: str,
+    ) -> WorkflowEnvelope:
+        with self._lock:
+            entry = self._entries.get(workflow_id)
+        if entry is None:
+            raise WorkflowNotFound("workflow does not exist")
+        with entry.lock:
+            replay = entry.check_replays.get(idempotency_key)
+            if replay is not None:
+                return replay.model_copy(deep=True)
+            if entry.packet is not None:
+                raise WorkflowConflict("campaign checks stop after packet preparation")
+
+            latest = {item.citation_id: item for item in entry.evidence}
+            accepted = {
+                citation_id
+                for citation_id, assessment in latest.items()
+                if assessment.status.value == "accepted"
+            }
+            feedback = {
+                citation_id: assessment.explanation
+                for citation_id, assessment in latest.items()
+                if assessment.status.value != "accepted"
+            }
+            try:
+                entry.snapshot = entry.session.run_next_check(
+                    accepted_citation_ids=accepted,
+                    evidence_feedback=feedback,
+                )
+            except WorkflowStateError as exc:
+                raise WorkflowConflict(str(exc)) from exc
+            envelope = self._envelope(workflow_id, entry)
+            entry.check_replays[idempotency_key] = envelope
             return envelope
 
     def prepare_packet(

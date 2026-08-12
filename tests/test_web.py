@@ -48,6 +48,12 @@ class FakeAgentCoreGateway:
             idempotency_key=idempotency_key,
         )
 
+    def run_next_check(self, workflow_id, payload, *, idempotency_key):
+        return self.registry.run_next_check(
+            workflow_id,
+            idempotency_key=idempotency_key,
+        )
+
     def prepare_packet(self, workflow_id, payload, *, idempotency_key):
         return self.registry.prepare_packet(
             workflow_id, idempotency_key=idempotency_key
@@ -188,6 +194,88 @@ def test_real_photo_upload_rejects_spoofed_content_and_oversize() -> None:
     assert spoofed.json()["error"]["code"] == "invalid_photo"
 
 
+def test_recovery_check_is_idempotent_stops_closed_citation_and_interrupts_at_t_minus_two() -> None:
+    with client() as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "check_workflow_123"},
+        ).json()
+        workflow_id = created["workflow_id"]
+        browser.post(
+            f"/api/workflows/{workflow_id}/resume",
+            json={
+                "interrupt_id": created["snapshot"]["interrupts"][0]["interrupt_id"],
+                "decision": "Wide photo showing equipment clearance with the access panel open",
+            },
+            headers={"Idempotency-Key": "check_resume_123"},
+        )
+        browser.post(
+            f"/api/workflows/{workflow_id}/evidence",
+            json={"citation_id": "1", "sample_id": "panel_wide_measured"},
+            headers={"Idempotency-Key": "check_evidence_123"},
+        )
+        headers = {"Idempotency-Key": "check_tick_123"}
+        first = browser.post(
+            f"/api/workflows/{workflow_id}/checks/next",
+            json={},
+            headers=headers,
+        )
+        replay = browser.post(
+            f"/api/workflows/{workflow_id}/checks/next",
+            json={},
+            headers=headers,
+        )
+        critical = browser.post(
+            f"/api/workflows/{workflow_id}/checks/next",
+            json={},
+            headers={"Idempotency-Key": "check_tick_critical_123"},
+        )
+
+    assert first.status_code == 200
+    assert replay.json() == first.json()
+    assert first.json()["snapshot"]["plan"]["as_of"] == "2026-08-14"
+    assert [
+        item["citation_id"] for item in first.json()["snapshot"]["deliveries"][-2:]
+    ] == ["2", "3"]
+    assert critical.json()["snapshot"]["status"] == "interrupted"
+    assert critical.json()["snapshot"]["interrupts"][0]["name"] == "deadline-tradeoff"
+
+
+def test_recovery_check_refuses_to_advance_past_pending_judgment() -> None:
+    with client() as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "blocked_check_workflow_123"},
+        ).json()
+        blocked = browser.post(
+            f"/api/workflows/{created['workflow_id']}/checks/next",
+            json={},
+            headers={"Idempotency-Key": "blocked_check_tick_123"},
+        )
+
+    assert blocked.status_code == 409
+    assert "waiting for a contractor decision" in blocked.json()["error"]["message"]
+
+
+def test_recovery_check_rejects_client_supplied_clock_state() -> None:
+    with client() as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "strict_check_workflow_123"},
+        ).json()
+        response = browser.post(
+            f"/api/workflows/{created['workflow_id']}/checks/next",
+            json={"as_of": "2026-08-16"},
+            headers={"Idempotency-Key": "strict_check_tick_123"},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_request"
+
+
 def test_dashboard_and_campaign_api_load() -> None:
     with client() as browser:
         page = browser.get("/")
@@ -197,6 +285,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Recovery command center" in page.text
     assert "Load a failed-inspection notice" in page.text
     assert "Run on AgentCore" in page.text
+    assert "Recovery clock" in page.text
+    assert "Run next scheduled check" in page.text
     assert page.headers["content-security-policy"].startswith("default-src 'self'")
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"

@@ -28,7 +28,7 @@ into caller-facing failures. The deterministic parser remains the default.
 
 ### Orchestration
 
-The working Strands graph runs `intake -> plan -> coordinate -> judgment gate -> contractor-directed coordination -> finish`. A graph interrupt pauses before code interpretation, returns a judgment card to the contractor, and resumes without replaying the initial outreach. The application then binds notice-anchored evidence assessment and contractor-approved packet assembly to that workflow state.
+The intake graph runs `intake -> plan -> coordinate -> judgment gate -> contractor-directed coordination -> finish`. A graph interrupt pauses before code interpretation, returns a judgment card to the contractor, and resumes without replaying the initial outreach. A second chase graph runs `replan open -> follow up -> deadline gate -> finish check`: deterministic policy chooses the next T−7/T−3/T−2/T−1/deadline checkpoint, removes citations with accepted evidence, records idempotent follow-ups for only the remainder, and interrupts at T−2 for the contractor's keep-date-or-reschedule judgment. The browser can compress time for a judge, but cannot choose campaign dates.
 
 ### External ports
 
@@ -40,12 +40,12 @@ Packet generation begins only when the latest evidence for every citation is acc
 
 ### Local application boundary
 
-FastAPI exposes bounded workflow creation, retrieval, and resume endpoints to the command center. A thread-safe in-memory registry owns each stateful Strands session, caps the number of runs, and protects create and resume operations with idempotency keys. It is a development boundary, not durable production storage.
+FastAPI exposes bounded workflow creation, retrieval, resume, evidence, packet, and next-check endpoints to the command center. A thread-safe in-memory registry owns each stateful Strands session, caps the number of runs, and protects every mutation with idempotency keys. It is a development boundary, not durable production storage; a production scheduler can invoke the same next-check operation later.
 
 ### AgentCore runtime boundary
 
 `agentcore_app.py` hosts the same registry behind the official AgentCore Python
-runtime. A discriminated JSON contract permits only `start` and `resume`,
+runtime. A discriminated JSON contract permits only the named workflow operations,
 forbids extra fields, bounds idempotency keys, and converts internal failures
 to quiet error codes. Logs contain only a one-way session reference; notice
 text and credentials are never logged.
@@ -95,7 +95,7 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 
 1. **Notice to campaign plan:** prove traceable extraction, deadline behavior, and judgment routing without a model.
 2. **Local Strands orchestration:** run deterministic contract nodes, recorded outreach, and a resumable human interrupt. **Complete.**
-3. **Recorded communication loop:** receive simulated SMS events with retry and idempotency behavior.
+3. **Deadline chase loop:** replan open citations, record scheduled follow-ups with replay safety, stop on accepted evidence, and interrupt at the T−2 tradeoff. **Complete locally and through the AgentCore-compatible contract; cloud redeploy pending.**
 4. **Evidence assessment:** compare trusted fixtures or normalized real photos to notice-anchored requirements and produce a specific re-request or judgment interrupt. **Local and Bedrock Vision adapters complete.**
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
 6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF. **Complete.**

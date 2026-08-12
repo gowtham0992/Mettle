@@ -78,9 +78,24 @@
             <div id="judgment-list" class="judgment-list"></div>
           </section>
 
+          <section class="panel recovery-clock" id="recovery-clock" hidden>
+            <div class="panel__header">
+              <div><span class="section-index">03</span><h2>Recovery clock</h2></div>
+              <span class="recovery-clock__mode">AUTONOMOUS</span>
+            </div>
+            <p class="panel__kicker">DEADLINE-AWARE CAMPAIGN · OPEN CITATIONS ONLY</p>
+            <div class="clock-track" id="clock-track" aria-label="Recovery campaign checkpoints"></div>
+            <div class="clock-brief" aria-live="polite">
+              <strong id="clock-title">Waiting for a recovery run</strong>
+              <p id="clock-copy">Mettle will choose the next scheduled checkpoint from the reinspection deadline.</p>
+            </div>
+            <button class="button clock-action" id="clock-action" type="button">Run next scheduled check</button>
+            <p class="clock-note">DEMO TIME COMPRESSION · THE SAME SERVER-SIDE ENGINE IS SCHEDULER-READY</p>
+          </section>
+
           <section class="panel evidence-panel" id="evidence-panel" hidden>
             <div class="panel__header">
-              <div><span class="section-index">03</span><h2>Evidence lab</h2></div>
+              <div><span class="section-index">04</span><h2>Evidence lab</h2></div>
               <span class="evidence-panel__mode">VISION + FIXTURES</span>
             </div>
             <form class="photo-evidence" id="photo-evidence-form">
@@ -128,7 +143,7 @@
 
           <section class="panel packet-panel">
             <div class="panel__header">
-              <div><span class="section-index">04</span><h2>Reinspection packet</h2></div>
+              <div><span class="section-index">05</span><h2>Reinspection packet</h2></div>
               <strong id="packet-status" class="packet-stamp">LOCKED</strong>
             </div>
             <div id="packet-list" class="packet-list"></div>
@@ -138,7 +153,7 @@
 
           <section class="panel log-panel">
             <div class="panel__header">
-              <div><span class="section-index">05</span><h2>Recovery log</h2></div>
+              <div><span class="section-index">06</span><h2>Recovery log</h2></div>
             </div>
             <p class="panel__kicker">WHAT METTLE DID, AND WHY</p>
             <ol id="event-list" class="event-list"></ol>

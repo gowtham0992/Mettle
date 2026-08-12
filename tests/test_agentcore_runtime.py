@@ -140,6 +140,46 @@ def test_agentcore_accepts_bounded_base64_photo_for_vision_assessment() -> None:
     assert response["workflow"]["evidence"][-1]["status"] == "accepted"
 
 
+def test_agentcore_runs_deadline_check_inside_the_same_session() -> None:
+    subject = runtime()
+    session_id = "session-check-123456789012345678901234567890"
+    started = subject.handle(
+        {
+            "operation": "start",
+            "idempotency_key": "agentcore_check_start_123",
+            "payload": workflow_payload(),
+        },
+        session_id=session_id,
+    )
+    workflow = started["workflow"]
+    subject.handle(
+        {
+            "operation": "resume",
+            "idempotency_key": "agentcore_check_resume_123",
+            "workflow_id": workflow["workflow_id"],
+            "payload": {
+                "interrupt_id": workflow["snapshot"]["interrupts"][0]["interrupt_id"],
+                "decision": "Wide photo showing equipment clearance with the access panel open",
+            },
+        },
+        session_id=session_id,
+    )
+
+    checked = subject.handle(
+        {
+            "operation": "run_next_check",
+            "idempotency_key": "agentcore_check_tick_123",
+            "workflow_id": workflow["workflow_id"],
+            "payload": {},
+        },
+        session_id=session_id,
+    )
+
+    assert checked["ok"] is True
+    assert checked["workflow"]["snapshot"]["plan"]["as_of"] == "2026-08-14"
+    assert len(checked["workflow"]["snapshot"]["deliveries"]) == 6
+
+
 def test_agentcore_boundary_rejects_unknown_fields_without_echoing_input() -> None:
     response = runtime().handle(
         {

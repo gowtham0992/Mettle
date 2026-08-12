@@ -18,6 +18,11 @@ const elements = {
   events: document.querySelector("#event-list"),
   judgments: document.querySelector("#judgment-list"),
   judgmentCount: document.querySelector("#judgment-count"),
+  recoveryClock: document.querySelector("#recovery-clock"),
+  clockTrack: document.querySelector("#clock-track"),
+  clockTitle: document.querySelector("#clock-title"),
+  clockCopy: document.querySelector("#clock-copy"),
+  clockAction: document.querySelector("#clock-action"),
   evidencePanel: document.querySelector("#evidence-panel"),
   evidenceResult: document.querySelector("#evidence-result"),
   evidenceButtons: [...document.querySelectorAll(".evidence-submit")],
@@ -89,6 +94,18 @@ function formatTime(value) {
     .format(new Date(value));
 }
 
+function daysBetween(from, to) {
+  return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
+}
+
+function campaignCheckpoints(deadline) {
+  const deadlineAtNoon = Date.parse(`${deadline}T12:00:00Z`);
+  return [7, 3, 2, 1, 0].map((daysBefore) => ({
+    label: daysBefore ? `T−${daysBefore}` : "DUE",
+    date: new Date(deadlineAtNoon - daysBefore * 86_400_000).toISOString().slice(0, 10),
+  }));
+}
+
 function workflowCampaign(envelope, executionTarget = "local") {
   const snapshot = envelope.snapshot;
   const notice = snapshot.notice;
@@ -133,11 +150,21 @@ function workflowCampaign(envelope, executionTarget = "local") {
       title: `Built ${plan.actions.length} autonomous outreach actions`,
       detail: `Cadence is anchored to the ${formatDate(notice.reinspection_due_on)} reinspection deadline.`,
     },
-    ...snapshot.deliveries.map((delivery, index) => ({
-      happened_at: timestamp(8, 16 + index), kind: "message_recorded", actor: "Mettle · coordinator",
-      title: `${delivery.message_id.endsWith("-decision") ? "Recorded contractor-directed" : "Recorded"} C${delivery.citation_id} request for ${delivery.recipient.name}`,
-      detail: "Local delivery adapter used; no live SMS was sent.",
-    })),
+    ...snapshot.deliveries.map((delivery, index) => {
+      const followUp = delivery.message_id.endsWith("-followup");
+      const contractorDirected = delivery.message_id.endsWith("-decision");
+      return {
+        happened_at: `${delivery.scheduled_on}T08:${String(16 + index).padStart(2, "0")}:00Z`,
+        kind: followUp ? "deadline_escalation" : "message_recorded",
+        actor: followUp ? "Mettle · chase graph" : "Mettle · coordinator",
+        title: followUp
+          ? `Autonomously followed up C${delivery.citation_id} with ${delivery.recipient.name}`
+          : `${contractorDirected ? "Recorded contractor-directed" : "Recorded"} C${delivery.citation_id} request for ${delivery.recipient.name}`,
+        detail: followUp
+          ? `${plan.priority.toUpperCase()} cadence at ${daysBetween(delivery.scheduled_on, notice.reinspection_due_on)} day(s) to reinspection; no live SMS was sent.`
+          : "Local delivery adapter used; no live SMS was sent.",
+      };
+    }),
   ];
   if (pendingInterrupt) {
     events.push({
@@ -151,6 +178,13 @@ function workflowCampaign(envelope, executionTarget = "local") {
       happened_at: timestamp(8, 20), kind: "judgment_resolved", actor: "Contractor",
       title: "Contractor decision recorded; graph resumed",
       detail: snapshot.contractor_decision,
+    });
+  }
+  if (snapshot.deadline_decision) {
+    events.push({
+      happened_at: timestamp(8, 21), kind: "judgment_resolved", actor: "Contractor",
+      title: "Deadline tradeoff resolved; chase graph resumed",
+      detail: snapshot.deadline_decision,
     });
   }
   for (const [index, assessment] of (envelope.evidence || []).entries()) {
@@ -200,6 +234,7 @@ function workflowCampaign(envelope, executionTarget = "local") {
     notice_id: notice.notice_id,
     property_label: notice.property_label,
     as_of: plan.as_of,
+    deadline_on: notice.reinspection_due_on,
     days_remaining: plan.days_remaining,
     priority: plan.priority,
     citations,
@@ -216,6 +251,7 @@ function workflowCampaign(envelope, executionTarget = "local") {
       messages_handled: snapshot.deliveries.length,
       automated_actions: 2 + snapshot.deliveries.length + (envelope.evidence || []).length,
       contractor_decisions: (snapshot.contractor_decision ? 1 : 0)
+        + (snapshot.deadline_decision ? 1 : 0)
         + (envelope.packet?.status === "approved" ? 1 : 0),
     },
     scenario_step: 0,
@@ -412,6 +448,41 @@ function renderPacket(data) {
   if (data.packet_status === "awaiting_approval") elements.packet.classList.add("packet-stamp--awaiting");
 }
 
+function renderRecoveryClock(data) {
+  const checkpoints = campaignCheckpoints(data.deadline_on);
+  elements.clockTrack.replaceChildren(...checkpoints.map((checkpoint) => {
+    const stop = node("span", "clock-stop", checkpoint.label);
+    if (checkpoint.date < data.as_of) stop.classList.add("clock-stop--passed");
+    if (checkpoint.date === data.as_of) stop.classList.add("clock-stop--current");
+    if (checkpoint.label === "DUE") stop.classList.add("clock-stop--due");
+    stop.title = formatDate(checkpoint.date);
+    return stop;
+  }));
+
+  const open = data.metrics.citations_total - data.metrics.citations_ready;
+  const waiting = data.workflow_status === "interrupted";
+  const next = checkpoints.find((checkpoint) => checkpoint.date > data.as_of);
+  const closed = open === 0;
+  const expired = !next;
+  if (closed) {
+    elements.clockTitle.textContent = "All citations closed · campaign standing down";
+    elements.clockCopy.textContent = "Accepted evidence removed every citation from the chase plan. Mettle will send no further follow-ups.";
+  } else if (waiting) {
+    elements.clockTitle.textContent = `${open} open citation${open === 1 ? "" : "s"} · waiting for your decision`;
+    elements.clockCopy.textContent = "The campaign is paused at a Strands judgment gate. Resolve it above before the next scheduled check.";
+  } else if (expired) {
+    elements.clockTitle.textContent = `${open} open citation${open === 1 ? "" : "s"} · deadline reached`;
+    elements.clockCopy.textContent = "No later campaign checkpoint exists. Mettle will not invent outreach beyond the configured reinspection deadline.";
+  } else {
+    const nextDays = daysBetween(next.date, data.deadline_on);
+    const behavior = nextDays <= 2 ? "critical four-hour follow-up and a contractor tradeoff gate" : "deadline-aware follow-up to each open trade";
+    elements.clockTitle.textContent = `Next: ${next.label} · ${formatDate(next.date)}`;
+    elements.clockCopy.textContent = `${open} open citation${open === 1 ? "" : "s"}. Mettle will replan only those citations, then run ${behavior}.`;
+  }
+  elements.clockAction.disabled = closed || waiting || expired || data.packet_status !== "blocked";
+  elements.clockAction.textContent = waiting ? "Resolve decision to continue" : closed ? "Campaign stood down" : expired ? "Deadline reached" : "Run next scheduled check";
+}
+
 function render(data) {
   campaign = data;
   elements.loading.hidden = true;
@@ -453,6 +524,8 @@ function render(data) {
   const isWorkflow = data.source_mode === "workflow";
   const isAgentCore = isWorkflow && data.execution_target === "agentcore";
   elements.evidencePanel.hidden = !isWorkflow;
+  elements.recoveryClock.hidden = !isWorkflow;
+  if (isWorkflow) renderRecoveryClock(data);
   if (isWorkflow) {
     const selectedCitation = elements.photoCitation.value;
     elements.photoCitation.replaceChildren(...data.citations.map((citation) => {
@@ -731,6 +804,33 @@ for (const button of elements.evidenceButtons) {
     }
   });
 }
+
+elements.clockAction.addEventListener("click", async () => {
+  if (!activeWorkflowId || elements.clockAction.disabled) return;
+  const workflowRoot = activeWorkflowTarget === "agentcore"
+    ? "/api/agentcore/workflows"
+    : "/api/workflows";
+  setBusy(elements.clockAction, true);
+  try {
+    const envelope = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/checks/next`, {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
+      body: "{}",
+    });
+    campaign = workflowCampaign(envelope, activeWorkflowTarget);
+    render(campaign);
+    if (campaign.workflow_status === "interrupted") {
+      document.querySelector(".judgment input")?.focus();
+      showToast("Mettle reached T−2 and needs one deadline tradeoff decision.");
+    } else {
+      showToast(`Scheduled check complete. ${campaign.metrics.citations_ready}/${campaign.metrics.citations_total} citations are closed.`);
+    }
+  } catch (error) {
+    showError(error);
+  } finally {
+    if (campaign?.workflow_status !== "interrupted") setBusy(elements.clockAction, false);
+  }
+});
 
 elements.packetAction.addEventListener("click", async () => {
   if (!activeWorkflowId) return;

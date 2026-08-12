@@ -36,6 +36,7 @@ from mettle.workflow_registry import (
     PacketNotApproved,
     PacketNotReady,
     PreparePacketRequest,
+    RunNextCheckRequest,
     ResumeWorkflowRequest,
     SubmitEvidenceRequest,
     SubmitPhotoEvidenceRequest,
@@ -534,6 +535,26 @@ def create_app(
         )
 
     @app.post(
+        "/api/agentcore/workflows/{workflow_id}/checks/next",
+        response_model=WorkflowEnvelope,
+    )
+    def run_agentcore_next_check(
+        workflow_id: str,
+        payload: RunNextCheckRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        return require_agentcore(request).run_next_check(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
         "/api/agentcore/workflows/{workflow_id}/packet/approve",
         response_model=WorkflowEnvelope,
     )
@@ -630,6 +651,25 @@ def create_app(
         ),
     ) -> WorkflowEnvelope:
         return request.app.state.workflows.prepare_packet(
+            workflow_id,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
+        "/api/workflows/{workflow_id}/checks/next",
+        response_model=WorkflowEnvelope,
+    )
+    def run_next_check(
+        workflow_id: str,
+        _payload: RunNextCheckRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        return request.app.state.workflows.run_next_check(
             workflow_id,
             idempotency_key=idempotency_key,
         )
