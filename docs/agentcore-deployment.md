@@ -9,7 +9,7 @@ profile during normal development.
 
 - Runtime: `MettleRecovery-example`
 - ARN: `arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/MettleRecovery-example`
-- Version and status: `6`, `READY`
+- Version and status: `7`, `READY`
 - Artifact: `runtime/MettleRecovery-example.zip`, S3 version
   `EXAMPLE_OBJECT_VERSION`
 - Artifact SHA-256:
@@ -17,6 +17,27 @@ profile during normal development.
 - Runtime lifecycle: 15-minute idle timeout, 8-hour maximum session
 - Log group: `/aws/bedrock-agentcore/runtimes/MettleRecovery-example-DEFAULT`,
   14-day retention
+
+The version 7 acceptance workflow `77CZ9R2KfJ8JaSgn` ran Nova Micro notice
+intake, Nova Lite photo assessment, T−3 open-citation replanning, an idempotent
+check replay with no duplicate outreach, the T−2 deadline tradeoff interrupt
+and resume, final packet approval, and PDF integrity verification in one
+AgentCore session. Citation 1 stopped receiving follow-ups after its evidence
+was accepted; only citations 2 and 3 were chased. The final 5,617,843-byte
+five-page packet had SHA-256
+`ebecd28593bd57981878db512decf57ccf0ee87787e27fbd6a8cfa0c890752a3`.
+
+The first version 7 acceptance attempt proved the full chase loop but exposed a
+stale smoke-test assumption that every packet has exactly four pages. Seven
+communication records correctly flow the packet onto a fifth page. A local
+regression test reproduced that structure before the smoke check was updated
+to verify the expected page count, PDF text, content type, and SHA-256. The
+second paid acceptance then passed end to end.
+
+The immutable version 6 rollback artifact remains
+`runtime/MettleRecovery-example.zip`, S3 version
+`EXAMPLE_OBJECT_VERSION`, SHA-256
+`EXAMPLE_ARTIFACT_SHA256`.
 
 The version 4 vision acceptance workflow `qrbNmKhlhEzAxqVP` ran Nova Micro
 notice intake and one real AgentCore-to-Nova-Lite photo assessment. The photo
@@ -155,7 +176,8 @@ time in a local ignored file. No notice data belongs in deployment state.
 5. Submit accepted synthetic evidence for all three citations.
 6. Prepare the packet, approve it through the contractor judgment gate, and
    render the PDF.
-7. Verify the PDF type, SHA-256 digest, and four-page structure.
+7. Verify the PDF type, SHA-256 digest, recovery communication record, and
+   expected structure (four pages without chase history; five with it).
 8. Confirm the graph completes and that the first outreach was not replayed.
 9. Check CloudWatch logs for the hashed session reference and absence of notice
    text when using an authorized observability identity.
@@ -168,7 +190,8 @@ metadata, not the notice or model response:
 uv run python scripts/agentcore_smoke.py \
   --profile mettle-agentcore \
   --runtime-arn <RUNTIME_ARN> \
-  --vision
+  --vision \
+  --chase
 ```
 
 AgentCore runtime sessions are ephemeral. The default idle timeout here is 15

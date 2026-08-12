@@ -21,7 +21,7 @@ intake. It can:
 - pause at ambiguous requirements, accept the contractor's decision, and resume with contractor-directed outreach;
 - securely normalize a real JPEG/PNG photo, use Nova Lite to check only visible notice requirements, and accept, re-request, or reserve ambiguity for the contractor;
 - retain synthetic fixtures as a deterministic, zero-cost demo fallback; and
-- assemble a four-page evidence packet, block download until final contractor approval, and produce a polished PDF with citation-to-evidence traceability.
+- assemble an evidence packet, block download until final contractor approval, and produce a polished PDF with citation-to-evidence and communication-history traceability.
 
 The product core now runs those steps as a real Strands graph. Deterministic
 policy nodes parse and plan the campaign, an idempotent communication port
@@ -123,18 +123,14 @@ allow only Nova Micro and Nova Lite plus AgentCore telemetry and restrict deploy
 Project-tagged Mettle runtimes. See
 [AgentCore deployment and rollback](docs/agentcore-deployment.md).
 
-The cloud runtime currently deployed in `us-east-1` is `MettleRecovery` version 6.
+The cloud runtime currently deployed in `us-east-1` is `MettleRecovery` version 7.
 Its tested path runs live Bedrock intake inside Strands, pauses for contractor
 judgment, resumes the same AgentCore session, assesses a normalized real photo
-with Nova Lite plus two deterministic fallback fixtures, gates packet approval,
-and returns the verified four-page PDF. The previous version 3 artifact was
-successfully redeployed and tested during a rollback drill before the exact
-vision artifact was restored.
-
-The deadline chase graph described above is implemented and verified locally
-through the same AgentCore invocation contract. It is not part of deployed
-version 6 yet; deploy the next immutable artifact before demonstrating that
-specific control through **Run on AgentCore**.
+with Nova Lite, runs the T−3/T−2 chase loop with replay-safe follow-up and a
+deadline judgment interrupt, gates packet approval, and returns a verified
+five-page chased-campaign PDF. The immutable version 6 vision artifact remains
+available as the rollback target; artifact rollback and restoration were
+already exercised on this runtime.
 
 To expose **Run on AgentCore** in the command center, start the loopback-only
 server with the deployed runtime fixed in server configuration:

@@ -101,9 +101,10 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF. **Complete.**
 7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,
    package it as CodeZip, and define least-privilege deployment and rollback.
-   **Complete: runtime version 2 is deployed, rollback was exercised on a
-   disposable canary, and the command center passed live start, resume, and
-   refresh acceptance through its server-side gateway.**
+   **Complete: runtime version 7 is deployed, immutable-artifact rollback was
+   exercised on the real demo runtime, and live acceptance covers start,
+   resume, vision, T−3/T−2 chase behavior, replay safety, approval, and PDF
+   integrity in one AgentCore session.**
 8. **Durability and live integrations:** add durable workflow storage, AgentCore
    Memory where it creates demonstrable value, and an SMS adapter after the
    deployed recovery loop is verified.

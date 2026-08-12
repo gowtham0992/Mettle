@@ -45,6 +45,11 @@ def main() -> int:
         action="store_true",
         help="assess citation 1 through live Nova Lite instead of the fixture adapter",
     )
+    parser.add_argument(
+        "--chase",
+        action="store_true",
+        help="exercise T-3 follow-up, replay safety, and the T-2 deadline interrupt",
+    )
     args = parser.parse_args()
     if not args.runtime_arn.startswith(EXPECTED_ARN_PREFIX):
         parser.error("runtime ARN must be a Mettle runtime in the approved account and region")
@@ -117,6 +122,7 @@ def main() -> int:
 
     workflow_id = workflow["workflow_id"]
     current = resumed
+    citation_one_closed = False
     if args.vision:
         photo = normalize_photo(
             Path("src/mettle/web/static/evidence/panel-wide-measured.png").read_bytes()
@@ -152,10 +158,129 @@ def main() -> int:
                 indent=2,
             )
         )
+        citation_one_closed = True
+
+    if args.chase and not citation_one_closed:
+        current = invoke_json(
+            client,
+            runtime_arn=args.runtime_arn,
+            session_id=session_id,
+            payload={
+                "operation": "submit_evidence",
+                "idempotency_key": f"evidence_{uuid.uuid4().hex}",
+                "workflow_id": workflow_id,
+                "payload": {
+                    "citation_id": "1",
+                    "sample_id": "panel_wide_measured",
+                },
+            },
+        )
+        if not current.get("ok") or current["workflow"]["evidence"][-1]["status"] != "accepted":
+            raise AgentCoreInvocationError("pre-chase evidence did not accept citation 1")
+        citation_one_closed = True
+
+    if args.chase:
+        check_key = f"check_{uuid.uuid4().hex}"
+        check_payload = {
+            "operation": "run_next_check",
+            "idempotency_key": check_key,
+            "workflow_id": workflow_id,
+            "payload": {},
+        }
+        first_check = invoke_json(
+            client,
+            runtime_arn=args.runtime_arn,
+            session_id=session_id,
+            payload=check_payload,
+        )
+        replayed_check = invoke_json(
+            client,
+            runtime_arn=args.runtime_arn,
+            session_id=session_id,
+            payload=check_payload,
+        )
+        first_snapshot = first_check.get("workflow", {}).get("snapshot", {})
+        if (
+            not first_check.get("ok")
+            or first_snapshot.get("status") != "completed"
+            or first_snapshot.get("plan", {}).get("as_of") != "2026-08-14"
+            or [
+                action.get("citation_id")
+                for action in first_snapshot.get("plan", {}).get("actions", [])
+            ]
+            != ["2", "3"]
+            or len(first_snapshot.get("deliveries", [])) != 5
+            or replayed_check.get("workflow") != first_check.get("workflow")
+        ):
+            raise AgentCoreInvocationError("T-3 chase or replay verification failed")
+
+        critical = invoke_json(
+            client,
+            runtime_arn=args.runtime_arn,
+            session_id=session_id,
+            payload={
+                "operation": "run_next_check",
+                "idempotency_key": f"check_{uuid.uuid4().hex}",
+                "workflow_id": workflow_id,
+                "payload": {},
+            },
+        )
+        critical_snapshot = critical.get("workflow", {}).get("snapshot", {})
+        deadline_interrupts = critical_snapshot.get("interrupts", [])
+        if (
+            not critical.get("ok")
+            or critical_snapshot.get("status") != "interrupted"
+            or critical_snapshot.get("plan", {}).get("as_of") != "2026-08-15"
+            or len(deadline_interrupts) != 1
+            or deadline_interrupts[0].get("name") != "deadline-tradeoff"
+            or len(critical_snapshot.get("deliveries", [])) != 7
+        ):
+            raise AgentCoreInvocationError("T-2 deadline interrupt verification failed")
+
+        deadline_resumed = invoke_json(
+            client,
+            runtime_arn=args.runtime_arn,
+            session_id=session_id,
+            payload={
+                "operation": "resume",
+                "idempotency_key": f"resume_{uuid.uuid4().hex}",
+                "workflow_id": workflow_id,
+                "payload": {
+                    "interrupt_id": deadline_interrupts[0]["interrupt_id"],
+                    "decision": (
+                        "Keep the current reinspection date and continue critical "
+                        "follow-ups."
+                    ),
+                },
+            },
+        )
+        deadline_snapshot = deadline_resumed.get("workflow", {}).get("snapshot", {})
+        if (
+            not deadline_resumed.get("ok")
+            or deadline_snapshot.get("status") != "completed"
+            or not deadline_snapshot.get("deadline_decision")
+            or len(deadline_snapshot.get("deliveries", [])) != 7
+        ):
+            raise AgentCoreInvocationError("deadline decision did not resume safely")
+        current = deadline_resumed
+        print(
+            json.dumps(
+                {
+                    "chase": {
+                        "t_minus_3_open_citations": ["2", "3"],
+                        "t_minus_3_deliveries": 5,
+                        "replay_safe": True,
+                        "t_minus_2_interrupt": "deadline-tradeoff",
+                        "t_minus_2_deliveries": 7,
+                    }
+                },
+                indent=2,
+            )
+        )
 
     fixture_evidence = (
         (("2", "framing_plates_complete"), ("3", "mechanical_access_wide"))
-        if args.vision
+        if citation_one_closed
         else (
             ("1", "panel_wide_measured"),
             ("2", "framing_plates_complete"),
@@ -221,11 +346,15 @@ def main() -> int:
         pdf = base64.b64decode(rendered["body_base64"], validate=True)
     except (KeyError, ValueError) as exc:
         raise AgentCoreInvocationError("packet response was not valid base64") from exc
+    reader = PdfReader(BytesIO(pdf))
+    expected_pages = 5 if args.chase else 4
+    packet_text = "\n".join(page.extract_text() or "" for page in reader.pages)
     if (
         not rendered.get("ok")
         or rendered.get("content_type") != "application/pdf"
         or sha256(pdf).hexdigest() != rendered.get("sha256")
-        or len(PdfReader(BytesIO(pdf)).pages) != 4
+        or len(reader.pages) != expected_pages
+        or "Recovery communication record" not in packet_text
     ):
         raise AgentCoreInvocationError("packet response failed integrity checks")
     print(
@@ -235,7 +364,7 @@ def main() -> int:
                     "workflow_id": workflow_id,
                     "evidence_accepted": len(approved["workflow"]["evidence"]),
                     "packet_status": approved["workflow"]["packet"]["status"],
-                    "packet_pages": 4,
+                    "packet_pages": len(reader.pages),
                     "packet_bytes": len(pdf),
                     "packet_sha256": rendered["sha256"],
                 }

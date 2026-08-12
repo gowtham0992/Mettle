@@ -276,6 +276,76 @@ def test_recovery_check_rejects_client_supplied_clock_state() -> None:
     assert response.json()["error"]["code"] == "invalid_request"
 
 
+def test_reinspection_packet_with_chase_history_has_stable_structure() -> None:
+    with client() as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "chase_packet_workflow_123"},
+        ).json()
+        workflow_id = created["workflow_id"]
+        browser.post(
+            f"/api/workflows/{workflow_id}/resume",
+            json={
+                "interrupt_id": created["snapshot"]["interrupts"][0]["interrupt_id"],
+                "decision": "Wide photo showing equipment clearance with the access panel open",
+            },
+            headers={"Idempotency-Key": "chase_packet_resume_123"},
+        )
+        browser.post(
+            f"/api/workflows/{workflow_id}/evidence",
+            json={"citation_id": "1", "sample_id": "panel_wide_measured"},
+            headers={"Idempotency-Key": "chase_packet_evidence_1"},
+        )
+        browser.post(
+            f"/api/workflows/{workflow_id}/checks/next",
+            json={},
+            headers={"Idempotency-Key": "chase_packet_check_t3"},
+        )
+        deadline = browser.post(
+            f"/api/workflows/{workflow_id}/checks/next",
+            json={},
+            headers={"Idempotency-Key": "chase_packet_check_t2"},
+        ).json()
+        browser.post(
+            f"/api/workflows/{workflow_id}/resume",
+            json={
+                "interrupt_id": deadline["snapshot"]["interrupts"][0]["interrupt_id"],
+                "decision": "Keep the current reinspection date and continue critical follow-ups",
+            },
+            headers={"Idempotency-Key": "chase_packet_deadline_resume"},
+        )
+        for citation_id, sample_id in (
+            ("2", "framing_plates_complete"),
+            ("3", "mechanical_access_wide"),
+        ):
+            browser.post(
+                f"/api/workflows/{workflow_id}/evidence",
+                json={"citation_id": citation_id, "sample_id": sample_id},
+                headers={"Idempotency-Key": f"chase_packet_evidence_{citation_id}"},
+            )
+        prepared = browser.post(
+            f"/api/workflows/{workflow_id}/packet/prepare",
+            json={},
+            headers={"Idempotency-Key": "chase_packet_prepare_123"},
+        ).json()
+        browser.post(
+            f"/api/workflows/{workflow_id}/packet/approve",
+            json={
+                "approval_id": prepared["packet"]["approval_id"],
+                "decision": "Approve packet for reinspection scheduling",
+            },
+            headers={"Idempotency-Key": "chase_packet_approve_123"},
+        )
+        downloaded = browser.get(f"/api/workflows/{workflow_id}/packet.pdf")
+
+    assert downloaded.status_code == 200
+    reader = PdfReader(BytesIO(downloaded.content))
+    assert len(reader.pages) == 5
+    packet_text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    assert "Recovery communication record" in packet_text
+
+
 def test_dashboard_and_campaign_api_load() -> None:
     with client() as browser:
         page = browser.get("/")
