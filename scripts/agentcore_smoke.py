@@ -12,6 +12,7 @@ import boto3
 from pypdf import PdfReader
 
 from mettle.agentcore_client import AgentCoreInvocationError, invoke_json
+from mettle.photo_upload import normalize_photo
 
 
 EXPECTED_ARN_PREFIX = (
@@ -39,6 +40,11 @@ def main() -> int:
     parser.add_argument("--runtime-arn", required=True)
     parser.add_argument("--profile", default="mettle-agentcore")
     parser.add_argument("--region", default="us-east-1", choices=("us-east-1",))
+    parser.add_argument(
+        "--vision",
+        action="store_true",
+        help="assess citation 1 through live Nova Lite instead of the fixture adapter",
+    )
     args = parser.parse_args()
     if not args.runtime_arn.startswith(EXPECTED_ARN_PREFIX):
         parser.error("runtime ARN must be a Mettle runtime in the approved account and region")
@@ -111,11 +117,52 @@ def main() -> int:
 
     workflow_id = workflow["workflow_id"]
     current = resumed
-    for citation_id, sample_id in (
-        ("1", "panel_wide_measured"),
-        ("2", "framing_plates_complete"),
-        ("3", "mechanical_access_wide"),
-    ):
+    if args.vision:
+        photo = normalize_photo(
+            Path("src/mettle/web/static/evidence/panel-wide-measured.png").read_bytes()
+        )
+        current = invoke_json(
+            client,
+            runtime_arn=args.runtime_arn,
+            session_id=session_id,
+            payload={
+                "operation": "submit_photo_evidence",
+                "idempotency_key": f"photo_{uuid.uuid4().hex}",
+                "workflow_id": workflow_id,
+                "payload": {
+                    "citation_id": "1",
+                    "image_base64": base64.b64encode(photo).decode("ascii"),
+                },
+            },
+        )
+        assessment = current.get("workflow", {}).get("evidence", [{}])[-1]
+        if not current.get("ok") or assessment.get("status") != "accepted":
+            raise AgentCoreInvocationError(
+                f"vision evidence was not accepted ({assessment.get('status', 'missing')})"
+            )
+        print(
+            json.dumps(
+                {
+                    "vision": {
+                        "citation_id": assessment["citation_id"],
+                        "status": assessment["status"],
+                        "requirements_matched": len(assessment["matched_requirements"]),
+                    }
+                },
+                indent=2,
+            )
+        )
+
+    fixture_evidence = (
+        (("2", "framing_plates_complete"), ("3", "mechanical_access_wide"))
+        if args.vision
+        else (
+            ("1", "panel_wide_measured"),
+            ("2", "framing_plates_complete"),
+            ("3", "mechanical_access_wide"),
+        )
+    )
+    for citation_id, sample_id in fixture_evidence:
         current = invoke_json(
             client,
             runtime_arn=args.runtime_arn,

@@ -9,7 +9,7 @@ profile during normal development.
 
 - Runtime: `MettleRecovery-example`
 - ARN: `arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/MettleRecovery-example`
-- Version and status: `3`, `READY`
+- Version and status: `6`, `READY`
 - Artifact: `runtime/MettleRecovery-example.zip`, S3 version
   `EXAMPLE_OBJECT_VERSION`
 - Artifact SHA-256:
@@ -18,7 +18,21 @@ profile during normal development.
 - Log group: `/aws/bedrock-agentcore/runtimes/MettleRecovery-example-DEFAULT`,
   14-day retention
 
-The version 3 acceptance workflow `gC2tCVUproqzcjpu` ran the entire recovery
+The version 4 vision acceptance workflow `qrbNmKhlhEzAxqVP` ran Nova Micro
+notice intake and one real AgentCore-to-Nova-Lite photo assessment. The photo
+was accepted against its notice-grounded visible requirement, all three
+citations reached ready, contractor approval gated the final packet, and the
+5,616,749-byte four-page PDF passed SHA-256 verification. CloudWatch recorded
+only request/session metadata and timings; it did not log the notice, image,
+model findings, phone numbers, or packet.
+
+The rollback drill then deployed the recorded version 3 artifact as runtime
+version 5, reached `READY`, and completed acceptance workflow
+`okBa3CpGLR9W7d-B`. The exact immutable vision artifact was restored as runtime
+version 6 and reached `READY`. This exercised artifact rollback and restoration
+on the actual demo runtime rather than relying on a paper rollback.
+
+The original version 3 acceptance workflow `gC2tCVUproqzcjpu` ran the entire recovery
 inside one AgentCore session: Nova Micro intake, two initial trade deliveries,
 one contractor judgment, a third delivery after resume, three accepted
 evidence records, packet preparation, final contractor approval, and a
@@ -82,7 +96,7 @@ The checked-in policies are:
 - `agentcore/iam/bootstrap-deployer-policy.json`
 
 The execution policy grants model invocation only for
-`amazon.nova-micro-v1:0`. It also includes the exact CloudWatch Logs, X-Ray,
+`amazon.nova-micro-v1:0` and `amazon.nova-lite-v1:0`. It also includes the exact CloudWatch Logs, X-Ray,
 and namespaced metric permissions documented for AgentCore Runtime. It has no
 IAM, S3, configuration-bundle, or wildcard Bedrock model permission.
 
@@ -153,7 +167,8 @@ metadata, not the notice or model response:
 ```bash
 uv run python scripts/agentcore_smoke.py \
   --profile mettle-agentcore \
-  --runtime-arn <RUNTIME_ARN>
+  --runtime-arn <RUNTIME_ARN> \
+  --vision
 ```
 
 AgentCore runtime sessions are ephemeral. The default idle timeout here is 15
