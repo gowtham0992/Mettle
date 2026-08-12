@@ -328,12 +328,15 @@ function renderJudgment(judgment) {
     setBusy(button, true);
     try {
       if (activeWorkflowId && judgment.packet_approval) {
-        const envelope = await request(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/packet/approve`, {
+        const workflowRoot = activeWorkflowTarget === "agentcore"
+          ? "/api/agentcore/workflows"
+          : "/api/workflows";
+        const envelope = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/packet/approve`, {
           method: "POST",
           headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
           body: JSON.stringify({ approval_id: judgment.judgment_id, decision }),
         });
-        campaign = workflowCampaign(envelope);
+        campaign = workflowCampaign(envelope, activeWorkflowTarget);
       } else if (activeWorkflowId) {
         const workflowRoot = activeWorkflowTarget === "agentcore"
           ? "/api/agentcore/workflows"
@@ -439,8 +442,8 @@ function render(data) {
   renderPacket(data);
   const isWorkflow = data.source_mode === "workflow";
   const isAgentCore = isWorkflow && data.execution_target === "agentcore";
-  elements.evidencePanel.hidden = !isWorkflow || isAgentCore;
-  if (isWorkflow && !isAgentCore) {
+  elements.evidencePanel.hidden = !isWorkflow;
+  if (isWorkflow) {
     const latestEvidence = data.evidence.at(-1);
     elements.evidenceResult.hidden = !latestEvidence;
     if (latestEvidence) {
@@ -458,15 +461,13 @@ function render(data) {
       button.title = button.disabled ? "Resolve the mechanical evidence specification first" : "";
     }
   }
-  elements.packetAction.hidden = !isWorkflow || isAgentCore
+  elements.packetAction.hidden = !isWorkflow
     || (data.metrics.citations_ready < data.metrics.citations_total && data.packet_status !== "approved");
   elements.packetAction.textContent = data.packet_status === "approved"
     ? "Download approved PDF"
     : data.packet_status === "awaiting_approval" ? "Awaiting your approval" : "Prepare packet for approval";
   elements.packetAction.disabled = data.packet_status === "awaiting_approval";
-  elements.packetNote.textContent = isAgentCore
-    ? "AgentCore completed notice intake, outreach, and contractor judgment. Continue the full evidence-to-packet scenario in local demo mode."
-    : "Assembles as evidence is accepted. Nothing reaches the inspector until you approve it.";
+  elements.packetNote.textContent = "Assembles as evidence is accepted. Nothing reaches the inspector until you approve it.";
   elements.demoStep.textContent = isWorkflow
     ? `${isAgentCore ? "AGENTCORE + " : ""}${data.intake_provider === "bedrock" ? "BEDROCK + " : ""}STRANDS · ${data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH COMPLETE"}`
     : `${data.scenario_step} · ${stepLabels[data.scenario_step] || "RECOVERY RUN"}`;
@@ -639,7 +640,10 @@ for (const button of elements.evidenceButtons) {
     if (!activeWorkflowId) return;
     setBusy(button, true);
     try {
-      const envelope = await request(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/evidence`, {
+      const workflowRoot = activeWorkflowTarget === "agentcore"
+        ? "/api/agentcore/workflows"
+        : "/api/workflows";
+      const envelope = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/evidence`, {
         method: "POST",
         headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
         body: JSON.stringify({
@@ -663,13 +667,16 @@ for (const button of elements.evidenceButtons) {
 
 elements.packetAction.addEventListener("click", async () => {
   if (!activeWorkflowId) return;
+  const workflowRoot = activeWorkflowTarget === "agentcore"
+    ? "/api/agentcore/workflows"
+    : "/api/workflows";
   if (campaign?.packet_status === "approved") {
-    window.location.assign(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/packet.pdf`);
+    window.location.assign(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/packet.pdf`);
     return;
   }
   setBusy(elements.packetAction, true);
   try {
-    const envelope = await request(`/api/workflows/${encodeURIComponent(activeWorkflowId)}/packet/prepare`, {
+    const envelope = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/packet/prepare`, {
       method: "POST",
       headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
       body: "{}",

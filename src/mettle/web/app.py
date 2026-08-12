@@ -413,6 +413,80 @@ def create_app(
         )
 
     @app.post(
+        "/api/agentcore/workflows/{workflow_id}/evidence",
+        response_model=WorkflowEnvelope,
+    )
+    def submit_agentcore_evidence(
+        workflow_id: str,
+        payload: SubmitEvidenceRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        return require_agentcore(request).submit_evidence(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
+        "/api/agentcore/workflows/{workflow_id}/packet/prepare",
+        response_model=WorkflowEnvelope,
+    )
+    def prepare_agentcore_packet(
+        workflow_id: str,
+        payload: PreparePacketRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        return require_agentcore(request).prepare_packet(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
+        "/api/agentcore/workflows/{workflow_id}/packet/approve",
+        response_model=WorkflowEnvelope,
+    )
+    def approve_agentcore_packet(
+        workflow_id: str,
+        payload: ApprovePacketRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        return require_agentcore(request).approve_packet(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.get("/api/agentcore/workflows/{workflow_id}/packet.pdf")
+    def download_agentcore_packet(workflow_id: str, request: Request) -> Response:
+        pdf = require_agentcore(request).render_packet(workflow_id)
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": (
+                    'attachment; filename="mettle-reinspection-packet.pdf"'
+                ),
+                "Cache-Control": "no-store",
+            },
+        )
+
+    @app.post(
         "/api/workflows/{workflow_id}/evidence",
         response_model=WorkflowEnvelope,
     )

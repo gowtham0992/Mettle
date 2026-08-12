@@ -1,4 +1,8 @@
+import base64
+from io import BytesIO
 from pathlib import Path
+
+from pypdf import PdfReader
 
 from mettle.agentcore_runtime import MettleAgentCoreRuntime
 from mettle.notice_parser import parse_notice
@@ -124,4 +128,117 @@ def test_agentcore_boundary_returns_quiet_error_for_unknown_workflow() -> None:
     assert response == {
         "ok": False,
         "error": {"code": "workflow_not_found", "message": "workflow does not exist"},
+    }
+
+
+def test_agentcore_session_completes_evidence_approval_and_pdf_packet() -> None:
+    subject = runtime()
+    session_id = "session-complete-123456789012345678901234567890"
+    started = subject.handle(
+        {
+            "operation": "start",
+            "idempotency_key": "agentcore_full_start_123",
+            "payload": workflow_payload(),
+        },
+        session_id=session_id,
+    )
+    workflow = started["workflow"]
+    workflow_id = workflow["workflow_id"]
+    resumed = subject.handle(
+        {
+            "operation": "resume",
+            "idempotency_key": "agentcore_full_resume_123",
+            "workflow_id": workflow_id,
+            "payload": {
+                "interrupt_id": workflow["snapshot"]["interrupts"][0]["interrupt_id"],
+                "decision": "Wide photo showing equipment clearance with the access panel open",
+            },
+        },
+        session_id=session_id,
+    )
+    assert resumed["ok"] is True
+
+    latest = None
+    for index, (citation_id, sample_id) in enumerate(
+        [
+            ("1", "panel_wide_measured"),
+            ("2", "framing_plates_complete"),
+            ("3", "mechanical_access_wide"),
+        ]
+    ):
+        latest = subject.handle(
+            {
+                "operation": "submit_evidence",
+                "idempotency_key": f"agentcore_full_evidence_{index}",
+                "workflow_id": workflow_id,
+                "payload": {"citation_id": citation_id, "sample_id": sample_id},
+            },
+            session_id=session_id,
+        )
+        assert latest["ok"] is True
+        assert latest["workflow"]["evidence"][-1]["status"] == "accepted"
+
+    prepared = subject.handle(
+        {
+            "operation": "prepare_packet",
+            "idempotency_key": "agentcore_full_prepare_123",
+            "workflow_id": workflow_id,
+            "payload": {},
+        },
+        session_id=session_id,
+    )
+    packet = prepared["workflow"]["packet"]
+    assert packet["status"] == "awaiting_approval"
+    approved = subject.handle(
+        {
+            "operation": "approve_packet",
+            "idempotency_key": "agentcore_full_approve_123",
+            "workflow_id": workflow_id,
+            "payload": {
+                "approval_id": packet["approval_id"],
+                "decision": "Approve packet for reinspection scheduling",
+            },
+        },
+        session_id=session_id,
+    )
+    assert approved["workflow"]["packet"]["status"] == "approved"
+
+    rendered = subject.handle(
+        {"operation": "render_packet", "workflow_id": workflow_id},
+        session_id=session_id,
+    )
+    pdf = base64.b64decode(rendered["body_base64"], validate=True)
+    assert rendered["ok"] is True
+    assert rendered["content_type"] == "application/pdf"
+    assert rendered["filename"] == "mettle-reinspection-packet.pdf"
+    assert len(PdfReader(BytesIO(pdf)).pages) == 4
+
+
+def test_agentcore_evidence_rejects_unknown_sample_without_echoing_it() -> None:
+    subject = runtime()
+    session_id = "session-evidence-1234567890123456789012345678"
+    started = subject.handle(
+        {
+            "operation": "start",
+            "idempotency_key": "agentcore_evidence_start_123",
+            "payload": workflow_payload(),
+        },
+        session_id=session_id,
+    )
+    response = subject.handle(
+        {
+            "operation": "submit_evidence",
+            "idempotency_key": "agentcore_bad_evidence_123",
+            "workflow_id": started["workflow"]["workflow_id"],
+            "payload": {"citation_id": "1", "sample_id": "secret_sample"},
+        },
+        session_id=session_id,
+    )
+
+    assert response == {
+        "ok": False,
+        "error": {
+            "code": "invalid_evidence_submission",
+            "message": "evidence sample is not available",
+        },
     }

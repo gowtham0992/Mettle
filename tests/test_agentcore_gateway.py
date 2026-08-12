@@ -2,15 +2,20 @@ from __future__ import annotations
 
 import io
 import json
+from base64 import b64encode
 from collections import deque
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
 
 from mettle.agentcore_gateway import AgentCoreGatewayError, AgentCoreWorkflowGateway
 from mettle.workflow_registry import (
+    ApprovePacketRequest,
     CreateWorkflowRequest,
+    PreparePacketRequest,
     ResumeWorkflowRequest,
+    SubmitEvidenceRequest,
     WorkflowConflict,
     WorkflowRegistry,
 )
@@ -178,3 +183,122 @@ def test_runtime_error_is_mapped_without_exposing_untrusted_details() -> None:
         gateway.create(create_payload(), idempotency_key="cloud_error_123")
 
     assert "secret" not in str(raised.value)
+
+
+def test_full_cloud_mutation_path_reuses_session_and_caches_verified_pdf() -> None:
+    source = WorkflowRegistry()
+    created, _ = source.create(create_payload(), idempotency_key="full_source_create")
+    resume_payload = ResumeWorkflowRequest(
+        interrupt_id=created.snapshot.interrupts[0].interrupt_id,
+        decision="Wide photo showing equipment clearance with the access panel open",
+    )
+    resumed = source.resume(
+        created.workflow_id,
+        resume_payload,
+        idempotency_key="full_source_resume",
+    )
+    envelopes = [created, resumed]
+    evidence_payloads = [
+        SubmitEvidenceRequest(citation_id="1", sample_id="panel_wide_measured"),
+        SubmitEvidenceRequest(citation_id="2", sample_id="framing_plates_complete"),
+        SubmitEvidenceRequest(citation_id="3", sample_id="mechanical_access_wide"),
+    ]
+    for index, payload in enumerate(evidence_payloads):
+        envelopes.append(
+            source.submit_evidence(
+                created.workflow_id,
+                payload,
+                idempotency_key=f"full_source_evidence_{index}",
+            )
+        )
+    prepared = source.prepare_packet(
+        created.workflow_id,
+        idempotency_key="full_source_prepare",
+    )
+    envelopes.append(prepared)
+    approval_payload = ApprovePacketRequest(
+        approval_id=prepared.packet.approval_id,
+        decision="Approve packet for reinspection scheduling",
+    )
+    approved = source.approve_packet(
+        created.workflow_id,
+        approval_payload,
+        idempotency_key="full_source_approve",
+    )
+    envelopes.append(approved)
+    pdf = b"%PDF-1.7\nsynthetic verified packet\n%%EOF"
+    render_result = {
+        "ok": True,
+        "content_type": "application/pdf",
+        "filename": "mettle-reinspection-packet.pdf",
+        "sha256": sha256(pdf).hexdigest(),
+        "body_base64": b64encode(pdf).decode("ascii"),
+    }
+    client = QueueClient([*(success(item) for item in envelopes), render_result])
+    gateway = AgentCoreWorkflowGateway(client=client, runtime_arn=RUNTIME_ARN)
+
+    cloud, _ = gateway.create(
+        create_payload(), idempotency_key="full_cloud_create_123"
+    )
+    gateway.resume(
+        cloud.workflow_id,
+        resume_payload,
+        idempotency_key="full_cloud_resume_123",
+    )
+    for index, payload in enumerate(evidence_payloads):
+        gateway.submit_evidence(
+            cloud.workflow_id,
+            payload,
+            idempotency_key=f"full_cloud_evidence_{index}",
+        )
+    gateway.prepare_packet(
+        cloud.workflow_id,
+        PreparePacketRequest(),
+        idempotency_key="full_cloud_prepare_123",
+    )
+    gateway.approve_packet(
+        cloud.workflow_id,
+        approval_payload,
+        idempotency_key="full_cloud_approve_123",
+    )
+    first_pdf = gateway.render_packet(cloud.workflow_id)
+    cached_pdf = gateway.render_packet(cloud.workflow_id)
+
+    assert first_pdf == cached_pdf == pdf
+    assert len(client.requests) == 8
+    assert len({item["runtimeSessionId"] for item in client.requests}) == 1
+    operations = [json.loads(item["payload"])["operation"] for item in client.requests]
+    assert operations == [
+        "start",
+        "resume",
+        "submit_evidence",
+        "submit_evidence",
+        "submit_evidence",
+        "prepare_packet",
+        "approve_packet",
+        "render_packet",
+    ]
+
+
+def test_packet_integrity_mismatch_is_rejected_and_not_cached() -> None:
+    created = interrupted_envelope()
+    pdf = b"%PDF-1.7\nnot trusted\n%%EOF"
+    client = QueueClient(
+        [
+            success(created),
+            {
+                "ok": True,
+                "content_type": "application/pdf",
+                "filename": "mettle-reinspection-packet.pdf",
+                "sha256": "0" * 64,
+                "body_base64": b64encode(pdf).decode("ascii"),
+            },
+        ]
+    )
+    gateway = AgentCoreWorkflowGateway(client=client, runtime_arn=RUNTIME_ARN)
+    cloud, _ = gateway.create(
+        create_payload(), idempotency_key="packet_integrity_create_123"
+    )
+
+    with pytest.raises(AgentCoreGatewayError, match="integrity check failed"):
+        gateway.render_packet(cloud.workflow_id)

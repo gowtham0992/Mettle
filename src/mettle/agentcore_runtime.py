@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import base64
 import logging
 from hashlib import sha256
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
@@ -9,8 +11,14 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from mettle.agents.bedrock import BedrockIntakeError
 from mettle.workflow import WorkflowConfigurationError
 from mettle.workflow_registry import (
+    ApprovePacketRequest,
     CreateWorkflowRequest,
+    EvidenceSubmissionError,
+    PacketNotApproved,
+    PacketNotReady,
+    PreparePacketRequest,
     ResumeWorkflowRequest,
+    SubmitEvidenceRequest,
     WorkflowCapacityReached,
     WorkflowConflict,
     WorkflowNotFound,
@@ -46,8 +54,59 @@ class _ResumeInvocation(BaseModel):
     payload: ResumeWorkflowRequest
 
 
+class _SubmitEvidenceInvocation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation: Literal["submit_evidence"]
+    idempotency_key: str = Field(
+        min_length=8,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
+    workflow_id: str = Field(min_length=1, max_length=64)
+    payload: SubmitEvidenceRequest
+
+
+class _PreparePacketInvocation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation: Literal["prepare_packet"]
+    idempotency_key: str = Field(
+        min_length=8,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
+    workflow_id: str = Field(min_length=1, max_length=64)
+    payload: PreparePacketRequest
+
+
+class _ApprovePacketInvocation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation: Literal["approve_packet"]
+    idempotency_key: str = Field(
+        min_length=8,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
+    workflow_id: str = Field(min_length=1, max_length=64)
+    payload: ApprovePacketRequest
+
+
+class _RenderPacketInvocation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation: Literal["render_packet"]
+    workflow_id: str = Field(min_length=1, max_length=64)
+
+
 AgentCoreInvocation = Annotated[
-    _StartInvocation | _ResumeInvocation,
+    _StartInvocation
+    | _ResumeInvocation
+    | _SubmitEvidenceInvocation
+    | _PreparePacketInvocation
+    | _ApprovePacketInvocation
+    | _RenderPacketInvocation,
     Field(discriminator="operation"),
 ]
 INVOCATION_ADAPTER = TypeAdapter(AgentCoreInvocation)
@@ -64,8 +123,16 @@ def _error(code: str, message: str) -> dict[str, Any]:
 class MettleAgentCoreRuntime:
     """Strict JSON boundary around one session-local Mettle workflow registry."""
 
-    def __init__(self, *, workflows: WorkflowRegistry) -> None:
+    def __init__(
+        self,
+        *,
+        workflows: WorkflowRegistry,
+        evidence_dir: Path | None = None,
+    ) -> None:
         self._workflows = workflows
+        self._evidence_dir = evidence_dir or (
+            Path(__file__).resolve().parent / "web" / "static" / "evidence"
+        )
 
     def handle(self, payload: object, *, session_id: str) -> dict[str, Any]:
         session_reference = _session_reference(session_id)
@@ -85,7 +152,7 @@ class MettleAgentCoreRuntime:
                     idempotency_key=invocation.idempotency_key,
                 )
                 operation = "start"
-            else:
+            elif isinstance(invocation, _ResumeInvocation):
                 envelope = self._workflows.resume(
                     invocation.workflow_id,
                     invocation.payload,
@@ -93,6 +160,52 @@ class MettleAgentCoreRuntime:
                 )
                 replayed = False
                 operation = "resume"
+            elif isinstance(invocation, _SubmitEvidenceInvocation):
+                envelope = self._workflows.submit_evidence(
+                    invocation.workflow_id,
+                    invocation.payload,
+                    idempotency_key=invocation.idempotency_key,
+                )
+                replayed = False
+                operation = "submit_evidence"
+            elif isinstance(invocation, _PreparePacketInvocation):
+                envelope = self._workflows.prepare_packet(
+                    invocation.workflow_id,
+                    idempotency_key=invocation.idempotency_key,
+                )
+                replayed = False
+                operation = "prepare_packet"
+            elif isinstance(invocation, _ApprovePacketInvocation):
+                envelope = self._workflows.approve_packet(
+                    invocation.workflow_id,
+                    invocation.payload,
+                    idempotency_key=invocation.idempotency_key,
+                )
+                replayed = False
+                operation = "approve_packet"
+            else:
+                pdf = self._workflows.render_packet(
+                    invocation.workflow_id,
+                    evidence_dir=self._evidence_dir,
+                )
+                if len(pdf) > 25_000_000:
+                    return _error(
+                        "packet_too_large",
+                        "The rendered packet exceeds the AgentCore response limit.",
+                    )
+                LOGGER.info(
+                    "agentcore_operation_completed session=%s operation=render_packet workflow=%s bytes=%s",
+                    session_reference,
+                    invocation.workflow_id,
+                    len(pdf),
+                )
+                return {
+                    "ok": True,
+                    "content_type": "application/pdf",
+                    "filename": "mettle-reinspection-packet.pdf",
+                    "sha256": sha256(pdf).hexdigest(),
+                    "body_base64": base64.b64encode(pdf).decode("ascii"),
+                }
         except WorkflowNotFound as exc:
             return _error("workflow_not_found", str(exc))
         except WorkflowConflict as exc:
@@ -107,6 +220,12 @@ class MettleAgentCoreRuntime:
                 session_reference,
             )
             return _error("bedrock_intake_failed", str(exc))
+        except EvidenceSubmissionError as exc:
+            return _error("invalid_evidence_submission", str(exc))
+        except PacketNotReady as exc:
+            return _error("packet_not_ready", str(exc))
+        except PacketNotApproved as exc:
+            return _error("packet_not_approved", str(exc))
         except Exception:
             LOGGER.exception(
                 "agentcore_operation_failed session=%s operation=%s",

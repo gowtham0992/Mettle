@@ -14,6 +14,43 @@ from mettle.workflow_registry import WorkflowRegistry
 NOTICE = Path("examples/notices/failed-rough-in.txt").read_text(encoding="utf-8")
 
 
+class FakeAgentCoreGateway:
+    def __init__(self) -> None:
+        self.registry = WorkflowRegistry(bedrock_intake=parse_notice)
+
+    def create(self, payload, *, idempotency_key):
+        return self.registry.create(payload, idempotency_key=idempotency_key)
+
+    def get(self, workflow_id):
+        return self.registry.get(workflow_id)
+
+    def resume(self, workflow_id, payload, *, idempotency_key):
+        return self.registry.resume(
+            workflow_id, payload, idempotency_key=idempotency_key
+        )
+
+    def submit_evidence(self, workflow_id, payload, *, idempotency_key):
+        return self.registry.submit_evidence(
+            workflow_id, payload, idempotency_key=idempotency_key
+        )
+
+    def prepare_packet(self, workflow_id, payload, *, idempotency_key):
+        return self.registry.prepare_packet(
+            workflow_id, idempotency_key=idempotency_key
+        )
+
+    def approve_packet(self, workflow_id, payload, *, idempotency_key):
+        return self.registry.approve_packet(
+            workflow_id, payload, idempotency_key=idempotency_key
+        )
+
+    def render_packet(self, workflow_id):
+        return self.registry.render_packet(
+            workflow_id,
+            evidence_dir=Path("src/mettle/web/static/evidence"),
+        )
+
+
 def workflow_payload(*, notice_text: str = NOTICE, intake_provider: str = "local") -> dict:
     return {
         "notice_text": notice_text,
@@ -230,7 +267,7 @@ def test_live_bedrock_failure_is_safe_and_retryable() -> None:
 
 
 def test_agentcore_http_boundary_starts_restores_and_resumes_cloud_workflow() -> None:
-    cloud = WorkflowRegistry(bedrock_intake=parse_notice)
+    cloud = FakeAgentCoreGateway()
     payload = workflow_payload(intake_provider="bedrock")
     with client(agentcore=cloud) as browser:
         capabilities = browser.get("/api/capabilities")
@@ -250,6 +287,37 @@ def test_agentcore_http_boundary_starts_restores_and_resumes_cloud_workflow() ->
             },
             headers={"Idempotency-Key": "agentcore_resume_123"},
         )
+        evidence_responses = []
+        for index, (citation_id, sample_id) in enumerate(
+            [
+                ("1", "panel_wide_measured"),
+                ("2", "framing_plates_complete"),
+                ("3", "mechanical_access_wide"),
+            ]
+        ):
+            evidence_responses.append(
+                browser.post(
+                    f"/api/agentcore/workflows/{workflow_id}/evidence",
+                    json={"citation_id": citation_id, "sample_id": sample_id},
+                    headers={"Idempotency-Key": f"agentcore_evidence_{index}"},
+                )
+            )
+        prepared = browser.post(
+            f"/api/agentcore/workflows/{workflow_id}/packet/prepare",
+            json={},
+            headers={"Idempotency-Key": "agentcore_prepare_123"},
+        )
+        approved = browser.post(
+            f"/api/agentcore/workflows/{workflow_id}/packet/approve",
+            json={
+                "approval_id": prepared.json()["packet"]["approval_id"],
+                "decision": "Approve packet for reinspection scheduling",
+            },
+            headers={"Idempotency-Key": "agentcore_approve_123"},
+        )
+        downloaded = browser.get(
+            f"/api/agentcore/workflows/{workflow_id}/packet.pdf"
+        )
 
     assert capabilities.json() == {
         "bedrock_intake": False,
@@ -260,6 +328,11 @@ def test_agentcore_http_boundary_starts_restores_and_resumes_cloud_workflow() ->
     assert resumed.status_code == 200
     assert resumed.json()["snapshot"]["status"] == "completed"
     assert len(resumed.json()["snapshot"]["deliveries"]) == 3
+    assert all(item.json()["evidence"][-1]["status"] == "accepted" for item in evidence_responses)
+    assert approved.json()["packet"]["status"] == "approved"
+    assert downloaded.status_code == 200
+    assert downloaded.headers["content-type"] == "application/pdf"
+    assert len(PdfReader(BytesIO(downloaded.content)).pages) == 4
 
 
 def test_agentcore_http_boundary_fails_closed_without_explicit_server_enablement() -> None:
