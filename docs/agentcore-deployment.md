@@ -26,8 +26,9 @@ The one-time account setup creates only:
    `123456789012` in `us-east-1`;
 3. `MettleAgentCoreDeployer`, assumable by the existing bootstrap user for one
    hour; and
-4. an update to the bootstrap user's assume-role policy allowing that one new
-   role.
+4. a separate `AssumeMettleAgentCoreDeployer` inline policy on the bootstrap
+   user allowing only that one new role. The existing Bedrock developer policy
+   is left unchanged.
 
 The deployment then uploads `agentcore/MettleRecovery.zip` below `runtime/`
 and creates one IAM-authorized public-network AgentCore Runtime tagged
@@ -40,11 +41,35 @@ The checked-in policies are:
 - `agentcore/iam/runtime-policy.json`
 - `agentcore/iam/deployer-trust.json`
 - `agentcore/iam/deployer-policy.json`
+- `agentcore/iam/bootstrap-deployer-policy.json`
 
 The execution policy grants model invocation only for
 `amazon.nova-micro-v1:0`. It also includes the exact CloudWatch Logs, X-Ray,
 and namespaced metric permissions documented for AgentCore Runtime. It has no
 IAM, S3, configuration-bundle, or wildcard Bedrock model permission.
+
+AgentCore's `CreateAgentRuntime` operation also authorizes the dependent
+`CreateAgentRuntimeEndpoint` action for the future `runtime/*` ARN. AWS does
+not pass the runtime request-tag context to that dependent authorization, so
+this single action must be account-scoped. Runtime creation remains
+`Project=Mettle` request-tag-gated, and get/update/delete/invoke remain
+resource-tag-gated.
+
+Runtime deletion has the symmetric `DeleteAgentRuntimeEndpoint` dependency.
+AWS does not pass resource-tag context to that dependent authorization, so the
+endpoint action uses the account's `runtime/*` ARN. `DeleteAgentRuntime`
+itself remains `Project=Mettle` resource-tag-gated, so the deployer cannot
+initiate deletion of a non-Mettle runtime.
+
+First-use runtime creation also creates an AgentCore-managed workload identity
+under the account's `default` workload identity directory. The deployer can
+create and tag only the exact default directory and identities under it, and
+only with
+`Project=Mettle`; it cannot read identities or obtain workload tokens.
+Rollback can delete only managed identities under that directory carrying the
+same `Project=Mettle` resource tag. AWS also evaluates deletion against the
+untagged parent, so the policy allows the delete action on the one exact
+`default` directory ARN; it does not allow deletion under any other directory.
 
 ## Direct runtime request
 
