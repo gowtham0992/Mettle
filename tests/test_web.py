@@ -4,16 +4,20 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
 
+from mettle.agents.bedrock import BedrockIntakeError
 from mettle.demo import DemoStore
+from mettle.notice_parser import parse_notice
 from mettle.web.app import create_app
+from mettle.workflow_registry import WorkflowRegistry
 
 
 NOTICE = Path("examples/notices/failed-rough-in.txt").read_text(encoding="utf-8")
 
 
-def workflow_payload(*, notice_text: str = NOTICE) -> dict:
+def workflow_payload(*, notice_text: str = NOTICE, intake_provider: str = "local") -> dict:
     return {
         "notice_text": notice_text,
+        "intake_provider": intake_provider,
         "as_of": "2026-08-10",
         "roster": [
             {"trade": "electrical", "name": "Mike Alvarez", "phone": "+13035550101"},
@@ -57,8 +61,8 @@ def ready_workflow(browser: TestClient) -> tuple[str, dict]:
     return workflow_id, created
 
 
-def client() -> TestClient:
-    return TestClient(create_app(store=DemoStore()))
+def client(*, workflows: WorkflowRegistry | None = None) -> TestClient:
+    return TestClient(create_app(store=DemoStore(), workflows=workflows))
 
 
 def test_dashboard_and_campaign_api_load() -> None:
@@ -153,6 +157,67 @@ def test_workflow_create_replay_is_idempotent_and_changed_replay_conflicts() -> 
     assert replay.json() == first.json()
     assert changed.status_code == 409
     assert changed.json()["error"]["code"] == "idempotency_conflict"
+
+
+def test_live_bedrock_workflow_runs_inside_graph_and_replays_without_second_call() -> None:
+    calls: list[str] = []
+
+    def bedrock_intake(text: str):
+        calls.append(text)
+        return parse_notice(text)
+
+    workflows = WorkflowRegistry(bedrock_intake=bedrock_intake)
+    headers = {"Idempotency-Key": "bedrock_workflow_123"}
+    payload = workflow_payload(intake_provider="bedrock")
+    with client(workflows=workflows) as browser:
+        capabilities = browser.get("/api/capabilities")
+        first = browser.post("/api/workflows", json=payload, headers=headers)
+        replay = browser.post("/api/workflows", json=payload, headers=headers)
+
+    assert capabilities.json() == {"bedrock_intake": True}
+    assert first.status_code == 201
+    assert replay.status_code == 200
+    assert replay.json() == first.json()
+    assert first.json()["intake_provider"] == "bedrock"
+    assert first.json()["snapshot"]["status"] == "interrupted"
+    assert calls == [NOTICE]
+
+
+def test_live_bedrock_workflow_fails_closed_when_server_has_not_enabled_it() -> None:
+    with client() as browser:
+        capabilities = browser.get("/api/capabilities")
+        response = browser.post(
+            "/api/workflows",
+            json=workflow_payload(intake_provider="bedrock"),
+            headers={"Idempotency-Key": "bedrock_disabled_123"},
+        )
+
+    assert capabilities.json() == {"bedrock_intake": False}
+    assert response.status_code == 422
+    assert response.json()["error"] == {
+        "code": "workflow_configuration_error",
+        "message": "live Bedrock intake is not enabled on this server",
+    }
+
+
+def test_live_bedrock_failure_is_safe_and_retryable() -> None:
+    def failing_intake(_text: str):
+        raise BedrockIntakeError("Bedrock could not be reached with the current AWS configuration")
+
+    workflows = WorkflowRegistry(bedrock_intake=failing_intake)
+    with client(workflows=workflows) as browser:
+        response = browser.post(
+            "/api/workflows",
+            json=workflow_payload(intake_provider="bedrock"),
+            headers={"Idempotency-Key": "bedrock_failure_123"},
+        )
+
+    assert response.status_code == 502
+    assert response.headers["retry-after"] == "5"
+    assert response.json()["error"] == {
+        "code": "bedrock_intake_failed",
+        "message": "Bedrock could not be reached with the current AWS configuration",
+    }
 
 
 def test_workflow_resume_is_idempotent_and_does_not_duplicate_outreach() -> None:

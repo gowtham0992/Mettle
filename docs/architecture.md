@@ -62,7 +62,7 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 4. **Evidence assessment:** compare synthetic photos to notice-anchored requirements and produce a specific re-request. **Local adapter complete.**
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
 6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF. **Complete.**
-7. **AWS deployment:** move the graph to AgentCore and add Bedrock, storage, memory, and observability. **Bedrock intake adapter complete; live verification and AgentCore remain.**
+7. **AWS deployment:** move the graph to AgentCore and add durable storage, memory, and observability. **The opt-in Bedrock intake now runs inside the graph; AgentCore remains.**
 
 ## Decisions we can reverse later
 

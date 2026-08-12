@@ -68,6 +68,7 @@ class ResumeDecision(BaseModel):
 
 
 NodeFunction = Callable[[str | list[dict[str, Any]], dict[str, Any]], str]
+NoticeExtractor = Callable[[str], InspectionNotice]
 
 
 class DeterministicNode(MultiAgentBase):
@@ -144,6 +145,7 @@ class RecoveryWorkflowSession:
         as_of: date,
         roster: Mapping[Trade, Recipient],
         messenger: Messenger,
+        notice_extractor: NoticeExtractor = parse_notice,
     ) -> None:
         if not notice_text.strip():
             raise ValueError("notice_text must contain visible characters")
@@ -151,6 +153,7 @@ class RecoveryWorkflowSession:
             raise ValueError("notice_text exceeds the 100,000 character limit")
 
         self._notice_text = notice_text
+        self._notice_extractor = notice_extractor
         self._state: dict[str, Any] = {
             "as_of": as_of,
             "roster": dict(roster),
@@ -235,8 +238,7 @@ class RecoveryWorkflowSession:
         builder.set_hook_providers([ContractorJudgmentHook()])
         return builder.build()
 
-    @staticmethod
-    def _intake(task: str | list[dict[str, Any]], state: dict[str, Any]) -> str:
+    def _intake(self, task: str | list[dict[str, Any]], state: dict[str, Any]) -> str:
         if isinstance(task, str):
             notice_text = task
         elif isinstance(task, list) and all(
@@ -246,7 +248,7 @@ class RecoveryWorkflowSession:
             notice_text = "\n".join(block["text"] for block in task)
         else:
             raise ValueError("notice intake requires text-only content blocks")
-        notice = parse_notice(notice_text)
+        notice = self._notice_extractor(notice_text)
         state["notice"] = notice
         return f"Parsed {len(notice.citations)} notice-anchored citations."
 

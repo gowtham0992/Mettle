@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date
+from enum import StrEnum
 from hashlib import sha256
 from pathlib import Path
 from secrets import token_urlsafe
@@ -9,14 +11,18 @@ from threading import Lock
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from mettle.communication import Recipient, RecordingMessenger
-from mettle.domain import Trade
+from mettle.domain import InspectionNotice, Trade
 from mettle.evidence import EvidenceAssessment, EvidenceSampleNotFound, assess_sample
 from mettle.packet import PacketRecord, PacketStatus, render_packet_pdf
 from mettle.workflow import (
     RecoveryWorkflowSession,
+    WorkflowConfigurationError,
     WorkflowSnapshot,
     WorkflowStateError,
 )
+
+
+NoticeExtractor = Callable[[str], InspectionNotice]
 
 
 class WorkflowNotFound(RuntimeError):
@@ -43,6 +49,11 @@ class PacketNotApproved(RuntimeError):
     """Raised when a packet operation requires final contractor approval."""
 
 
+class IntakeProvider(StrEnum):
+    LOCAL = "local"
+    BEDROCK = "bedrock"
+
+
 class WorkflowRosterEntry(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -55,6 +66,7 @@ class CreateWorkflowRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     notice_text: str = Field(min_length=1, max_length=100_000)
+    intake_provider: IntakeProvider = IntakeProvider.LOCAL
     as_of: date
     roster: tuple[WorkflowRosterEntry, ...] = Field(min_length=1, max_length=10)
 
@@ -101,15 +113,22 @@ class WorkflowEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     workflow_id: str
+    intake_provider: IntakeProvider
     snapshot: WorkflowSnapshot
     evidence: list[EvidenceAssessment] = Field(default_factory=list)
     packet: PacketRecord | None = None
 
 
 class _WorkflowEntry:
-    def __init__(self, session: RecoveryWorkflowSession, snapshot: WorkflowSnapshot) -> None:
+    def __init__(
+        self,
+        session: RecoveryWorkflowSession,
+        snapshot: WorkflowSnapshot,
+        intake_provider: IntakeProvider,
+    ) -> None:
         self.session = session
         self.snapshot = snapshot
+        self.intake_provider = intake_provider
         self.lock = Lock()
         self.resume_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
         self.evidence: list[EvidenceAssessment] = []
@@ -127,13 +146,23 @@ def _fingerprint(model: BaseModel) -> str:
 class WorkflowRegistry:
     """Bounded, process-local owner for stateful Strands workflow sessions."""
 
-    def __init__(self, *, capacity: int = 50) -> None:
+    def __init__(
+        self,
+        *,
+        capacity: int = 50,
+        bedrock_intake: NoticeExtractor | None = None,
+    ) -> None:
         if capacity < 1:
             raise ValueError("capacity must be positive")
         self._capacity = capacity
+        self._bedrock_intake = bedrock_intake
         self._lock = Lock()
         self._entries: dict[str, _WorkflowEntry] = {}
         self._create_replays: dict[str, tuple[str, str, WorkflowEnvelope]] = {}
+
+    @property
+    def bedrock_enabled(self) -> bool:
+        return self._bedrock_intake is not None
 
     def create(
         self,
@@ -159,15 +188,27 @@ class WorkflowRegistry:
                 item.trade: Recipient(name=item.name, phone=item.phone)
                 for item in payload.roster
             }
+            notice_extractor: NoticeExtractor | None = None
+            if payload.intake_provider is IntakeProvider.BEDROCK:
+                notice_extractor = self._bedrock_intake
+                if notice_extractor is None:
+                    raise WorkflowConfigurationError(
+                        "live Bedrock intake is not enabled on this server"
+                    )
             session = RecoveryWorkflowSession(
                 notice_text=payload.notice_text,
                 as_of=payload.as_of,
                 roster=roster,
                 messenger=RecordingMessenger(),
+                **({"notice_extractor": notice_extractor} if notice_extractor else {}),
             )
             snapshot = session.start()
             workflow_id = token_urlsafe(12)
-            self._entries[workflow_id] = _WorkflowEntry(session, snapshot)
+            self._entries[workflow_id] = _WorkflowEntry(
+                session,
+                snapshot,
+                payload.intake_provider,
+            )
             envelope = self._envelope(workflow_id, self._entries[workflow_id])
             self._create_replays[idempotency_key] = (
                 fingerprint,
@@ -387,6 +428,7 @@ class WorkflowRegistry:
     def _envelope(workflow_id: str, entry: _WorkflowEntry) -> WorkflowEnvelope:
         return WorkflowEnvelope(
             workflow_id=workflow_id,
+            intake_provider=entry.intake_provider,
             snapshot=entry.snapshot.model_copy(deep=True),
             evidence=[item.model_copy(deep=True) for item in entry.evidence],
             packet=entry.packet.model_copy(deep=True) if entry.packet else None,

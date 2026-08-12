@@ -35,6 +35,7 @@ const elements = {
   workflowAsOf: document.querySelector("#workflow-as-of"),
   workflowError: document.querySelector("#workflow-form-error"),
   startWorkflow: document.querySelector("#start-workflow-button"),
+  startBedrock: document.querySelector("#start-bedrock-button"),
   closeNotice: document.querySelector("#close-notice-button"),
   retry: document.querySelector("#retry-button"),
   toast: document.querySelector("#toast"),
@@ -53,6 +54,9 @@ const stepLabels = [
 let campaign = null;
 let activeWorkflowId = null;
 let toastTimer = null;
+let bedrockEnabled = false;
+let workflowCreateKey = null;
+let workflowCreateProvider = null;
 
 function node(tag, className, text) {
   const item = document.createElement(tag);
@@ -110,7 +114,7 @@ function workflowCampaign(envelope) {
 
   const events = [
     {
-      happened_at: timestamp(8, 14), kind: "notice_parsed", actor: "Mettle · intake",
+      happened_at: timestamp(8, 14), kind: "notice_parsed", actor: envelope.intake_provider === "bedrock" ? "Mettle · Nova Micro intake" : "Mettle · local intake",
       title: `Parsed ${notice.citations.length} notice-anchored citations`,
       detail: "The correction notice became the recovery docket without project setup.",
     },
@@ -180,6 +184,7 @@ function workflowCampaign(envelope) {
   const citationsReady = [...evidenceByCitation.values()].filter((item) => item.status === "accepted").length;
   return {
     source_mode: "workflow",
+    intake_provider: envelope.intake_provider || "local",
     workflow_status: snapshot.status,
     notice_id: notice.notice_id,
     property_label: notice.property_label,
@@ -451,7 +456,7 @@ function render(data) {
     : data.packet_status === "awaiting_approval" ? "Awaiting your approval" : "Prepare packet for approval";
   elements.packetAction.disabled = data.packet_status === "awaiting_approval";
   elements.demoStep.textContent = isWorkflow
-    ? `STRANDS · ${data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH RESUMED"}`
+    ? `${data.intake_provider === "bedrock" ? "BEDROCK + " : ""}STRANDS · ${data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH RESUMED"}`
     : `${data.scenario_step} · ${stepLabels[data.scenario_step] || "RECOVERY RUN"}`;
   elements.advance.disabled = isWorkflow || data.scenario_complete;
   const advanceLabels = elements.advance.querySelectorAll("span");
@@ -472,6 +477,19 @@ async function loadCampaign() {
       render(await request("/api/campaign"));
     }
   } catch (error) { showError(error); }
+}
+
+async function loadCapabilities() {
+  try {
+    const capabilities = await request("/api/capabilities");
+    bedrockEnabled = capabilities.bedrock_intake === true;
+  } catch (_error) {
+    bedrockEnabled = false;
+  }
+  elements.startBedrock.disabled = !bedrockEnabled;
+  elements.startBedrock.title = bedrockEnabled
+    ? "Run notice intake on Amazon Nova Micro; this consumes AWS credit"
+    : "Start the server with Bedrock enabled to use live intake";
 }
 
 elements.advance.addEventListener("click", async () => {
@@ -524,14 +542,23 @@ elements.noticeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const noticeText = elements.noticeText.value.trim();
   if (!noticeText) return;
+  const provider = event.submitter?.value === "bedrock" ? "bedrock" : "local";
+  if (provider === "bedrock" && !bedrockEnabled) return;
+  if (!workflowCreateKey || workflowCreateProvider !== provider) {
+    workflowCreateKey = crypto.randomUUID().replaceAll("-", "_");
+    workflowCreateProvider = provider;
+  }
+  const submittedKey = workflowCreateKey;
   setBusy(elements.startWorkflow, true);
+  setBusy(elements.startBedrock, true);
   elements.workflowError.hidden = true;
   try {
     const envelope = await request("/api/workflows", {
       method: "POST",
-      headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
+      headers: { "Idempotency-Key": submittedKey },
       body: JSON.stringify({
         notice_text: noticeText,
+        intake_provider: provider,
         as_of: elements.workflowAsOf.value,
         roster: [
           { trade: "electrical", name: "Mike Alvarez", phone: "+13035550101" },
@@ -544,13 +571,24 @@ elements.noticeForm.addEventListener("submit", async (event) => {
     window.history.replaceState({}, "", `${window.location.pathname}?workflow=${encodeURIComponent(activeWorkflowId)}`);
     render(workflowCampaign(envelope));
     elements.noticeDialog.close();
-    showToast("Strands parsed the notice, recorded outreach, and paused only for your judgment.");
+    workflowCreateKey = null;
+    workflowCreateProvider = null;
+    showToast(provider === "bedrock"
+      ? "Nova Micro grounded the notice; Strands ran recovery and paused only for your judgment."
+      : "Local intake and Strands ran recovery, then paused only for your judgment.");
   } catch (error) {
     elements.workflowError.textContent = error.message;
     elements.workflowError.hidden = false;
   } finally {
     setBusy(elements.startWorkflow, false);
+    elements.startBedrock.disabled = !bedrockEnabled;
+    elements.startBedrock.setAttribute("aria-busy", "false");
   }
+});
+
+elements.noticeForm.addEventListener("input", () => {
+  workflowCreateKey = null;
+  workflowCreateProvider = null;
 });
 
 for (const button of elements.evidenceButtons) {
@@ -613,4 +651,5 @@ document.addEventListener("keydown", (event) => {
 });
 
 elements.retry.addEventListener("click", loadCampaign);
+loadCapabilities();
 loadCampaign();

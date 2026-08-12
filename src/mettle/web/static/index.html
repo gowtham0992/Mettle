@@ -144,12 +144,12 @@
       <form id="notice-form">
         <div class="notice-dialog__header">
           <div>
-            <p class="mono-label">NEW RECOVERY RUN · LOCAL STRANDS GRAPH</p>
+            <p class="mono-label">NEW RECOVERY RUN · STRANDS GRAPH</p>
             <h2 id="notice-dialog-title">Load a failed-inspection notice</h2>
           </div>
           <button class="dialog-close" id="close-notice-button" type="button" aria-label="Close notice loader">×</button>
         </div>
-        <p class="notice-dialog__intro">Mettle derives the citation docket and outreach plan directly from the notice. Messages are recorded locally—nothing is sent.</p>
+        <p class="notice-dialog__intro">Mettle derives the citation docket and outreach plan directly from the notice. Choose deterministic local parsing or explicitly spend a small amount of AWS credit on live Nova Micro intake. Everything after intake runs through the same Strands recovery graph, and messages are recorded locally—nothing is sent.</p>
 
         <label class="field field--notice">
           <span>CORRECTION NOTICE · PLAIN TEXT</span>
@@ -195,7 +195,13 @@ END CITATION</textarea>
         <p class="form-error" id="workflow-form-error" role="alert" hidden></p>
         <div class="notice-dialog__footer">
           <span>ZERO CONFIGURATION · NO LIVE SMS</span>
-          <button class="button button--orange" id="start-workflow-button" type="submit">Parse notice &amp; start recovery</button>
+          <div class="notice-dialog__actions">
+            <button class="button" id="start-workflow-button" type="submit" value="local">Start local · free</button>
+            <button class="button button--orange" id="start-bedrock-button" type="submit" value="bedrock" disabled title="Start the server with Bedrock enabled to use live intake">
+              Run live Bedrock
+              <small>NOVA MICRO · USES AWS CREDIT</small>
+            </button>
+          </div>
         </div>
       </form>
     </dialog>

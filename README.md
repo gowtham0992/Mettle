@@ -8,7 +8,7 @@ Mettle turns a municipal failed-inspection notice into a deadline-driven recover
 
 ## The first working slice
 
-The repository runs a complete notice-to-judgment slice without AWS credentials or paid model calls. It can:
+The repository runs a complete notice-to-judgment slice locally, with an explicit opt-in for live Bedrock intake. It can:
 
 - load a realistic text-form correction notice from the command center;
 - extract its citations without interpreting building code;
@@ -25,7 +25,7 @@ judgment before it resumes. No cloud model is invoked in this local mode.
 
 The command center has two modes. **Load notice** runs the real local Strands graph, preserves the workflow ID in the URL, and exposes a synthetic evidence lab for all three trades. The **demo controls** drive a deterministic six-event judge scenario: accepted evidence, rejected evidence with a precise re-request, deadline escalation, human judgment, and a contractor-approved final packet.
 
-The deterministic core is intentional. Strands and Bedrock will provide agentic extraction, communication, evidence review, and orchestration, while the domain rules remain testable without a model.
+The deterministic core is intentional. Strands orchestrates the recovery graph, while Bedrock can replace only the intake node. Domain rules remain testable without a model.
 
 ## Run it locally
 
@@ -55,12 +55,28 @@ uv run mettle ingest examples/notices/failed-rough-in.txt \
   --as-of 2026-08-10
 ```
 
+To expose the separate, credit-metered **Run live Bedrock** action in the
+dashboard, start the server explicitly with the least-privilege assumed-role
+profile:
+
+```bash
+uv run mettle serve \
+  --enable-bedrock \
+  --aws-profile mettle-dev \
+  --aws-region us-east-1
+```
+
+AWS profile, region, and the Nova Micro allowlisted model remain server-side;
+the browser cannot override them. The default **Start local · free** action
+never calls Bedrock. Creation requests are idempotent, including across a
+browser retry, so an identical retry does not make a second model call.
+
 The Bedrock boundary uses a low-cost Nova Micro model, a 30,000-character
 input ceiling, a 2,048-token output ceiling, short timeouts, and at most two
 total attempts. The intake CLI refuses model IDs outside the approved Nova
 Micro allowlist. Model output must validate as Mettle's bounded notice schema
-before it can enter campaign state. AgentCore deployment will follow after
-this live intake path is verified.
+before it can enter campaign state. AgentCore deployment is the next cloud
+slice.
 
 `mettle-dev` assumes the one-hour, least-privilege
 `MettleHackathonDeveloper` role. It can invoke Nova Micro but cannot administer

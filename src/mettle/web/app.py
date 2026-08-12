@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Header, Request, Response
@@ -8,6 +9,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from mettle.agents.bedrock import (
+    BedrockIntakeError,
+    BedrockIntakeSettings,
+    extract_notice_with_bedrock,
+)
 from mettle.demo import DemoCampaign, DemoConflict, DemoNotFound, DemoStore
 from mettle.workflow import WorkflowConfigurationError
 from mettle.workflow_registry import (
@@ -50,6 +56,29 @@ class ResolveJudgmentRequest(BaseModel):
         return normalized
 
 
+class CapabilitiesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    bedrock_intake: bool
+
+
+def configured_workflow_registry() -> WorkflowRegistry:
+    """Build a registry whose paid intake boundary is explicitly server-enabled."""
+    if os.getenv("METTLE_BEDROCK_ENABLED") != "1":
+        return WorkflowRegistry()
+
+    settings = BedrockIntakeSettings(
+        region=os.getenv("METTLE_AWS_REGION", "us-east-1"),
+        profile=os.getenv("METTLE_AWS_PROFILE") or None,
+        model_id="amazon.nova-micro-v1:0",
+    )
+
+    def bedrock_intake(text: str):
+        return extract_notice_with_bedrock(text, settings=settings)
+
+    return WorkflowRegistry(bedrock_intake=bedrock_intake)
+
+
 def create_app(
     *,
     store: DemoStore | None = None,
@@ -62,7 +91,7 @@ def create_app(
         openapi_url=None,
     )
     app.state.store = store or DemoStore()
-    app.state.workflows = workflows or WorkflowRegistry()
+    app.state.workflows = workflows or configured_workflow_registry()
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -147,6 +176,19 @@ def create_app(
             },
         )
 
+    @app.exception_handler(BedrockIntakeError)
+    async def bedrock_intake_error(_request: Request, exc: BedrockIntakeError):
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": {
+                    "code": "bedrock_intake_failed",
+                    "message": str(exc),
+                }
+            },
+            headers={"Retry-After": "5"},
+        )
+
     @app.exception_handler(EvidenceSubmissionError)
     async def evidence_submission(
         _request: Request,
@@ -191,6 +233,12 @@ def create_app(
     @app.get("/api/campaign", response_model=DemoCampaign)
     async def get_campaign(request: Request) -> DemoCampaign:
         return request.app.state.store.snapshot()
+
+    @app.get("/api/capabilities", response_model=CapabilitiesResponse)
+    async def get_capabilities(request: Request) -> CapabilitiesResponse:
+        return CapabilitiesResponse(
+            bedrock_intake=request.app.state.workflows.bedrock_enabled
+        )
 
     @app.post("/api/demo/advance", response_model=DemoCampaign)
     async def advance_demo(payload: AdvanceRequest, request: Request) -> DemoCampaign:

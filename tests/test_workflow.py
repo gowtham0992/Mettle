@@ -5,6 +5,7 @@ import pytest
 
 from mettle.communication import RecordingMessenger, Recipient
 from mettle.domain import Trade
+from mettle.notice_parser import parse_notice
 from mettle.workflow import (
     RecoveryWorkflowSession,
     WorkflowConfigurationError,
@@ -92,3 +93,26 @@ def test_notice_identifiers_are_not_used_as_delivery_identifiers() -> None:
     assert snapshot.status is WorkflowStatus.INTERRUPTED
     assert all("Castle Pines" not in item.message_id for item in messenger.deliveries)
     assert all("Castle Pines" not in item.idempotency_key for item in messenger.deliveries)
+
+
+def test_strands_workflow_uses_injected_intake_without_changing_later_nodes() -> None:
+    extracted: list[str] = []
+
+    def intake(text: str):
+        extracted.append(text)
+        return parse_notice(text)
+
+    messenger = RecordingMessenger()
+    session = RecoveryWorkflowSession(
+        notice_text=NOTICE,
+        as_of=date(2026, 8, 10),
+        roster=ROSTER,
+        messenger=messenger,
+        notice_extractor=intake,
+    )
+
+    snapshot = session.start()
+
+    assert extracted == [NOTICE]
+    assert snapshot.status is WorkflowStatus.INTERRUPTED
+    assert [item.citation_id for item in messenger.deliveries] == ["1", "2"]
