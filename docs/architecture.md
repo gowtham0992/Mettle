@@ -84,8 +84,8 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF. **Complete.**
 7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,
    package it as CodeZip, and define least-privilege deployment and rollback.
-   **Local AgentCore runtime, package, IAM boundary, and smoke client complete;
-   cloud creation awaits explicit approval.**
+   **Complete: runtime version 2 is deployed, rollback was exercised on a
+   disposable canary, and live start/resume acceptance passed.**
 8. **Durability and live integrations:** add durable workflow storage, AgentCore
    Memory where it creates demonstrable value, and an SMS adapter after the
    deployed recovery loop is verified.

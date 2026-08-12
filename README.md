@@ -105,6 +105,10 @@ allow only Nova Micro plus AgentCore telemetry and restrict deployment to
 Project-tagged Mettle runtimes. See
 [AgentCore deployment and rollback](docs/agentcore-deployment.md).
 
+The cloud runtime is deployed in `us-east-1` as `MettleRecovery` version 2.
+Its tested path runs the live Bedrock intake inside Strands, pauses for the
+contractor's judgment, and resumes the same AgentCore session to completion.
+
 `mettle-dev` assumes the one-hour, least-privilege
 `MettleHackathonDeveloper` role. It can invoke Nova Micro but cannot administer
 IAM or invoke more expensive models. See [AWS access and teardown](docs/aws-access.md).

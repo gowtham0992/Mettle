@@ -5,6 +5,32 @@ deployment avoids the broad CloudFormation bootstrap roles created by the
 default CDK workflow. Do not run these commands with the root-backed `mettle`
 profile during normal development.
 
+## Current deployment
+
+- Runtime: `MettleRecovery-example`
+- ARN: `arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/MettleRecovery-example`
+- Version and status: `2`, `READY`
+- Artifact: `runtime/MettleRecovery-example.zip`, S3 version
+  `EXAMPLE_OBJECT_VERSION`
+- Artifact SHA-256:
+  `EXAMPLE_ARTIFACT_SHA256`
+- Runtime lifecycle: 15-minute idle timeout, 8-hour maximum session
+- Log group: `/aws/bedrock-agentcore/runtimes/MettleRecovery-example-DEFAULT`,
+  14-day retention
+
+The live acceptance workflow `DW8bsBrz77Q4Noa9` started with two recorded
+trade deliveries and one contractor judgment, then resumed in the same
+AgentCore session to `completed` with three deliveries. The successful log
+stream contains completion metadata only; it does not contain the synthetic
+notice or credentials.
+
+The rollback canary `MettleRecoveryCanary-gNWaC24tLN` reached `READY`, was
+deleted, and returned `ResourceNotFound` on verification. Its retained log
+group expires after 14 days. The first artifact failed before Bedrock intake
+because the deployed Python path omitted the repository's `src/` directory;
+the regression-tested entrypoint fix is in version 2, and the broken S3 object
+version was permanently removed.
+
 ## Proven locally
 
 - The official AgentCore development server completes `start -> Strands
@@ -15,6 +41,11 @@ profile during normal development.
   and fails if the zip still contains `.env`, `.aws`, `.git`, design sources,
   docs, tests, scripts, AgentCore deployment state, or Node dependencies.
 - The Python tests validate the runtime contract and cloud-response decoder.
+- The packaged entrypoint regression test removes the local editable-install
+  path and proves `agentcore_app.py` bootstraps the deployed `src/` layout.
+- AWS Access Analyzer reports zero findings for all checked-in identity
+  policies.
+- IAM simulation allows Nova Micro and implicitly denies Nova Pro.
 
 ## Intended AWS footprint
 
