@@ -1,0 +1,130 @@
+# AgentCore deployment and rollback
+
+Mettle is prepared for a direct CodeZip deployment in `us-east-1`. Direct
+deployment avoids the broad CloudFormation bootstrap roles created by the
+default CDK workflow. Do not run these commands with the root-backed `mettle`
+profile during normal development.
+
+## Proven locally
+
+- The official AgentCore development server completes `start -> Strands
+  interrupt -> resume` in one runtime session.
+- Replaying the same start idempotency key does not repeat the Bedrock intake.
+- `npx agentcore validate --json` succeeds.
+- `scripts/prune_agentcore_zip.sh` strips repository-only files after packaging
+  and fails if the zip still contains `.env`, `.aws`, `.git`, design sources,
+  docs, tests, scripts, AgentCore deployment state, or Node dependencies.
+- The Python tests validate the runtime contract and cloud-response decoder.
+
+## Intended AWS footprint
+
+The one-time account setup creates only:
+
+1. `mettle-agentcore-artifacts-123456789012-us-east-1`, a private, encrypted,
+   versioned S3 bucket with public access blocked;
+2. `MettleAgentCoreRuntime`, trusted by AgentCore only from account
+   `123456789012` in `us-east-1`;
+3. `MettleAgentCoreDeployer`, assumable by the existing bootstrap user for one
+   hour; and
+4. an update to the bootstrap user's assume-role policy allowing that one new
+   role.
+
+The deployment then uploads `agentcore/MettleRecovery.zip` below `runtime/`
+and creates one IAM-authorized public-network AgentCore Runtime tagged
+`Project=Mettle`. Public network mode describes outbound runtime networking;
+inbound invocation still requires AWS IAM authorization.
+
+The checked-in policies are:
+
+- `agentcore/iam/runtime-trust.json`
+- `agentcore/iam/runtime-policy.json`
+- `agentcore/iam/deployer-trust.json`
+- `agentcore/iam/deployer-policy.json`
+
+The execution policy grants model invocation only for
+`amazon.nova-micro-v1:0`. It also includes the exact CloudWatch Logs, X-Ray,
+and namespaced metric permissions documented for AgentCore Runtime. It has no
+IAM, S3, configuration-bundle, or wildcard Bedrock model permission.
+
+## Direct runtime request
+
+After packaging and uploading a versioned object, the control-plane request is
+equivalent to:
+
+```bash
+aws bedrock-agentcore-control create-agent-runtime \
+  --profile mettle-agentcore \
+  --region us-east-1 \
+  --agent-runtime-name MettleRecovery \
+  --agent-runtime-artifact '{"codeConfiguration":{"code":{"s3":{"bucket":"mettle-agentcore-artifacts-123456789012-us-east-1","prefix":"runtime/MettleRecovery.zip","versionId":"<VERSION_ID>"}},"runtime":"PYTHON_3_12","entryPoint":["agentcore_app.py"]}}' \
+  --role-arn arn:aws:iam::123456789012:role/MettleAgentCoreRuntime \
+  --network-configuration '{"networkMode":"PUBLIC"}' \
+  --protocol-configuration '{"serverProtocol":"HTTP"}' \
+  --lifecycle-configuration '{"idleRuntimeSessionTimeout":900,"maxLifetime":28800}' \
+  --tags Project=Mettle
+```
+
+The actual deployment must use a unique 33-or-more-character client token and
+record the returned runtime ID, ARN, version, artifact version ID, and request
+time in a local ignored file. No notice data belongs in deployment state.
+
+## Cloud acceptance check
+
+1. Wait until `GetAgentRuntime` returns `READY`.
+2. Invoke `start` with a fresh runtime session ID and synthetic notice.
+3. Confirm the response is interrupted with exactly one judgment request.
+4. Invoke `resume` with the same runtime session ID and returned workflow and
+   interrupt IDs.
+5. Confirm the graph completes and that the first outreach was not replayed.
+6. Check CloudWatch logs for the hashed session reference and absence of notice
+   text.
+7. Verify the execution role cannot invoke a model other than Nova Micro.
+
+The paid start/resume check is scripted and prints only workflow metadata, not
+the notice or model response:
+
+```bash
+uv run python scripts/agentcore_smoke.py \
+  --profile mettle-agentcore \
+  --runtime-arn <RUNTIME_ARN>
+```
+
+AgentCore runtime sessions are ephemeral. The default idle timeout here is 15
+minutes and maximum lifetime is 8 hours. The first cloud demo must therefore
+keep `start` and `resume` in the same session; durable campaign recovery across
+session expiry is explicitly out of scope for this slice.
+
+## Rollback drill
+
+Before leaving the final runtime deployed, create a disposable canary runtime,
+wait for `READY`, delete it, and verify `GetAgentRuntime` no longer returns an
+active resource. This exercises the same rollback path without deleting the
+demo runtime.
+
+If the final deployment is unhealthy, delete the runtime by its recorded ID,
+verify deletion, and delete the uploaded object version. Do not reuse a failed
+runtime while its state is `CREATING`, `UPDATING`, or `DELETING`.
+
+## Full teardown
+
+After the hackathon:
+
+1. delete the Mettle runtime and verify deletion;
+2. delete every object version and delete marker under the artifact bucket;
+3. delete the artifact bucket;
+4. delete inline policies from `MettleAgentCoreRuntime` and
+   `MettleAgentCoreDeployer`, then delete both roles; and
+5. remove the AgentCore deployer role from the bootstrap user's assume-role
+   policy and local AWS config.
+
+CloudWatch log groups may outlive the runtime. List only
+`/aws/bedrock-agentcore/runtimes/` groups associated with the recorded runtime
+before deciding whether to delete them.
+
+## Tooling caveat
+
+The supported `@aws/agentcore` 0.26.0 CLI is pinned as a development-only
+dependency. Its current transitive dependency tree reports upstream npm audit
+findings, and npm's automated fix attempts to install an AIX-only esbuild
+package on macOS. Node tooling is excluded from the Python runtime artifact;
+do not force incompatible dependency overrides into the deployable product.

@@ -8,7 +8,9 @@ Mettle turns a municipal failed-inspection notice into a deadline-driven recover
 
 ## The first working slice
 
-The repository runs a complete notice-to-judgment slice locally, with an explicit opt-in for live Bedrock intake. It can:
+The repository runs a complete notice-to-judgment slice locally and through the
+official AgentCore development server, with an explicit opt-in for live Bedrock
+intake. It can:
 
 - load a realistic text-form correction notice from the command center;
 - extract its citations without interpreting building code;
@@ -75,14 +77,42 @@ The Bedrock boundary uses a low-cost Nova Micro model, a 30,000-character
 input ceiling, a 2,048-token output ceiling, short timeouts, and at most two
 total attempts. The intake CLI refuses model IDs outside the approved Nova
 Micro allowlist. Model output must validate as Mettle's bounded notice schema
-before it can enter campaign state. AgentCore deployment is the next cloud
-slice.
+before it can enter campaign state.
+
+## Run the AgentCore boundary locally
+
+The official AgentCore app lives at `agentcore_app.py`. It accepts only the
+bounded `start` and `resume` operations, preserves the Strands workflow in the
+AgentCore session, and does not let callers select an AWS profile, region, or
+model. Start the local runtime without deploying anything:
+
+```bash
+npx agentcore dev --runtime MettleRecovery --port 8081 --logs --skip-deploy
+```
+
+Package the direct-code artifact with:
+
+```bash
+npx agentcore validate --json
+npx agentcore package --directory . --runtime MettleRecovery
+scripts/prune_agentcore_zip.sh
+```
+
+The final command strips design sources, docs, tests, and build tooling from the
+runtime zip, then fails if a forbidden path remains. The generated zip and
+staging tree are ignored. The checked-in IAM policies
+allow only Nova Micro plus AgentCore telemetry and restrict deployment to
+Project-tagged Mettle runtimes. See
+[AgentCore deployment and rollback](docs/agentcore-deployment.md).
 
 `mettle-dev` assumes the one-hour, least-privilege
 `MettleHackathonDeveloper` role. It can invoke Nova Micro but cannot administer
 IAM or invoke more expensive models. See [AWS access and teardown](docs/aws-access.md).
 
-Workflow state is intentionally process-local in this phase. Restarting the server clears created runs; durable storage, authentication, and live communication belong to the deployment slice.
+Workflow state is intentionally session-local in this phase. Restarting the
+local server clears created runs; a deployed AgentCore session keeps the graph
+only while its isolated runtime session is alive. Durable storage and live
+communication remain later slices.
 
 ## Product boundary
 

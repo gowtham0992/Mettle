@@ -42,6 +42,26 @@ Packet generation begins only when the latest evidence for every citation is acc
 
 FastAPI exposes bounded workflow creation, retrieval, and resume endpoints to the command center. A thread-safe in-memory registry owns each stateful Strands session, caps the number of runs, and protects create and resume operations with idempotency keys. It is a development boundary, not durable production storage.
 
+### AgentCore runtime boundary
+
+`agentcore_app.py` hosts the same registry behind the official AgentCore Python
+runtime. A discriminated JSON contract permits only `start` and `resume`,
+forbids extra fields, bounds idempotency keys, and converts internal failures
+to quiet error codes. Logs contain only a one-way session reference; notice
+text and credentials are never logged.
+
+AgentCore routes a runtime session to isolated compute, so a `start` and
+`resume` using the same runtime session ID reach the same in-memory Strands
+graph. This is not durable persistence: the state disappears when the session
+expires or the runtime stops. Mettle exposes that limitation instead of
+pretending AgentCore Memory has already been integrated.
+
+The deployment boundary uses direct CodeZip deployment rather than the CLI's
+default CDK bootstrap. A private, versioned S3 object holds the artifact. The
+runtime role can invoke only Nova Micro and publish AgentCore telemetry. A
+separate deployer role can pass only that execution role and manage only
+Project-tagged Mettle runtimes.
+
 ## Why this structure
 
 Putting all behavior inside agent prompts would produce an impressive but untestable demo. Keeping all behavior deterministic would miss the hackathon's agentic thesis. The boundary is deliberate: models handle language and evidence; code enforces state transitions, deadlines, idempotency, and human-approval policy.
@@ -62,7 +82,13 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 4. **Evidence assessment:** compare synthetic photos to notice-anchored requirements and produce a specific re-request. **Local adapter complete.**
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
 6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF. **Complete.**
-7. **AWS deployment:** move the graph to AgentCore and add durable storage, memory, and observability. **The opt-in Bedrock intake now runs inside the graph; AgentCore remains.**
+7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,
+   package it as CodeZip, and define least-privilege deployment and rollback.
+   **Local AgentCore runtime, package, IAM boundary, and smoke client complete;
+   cloud creation awaits explicit approval.**
+8. **Durability and live integrations:** add durable workflow storage, AgentCore
+   Memory where it creates demonstrable value, and an SMS adapter after the
+   deployed recovery loop is verified.
 
 ## Decisions we can reverse later
 
