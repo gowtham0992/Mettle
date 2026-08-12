@@ -34,9 +34,9 @@ The working Strands graph runs `intake -> plan -> coordinate -> judgment gate ->
 
 SMS, object storage, model providers, and packet rendering live behind small interfaces. The demo begins with recording fakes. Twilio, Amazon S3, Amazon Bedrock, and AgentCore can replace those fakes independently.
 
-The evidence lab uses a trusted catalog of synthetic photo fixtures. A deterministic adapter maps observable requirements in the notice to server-controlled capabilities, rejects missing views or scale, and routes unknown requirement language to manual review. This is a safe contract test for the future Bedrock vision adapter; it does not infer code compliance.
+The evidence lab keeps a trusted catalog of synthetic photo fixtures as a reliable fallback and also accepts real JPEG/PNG uploads. The server caps the raw body, decodes and bounds pixels, removes metadata, and re-encodes to JPEG before invoking Nova Lite. The vision contract returns one structured finding per notice requirement; Mettle derives accepted, rejected, or manual-review status and never asks the model to infer code compliance. Idempotency fingerprints include the normalized image bytes so retries cannot repeat model spend.
 
-Packet generation begins only when the latest evidence for every citation is accepted. A separate final approval record blocks PDF download until the contractor approves the assembled packet. ReportLab renders the notice, evidence requirements, synthetic images, safety boundary, and communication record from validated server state; client-provided paths or filenames never reach the renderer.
+Packet generation begins only when the latest evidence for every citation is accepted. A separate final approval record blocks PDF download until the contractor approves the assembled packet. ReportLab renders the notice, evidence requirements, trusted fixture or normalized uploaded images, safety boundary, and communication record from validated server state; client-provided paths or filenames never reach the renderer.
 
 ### Local application boundary
 
@@ -75,7 +75,7 @@ disabled unless the operator explicitly enables it at startup.
 
 The deployment boundary uses direct CodeZip deployment rather than the CLI's
 default CDK bootstrap. A private, versioned S3 object holds the artifact. The
-runtime role can invoke only Nova Micro and publish AgentCore telemetry. A
+runtime role can invoke only Nova Micro for text, Nova Lite for vision, and publish AgentCore telemetry. A
 separate deployer role can pass only that execution role and manage only
 Project-tagged Mettle runtimes.
 
@@ -96,7 +96,7 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 1. **Notice to campaign plan:** prove traceable extraction, deadline behavior, and judgment routing without a model.
 2. **Local Strands orchestration:** run deterministic contract nodes, recorded outreach, and a resumable human interrupt. **Complete.**
 3. **Recorded communication loop:** receive simulated SMS events with retry and idempotency behavior.
-4. **Evidence assessment:** compare synthetic photos to notice-anchored requirements and produce a specific re-request. **Local adapter complete.**
+4. **Evidence assessment:** compare trusted fixtures or normalized real photos to notice-anchored requirements and produce a specific re-request or judgment interrupt. **Local and Bedrock Vision adapters complete.**
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
 6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF. **Complete.**
 7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,

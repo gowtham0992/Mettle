@@ -81,9 +81,26 @@
           <section class="panel evidence-panel" id="evidence-panel" hidden>
             <div class="panel__header">
               <div><span class="section-index">03</span><h2>Evidence lab</h2></div>
-              <span class="evidence-panel__mode">SYNTHETIC</span>
+              <span class="evidence-panel__mode">VISION + FIXTURES</span>
             </div>
-            <p class="panel__kicker">RUN SYNTHETIC EVIDENCE FROM EACH TRADE</p>
+            <form class="photo-evidence" id="photo-evidence-form">
+              <div class="photo-evidence__copy">
+                <p class="panel__kicker">ASSESS A REAL JOB-SITE PHOTO</p>
+                <strong>Notice-anchored visual check</strong>
+                <span>JPEG or PNG · 5 MB max · Mettle checks visible proof, never code compliance</span>
+              </div>
+              <label>
+                <span>Citation</span>
+                <select id="photo-citation" aria-label="Citation for uploaded photo"></select>
+              </label>
+              <label class="photo-evidence__file">
+                <span>Photo</span>
+                <input id="photo-file" type="file" accept="image/jpeg,image/png">
+              </label>
+              <button class="button button--orange" id="photo-submit" type="submit" disabled>Assess with Bedrock Vision</button>
+              <p class="photo-evidence__error" id="photo-error" role="alert" hidden></p>
+            </form>
+            <p class="panel__kicker">OR RUN RELIABLE SYNTHETIC DEMO FIXTURES</p>
             <div class="evidence-fixtures">
               <article class="evidence-fixture">
                 <img src="/static/evidence/panel-closeup-insufficient.png" alt="Synthetic close-up of an electrical panel that does not show working clearance">

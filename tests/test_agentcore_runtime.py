@@ -3,9 +3,11 @@ from io import BytesIO
 from pathlib import Path
 
 from pypdf import PdfReader
+from PIL import Image
 
 from mettle.agentcore_runtime import MettleAgentCoreRuntime
 from mettle.notice_parser import parse_notice
+from mettle.evidence import EvidenceAssessment, EvidenceStatus
 from mettle.workflow_registry import WorkflowRegistry
 
 
@@ -26,9 +28,28 @@ def workflow_payload(*, provider: str = "bedrock") -> dict:
 
 
 def runtime() -> MettleAgentCoreRuntime:
+    def accept_photo(*, citation, image, assessment_id):
+        return EvidenceAssessment(
+            assessment_id=assessment_id,
+            citation_id=citation.citation_id,
+            sample_id=f"upload_{assessment_id}",
+            image_url="",
+            status=EvidenceStatus.ACCEPTED,
+            matched_requirements=citation.evidence_requirements,
+            explanation="Visible evidence accepted, not code compliance.",
+        )
     return MettleAgentCoreRuntime(
-        workflows=WorkflowRegistry(bedrock_intake=parse_notice)
+        workflows=WorkflowRegistry(
+            bedrock_intake=parse_notice,
+            photo_assessor=accept_photo,
+        )
     )
+
+
+def jpeg_photo() -> bytes:
+    output = BytesIO()
+    Image.new("RGB", (80, 60), "gray").save(output, format="JPEG")
+    return output.getvalue()
 
 
 def test_agentcore_session_starts_then_resumes_the_same_strands_graph() -> None:
@@ -89,6 +110,34 @@ def test_agentcore_start_replay_does_not_repeat_paid_intake() -> None:
     assert replay["replayed"] is True
     assert replay["workflow"] == first["workflow"]
     assert calls == [NOTICE]
+
+
+def test_agentcore_accepts_bounded_base64_photo_for_vision_assessment() -> None:
+    subject = runtime()
+    session_id = "session-photo-123456789012345678901234567890"
+    started = subject.handle(
+        {
+            "operation": "start",
+            "idempotency_key": "agentcore_photo_start_123",
+            "payload": workflow_payload(),
+        },
+        session_id=session_id,
+    )
+    response = subject.handle(
+        {
+            "operation": "submit_photo_evidence",
+            "idempotency_key": "agentcore_photo_submit_123",
+            "workflow_id": started["workflow"]["workflow_id"],
+            "payload": {
+                "citation_id": "1",
+                "image_base64": base64.b64encode(jpeg_photo()).decode("ascii"),
+            },
+        },
+        session_id=session_id,
+    )
+
+    assert response["ok"] is True
+    assert response["workflow"]["evidence"][-1]["status"] == "accepted"
 
 
 def test_agentcore_boundary_rejects_unknown_fields_without_echoing_input() -> None:

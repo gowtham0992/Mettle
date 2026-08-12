@@ -16,6 +16,7 @@ from mettle.workflow_registry import (
     PreparePacketRequest,
     ResumeWorkflowRequest,
     SubmitEvidenceRequest,
+    SubmitPhotoEvidenceRequest,
     WorkflowConflict,
     WorkflowRegistry,
 )
@@ -171,6 +172,25 @@ def test_resume_reuses_session_and_is_locally_idempotent() -> None:
     assert first.snapshot.status == "completed"
     assert len(client.requests) == 2
     assert client.requests[0]["runtimeSessionId"] == client.requests[1]["runtimeSessionId"]
+
+
+def test_photo_evidence_is_base64_encoded_inside_the_private_agentcore_request() -> None:
+    created = interrupted_envelope()
+    accepted = created.model_copy(deep=True)
+    client = QueueClient([success(created), success(accepted)])
+    gateway = AgentCoreWorkflowGateway(client=client, runtime_arn=RUNTIME_ARN)
+    gateway.create(create_payload(), idempotency_key="cloud_photo_create_123")
+
+    gateway.submit_photo_evidence(
+        created.workflow_id,
+        SubmitPhotoEvidenceRequest(citation_id="1"),
+        image=b"normalized-jpeg",
+        idempotency_key="cloud_photo_submit_123",
+    )
+
+    request_body = json.loads(client.requests[1]["payload"])
+    assert request_body["operation"] == "submit_photo_evidence"
+    assert request_body["payload"]["image_base64"] == b64encode(b"normalized-jpeg").decode("ascii")
 
 
 def test_runtime_error_is_mapped_without_exposing_untrusted_details() -> None:

@@ -52,7 +52,7 @@ version was permanently removed.
   path and proves `agentcore_app.py` bootstraps the deployed `src/` layout.
 - AWS Access Analyzer reports zero findings for all checked-in identity
   policies.
-- IAM simulation allows Nova Micro and implicitly denies Nova Pro.
+- IAM simulation allows Nova Micro and Nova Lite and implicitly denies Nova Pro.
 
 ## Intended AWS footprint
 
@@ -145,7 +145,7 @@ time in a local ignored file. No notice data belongs in deployment state.
 8. Confirm the graph completes and that the first outreach was not replayed.
 9. Check CloudWatch logs for the hashed session reference and absence of notice
    text when using an authorized observability identity.
-10. Verify the execution role cannot invoke a model other than Nova Micro.
+10. Verify the execution role cannot invoke a model other than the approved Nova Micro and Nova Lite pair.
 
 The paid end-to-end check is scripted and prints only workflow and packet
 metadata, not the notice or model response:

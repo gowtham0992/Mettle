@@ -21,6 +21,11 @@ const elements = {
   evidencePanel: document.querySelector("#evidence-panel"),
   evidenceResult: document.querySelector("#evidence-result"),
   evidenceButtons: [...document.querySelectorAll(".evidence-submit")],
+  photoForm: document.querySelector("#photo-evidence-form"),
+  photoCitation: document.querySelector("#photo-citation"),
+  photoFile: document.querySelector("#photo-file"),
+  photoSubmit: document.querySelector("#photo-submit"),
+  photoError: document.querySelector("#photo-error"),
   metrics: document.querySelector("#metrics-list"),
   packet: document.querySelector("#packet-status"),
   packetList: document.querySelector("#packet-list"),
@@ -59,6 +64,7 @@ let activeWorkflowTarget = "local";
 let toastTimer = null;
 let bedrockEnabled = false;
 let agentCoreEnabled = false;
+let photoEvidenceEnabled = false;
 let workflowCreateKey = null;
 let workflowCreateProvider = null;
 
@@ -218,9 +224,13 @@ function workflowCampaign(envelope, executionTarget = "local") {
 }
 
 async function request(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (!Object.keys(headers).some((key) => key.toLowerCase() === "content-type")) {
+    headers["Content-Type"] = "application/json";
+  }
   const response = await fetch(path, {
     ...options,
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers,
   });
   const payload = await response.json();
   if (!response.ok) throw new Error(payload.error?.message || "The campaign request failed.");
@@ -444,6 +454,19 @@ function render(data) {
   const isAgentCore = isWorkflow && data.execution_target === "agentcore";
   elements.evidencePanel.hidden = !isWorkflow;
   if (isWorkflow) {
+    const selectedCitation = elements.photoCitation.value;
+    elements.photoCitation.replaceChildren(...data.citations.map((citation) => {
+      const option = node("option", "", `C${citation.citation_id} · ${citation.trade}`);
+      option.value = citation.citation_id;
+      return option;
+    }));
+    if ([...elements.photoCitation.options].some((option) => option.value === selectedCitation)) {
+      elements.photoCitation.value = selectedCitation;
+    }
+    elements.photoSubmit.disabled = !photoEvidenceEnabled || !elements.photoFile.files?.length;
+    elements.photoSubmit.title = photoEvidenceEnabled
+      ? "This live vision check consumes a small amount of AWS credit"
+      : "Start Mettle with Bedrock or AgentCore enabled to assess real photos";
     const latestEvidence = data.evidence.at(-1);
     elements.evidenceResult.hidden = !latestEvidence;
     if (latestEvidence) {
@@ -508,9 +531,11 @@ async function loadCapabilities() {
     const capabilities = await request("/api/capabilities");
     bedrockEnabled = capabilities.bedrock_intake === true;
     agentCoreEnabled = capabilities.agentcore_runtime === true;
+    photoEvidenceEnabled = capabilities.photo_evidence === true;
   } catch (_error) {
     bedrockEnabled = false;
     agentCoreEnabled = false;
+    photoEvidenceEnabled = false;
   }
   elements.startBedrock.disabled = !bedrockEnabled;
   elements.startBedrock.title = bedrockEnabled
@@ -521,6 +546,48 @@ async function loadCapabilities() {
     ? "Run the Strands graph on the deployed AgentCore runtime; this consumes AWS credit"
     : "Start the server with AgentCore enabled to use the deployed runtime";
 }
+
+elements.photoFile.addEventListener("change", () => {
+  elements.photoError.hidden = true;
+  elements.photoSubmit.disabled = !photoEvidenceEnabled || !elements.photoFile.files?.length;
+});
+
+elements.photoForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!activeWorkflowId || !elements.photoFile.files?.length || !photoEvidenceEnabled) return;
+  const file = elements.photoFile.files[0];
+  elements.photoError.hidden = true;
+  setBusy(elements.photoSubmit, true);
+  try {
+    const workflowRoot = activeWorkflowTarget === "agentcore"
+      ? "/api/agentcore/workflows"
+      : "/api/workflows";
+    const citation = encodeURIComponent(elements.photoCitation.value);
+    const envelope = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/evidence/photo?citation_id=${citation}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type,
+        "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_"),
+      },
+      body: file,
+    });
+    campaign = workflowCampaign(envelope, activeWorkflowTarget);
+    render(campaign);
+    const result = envelope.evidence.at(-1);
+    showToast(result.status === "accepted"
+      ? "Photo visibly satisfies every notice evidence requirement."
+      : result.status === "manual_review"
+        ? "The image is ambiguous. Mettle reserved the decision for you."
+        : "Photo rejected with a specific re-request for the trade.");
+    elements.photoForm.reset();
+  } catch (error) {
+    elements.photoError.textContent = error.message;
+    elements.photoError.hidden = false;
+  } finally {
+    elements.photoSubmit.disabled = !photoEvidenceEnabled || !elements.photoFile.files?.length;
+    elements.photoSubmit.setAttribute("aria-busy", "false");
+  }
+});
 
 elements.advance.addEventListener("click", async () => {
   const previousStep = campaign?.scenario_step;
@@ -651,7 +718,7 @@ for (const button of elements.evidenceButtons) {
           sample_id: button.dataset.sample,
         }),
       });
-      campaign = workflowCampaign(envelope);
+      campaign = workflowCampaign(envelope, activeWorkflowTarget);
       render(campaign);
       const result = envelope.evidence.at(-1);
       showToast(result.status === "accepted"
@@ -681,7 +748,7 @@ elements.packetAction.addEventListener("click", async () => {
       headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
       body: "{}",
     });
-    campaign = workflowCampaign(envelope);
+    campaign = workflowCampaign(envelope, activeWorkflowTarget);
     render(campaign);
     document.querySelector(".judgment input")?.focus();
     showToast("Packet assembled. Download remains blocked until your final approval.");

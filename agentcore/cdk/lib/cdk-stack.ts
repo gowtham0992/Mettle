@@ -114,8 +114,8 @@ export class AgentCoreStack extends Stack {
     this.application = new AgentCoreApplication(this, 'Application', appProps as any);
 
     // The generated L3 grants broad Bedrock model access. Mettle's intake is
-    // intentionally fixed to Nova Micro, so an explicit deny keeps that
-    // allowlist enforceable even if the upstream construct broadens its grant.
+    // intentionally fixed to Nova Micro for text and Nova Lite for vision, so
+    // an explicit deny keeps that allowlist enforceable if the L3 broadens it.
     for (const [name, environment] of this.application.environments.entries()) {
       if (name !== 'MettleRecovery') {
         continue;
@@ -124,7 +124,10 @@ export class AgentCoreStack extends Stack {
         new iam.PolicyStatement({
           effect: iam.Effect.DENY,
           actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream', 'bedrock:CountTokens'],
-          notResources: ['arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0'],
+          notResources: [
+            'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0',
+            'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0',
+          ],
         })
       );
     }

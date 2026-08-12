@@ -5,6 +5,7 @@ from pathlib import Path
 
 import boto3
 from fastapi import FastAPI, Header, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,12 +16,18 @@ from mettle.agents.bedrock import (
     BedrockIntakeSettings,
     extract_notice_with_bedrock,
 )
+from mettle.agents.vision import (
+    BedrockVisionError,
+    BedrockVisionSettings,
+    assess_photo_with_bedrock,
+)
 from mettle.agentcore_gateway import (
     AgentCoreGatewayError,
     AgentCoreWorkflowGateway,
 )
 from mettle.demo import DemoCampaign, DemoConflict, DemoNotFound, DemoStore
 from mettle.workflow import WorkflowConfigurationError
+from mettle.photo_upload import MAX_UPLOAD_BYTES, PhotoUploadError, normalize_photo
 from mettle.workflow_registry import (
     ApprovePacketRequest,
     CreateWorkflowRequest,
@@ -31,6 +38,7 @@ from mettle.workflow_registry import (
     PreparePacketRequest,
     ResumeWorkflowRequest,
     SubmitEvidenceRequest,
+    SubmitPhotoEvidenceRequest,
     WorkflowCapacityReached,
     WorkflowConflict,
     WorkflowEnvelope,
@@ -67,6 +75,7 @@ class CapabilitiesResponse(BaseModel):
 
     bedrock_intake: bool
     agentcore_runtime: bool
+    photo_evidence: bool
 
 
 def configured_workflow_registry() -> WorkflowRegistry:
@@ -83,7 +92,18 @@ def configured_workflow_registry() -> WorkflowRegistry:
     def bedrock_intake(text: str):
         return extract_notice_with_bedrock(text, settings=settings)
 
-    return WorkflowRegistry(bedrock_intake=bedrock_intake)
+    vision_settings = BedrockVisionSettings(
+        region=settings.region,
+        profile=settings.profile,
+    )
+
+    def photo_assessor(**kwargs):
+        return assess_photo_with_bedrock(**kwargs, settings=vision_settings)
+
+    return WorkflowRegistry(
+        bedrock_intake=bedrock_intake,
+        photo_assessor=photo_assessor,
+    )
 
 
 def configured_agentcore_gateway() -> AgentCoreWorkflowGateway | None:
@@ -216,6 +236,21 @@ def create_app(
             headers={"Retry-After": "5"},
         )
 
+    @app.exception_handler(BedrockVisionError)
+    async def bedrock_vision_error(_request: Request, exc: BedrockVisionError):
+        return JSONResponse(
+            status_code=502,
+            content={"error": {"code": "bedrock_vision_failed", "message": str(exc)}},
+            headers={"Retry-After": "5"},
+        )
+
+    @app.exception_handler(PhotoUploadError)
+    async def photo_upload_error(_request: Request, exc: PhotoUploadError):
+        return JSONResponse(
+            status_code=422,
+            content={"error": {"code": "invalid_photo", "message": str(exc)}},
+        )
+
     @app.exception_handler(AgentCoreGatewayError)
     async def agentcore_gateway_error(_request: Request, exc: AgentCoreGatewayError):
         return JSONResponse(
@@ -279,7 +314,29 @@ def create_app(
         return CapabilitiesResponse(
             bedrock_intake=request.app.state.workflows.bedrock_enabled,
             agentcore_runtime=request.app.state.agentcore is not None,
+            photo_evidence=(
+                request.app.state.workflows.vision_enabled
+                or request.app.state.agentcore is not None
+            ),
         )
+
+    async def read_photo(request: Request) -> bytes:
+        content_type = request.headers.get("content-type", "").split(";", 1)[0].lower()
+        if content_type not in {"image/jpeg", "image/png"}:
+            raise PhotoUploadError("photo must be uploaded as image/jpeg or image/png")
+        declared = request.headers.get("content-length")
+        if declared is not None:
+            try:
+                if int(declared) > MAX_UPLOAD_BYTES:
+                    raise PhotoUploadError("photo exceeds the 5 MB upload limit")
+            except ValueError as exc:
+                raise PhotoUploadError("photo has an invalid content length") from exc
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > MAX_UPLOAD_BYTES:
+                raise PhotoUploadError("photo exceeds the 5 MB upload limit")
+        return await run_in_threadpool(normalize_photo, bytes(body))
 
     @app.post("/api/demo/advance", response_model=DemoCampaign)
     async def advance_demo(payload: AdvanceRequest, request: Request) -> DemoCampaign:
@@ -433,6 +490,30 @@ def create_app(
         )
 
     @app.post(
+        "/api/agentcore/workflows/{workflow_id}/evidence/photo",
+        response_model=WorkflowEnvelope,
+    )
+    async def submit_agentcore_photo_evidence(
+        workflow_id: str,
+        request: Request,
+        citation_id: str,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        payload = SubmitPhotoEvidenceRequest(citation_id=citation_id)
+        image = await read_photo(request)
+        return await run_in_threadpool(
+            require_agentcore(request).submit_photo_evidence,
+            workflow_id,
+            payload,
+            image=image,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
         "/api/agentcore/workflows/{workflow_id}/packet/prepare",
         response_model=WorkflowEnvelope,
     )
@@ -505,6 +586,32 @@ def create_app(
         return request.app.state.workflows.submit_evidence(
             workflow_id,
             payload,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
+        "/api/workflows/{workflow_id}/evidence/photo",
+        response_model=WorkflowEnvelope,
+    )
+    async def submit_photo_evidence(
+        workflow_id: str,
+        request: Request,
+        citation_id: str,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        if not workflow_id or len(workflow_id) > 64:
+            raise WorkflowNotFound("workflow does not exist")
+        payload = SubmitPhotoEvidenceRequest(citation_id=citation_id)
+        image = await read_photo(request)
+        return await run_in_threadpool(
+            request.app.state.workflows.submit_photo_evidence,
+            workflow_id,
+            payload,
+            image=image,
             idempotency_key=idempotency_key,
         )
 

@@ -30,7 +30,7 @@ The local trust chain is intentionally narrow:
   only call `sts:AssumeRole` for `MettleHackathonDeveloper`.
 - `mettle-dev` assumes that role for at most one hour.
 - The role can call `bedrock:InvokeModel` and
-  `bedrock:InvokeModelWithResponseStream` only for Amazon Nova Micro in
+  `bedrock:InvokeModelWithResponseStream` only for Amazon Nova Micro and Nova Lite in
   `us-east-1`.
 - The root account has MFA enabled and no root access keys.
 

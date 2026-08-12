@@ -17,7 +17,8 @@ intake. It can:
 - record citation-specific trade outreach through a safe local adapter;
 - increase urgency as the reinspection deadline approaches; and
 - pause at ambiguous requirements, accept the contractor's decision, and resume with contractor-directed outreach;
-- reject an insufficient synthetic photo, explain what is missing, and accept a replacement only when it satisfies the notice's observable requirements; and
+- securely normalize a real JPEG/PNG photo, use Nova Lite to check only visible notice requirements, and accept, re-request, or reserve ambiguity for the contractor;
+- retain synthetic fixtures as a deterministic, zero-cost demo fallback; and
 - assemble a four-page evidence packet, block download until final contractor approval, and produce a polished PDF with citation-to-evidence traceability.
 
 The product core now runs those steps as a real Strands graph. Deterministic
@@ -73,7 +74,7 @@ uv run mettle serve \
   --aws-region us-east-1
 ```
 
-AWS profile, region, and the Nova Micro allowlisted model remain server-side;
+AWS profile, region, and the Nova Micro/Nova Lite allowlist remain server-side;
 the browser cannot override them. The default **Start local · free** action
 never calls Bedrock. Creation requests are idempotent, including across a
 browser retry, so an identical retry does not make a second model call.
@@ -83,6 +84,13 @@ input ceiling, a 2,048-token output ceiling, short timeouts, and at most two
 total attempts. The intake CLI refuses model IDs outside the approved Nova
 Micro allowlist. Model output must validate as Mettle's bounded notice schema
 before it can enter campaign state.
+
+The same explicit Bedrock opt-in enables real-photo evidence assessment with
+Nova Lite. Uploads are capped at 5 MB, decoded as JPEG/PNG, stripped of metadata,
+bounded in pixel dimensions, and re-encoded before the model sees them. The
+model must return one structured, pixel-grounded finding per notice requirement.
+Mettle deterministically converts those findings to accepted, rejected, or
+manual-review status; the model is never asked to certify code compliance.
 
 ## Run the AgentCore boundary locally
 
@@ -106,11 +114,11 @@ scripts/prune_agentcore_zip.sh
 The final command strips design sources, docs, tests, and build tooling from the
 runtime zip, then fails if a forbidden path remains. The generated zip and
 staging tree are ignored. The checked-in IAM policies
-allow only Nova Micro plus AgentCore telemetry and restrict deployment to
+allow only Nova Micro and Nova Lite plus AgentCore telemetry and restrict deployment to
 Project-tagged Mettle runtimes. See
 [AgentCore deployment and rollback](docs/agentcore-deployment.md).
 
-The cloud runtime is deployed in `us-east-1` as `MettleRecovery` version 3.
+The cloud runtime currently deployed in `us-east-1` is `MettleRecovery` version 3.
 Its tested path runs live Bedrock intake inside Strands, pauses for contractor
 judgment, resumes the same AgentCore session, assesses all three synthetic
 evidence submissions, gates packet approval, and returns the verified
@@ -135,7 +143,7 @@ server gateway verifies the returned PDF type and digest before offering the
 contractor-approved download.
 
 `mettle-dev` assumes the one-hour, least-privilege
-`MettleHackathonDeveloper` role. It can invoke Nova Micro but cannot administer
+`MettleHackathonDeveloper` role. It can invoke only the approved Nova models but cannot administer
 IAM or invoke more expensive models. See [AWS access and teardown](docs/aws-access.md).
 
 Workflow state is intentionally session-local in this phase. Restarting the

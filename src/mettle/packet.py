@@ -151,8 +151,8 @@ class _PacketCanvas(Canvas):
         super().showPage()
 
 
-def _scaled_image(path: Path) -> Image:
-    image = Image(str(path))
+def _scaled_image(source: Path | BytesIO) -> Image:
+    image = Image(str(source) if isinstance(source, Path) else source)
     max_width = 6.35 * inch
     max_height = 4.25 * inch
     scale = min(max_width / image.imageWidth, max_height / image.imageHeight)
@@ -169,6 +169,7 @@ def render_packet_pdf(
     deliveries: list[RecordedDelivery],
     packet: PacketRecord,
     evidence_dir: Path,
+    uploaded_photos: dict[str, bytes] | None = None,
 ) -> bytes:
     """Render an approved packet from validated, server-owned workflow state."""
     if packet.status is not PacketStatus.APPROVED:
@@ -252,8 +253,12 @@ def render_packet_pdf(
 
     for citation in notice.citations:
         assessment = latest[citation.citation_id]
-        filename = _SAMPLE_FILES[assessment.sample_id]
-        image_path = evidence_dir / filename
+        uploaded = (uploaded_photos or {}).get(assessment.assessment_id)
+        if uploaded is not None:
+            image_source: Path | BytesIO = BytesIO(uploaded)
+        else:
+            filename = _SAMPLE_FILES[assessment.sample_id]
+            image_source = evidence_dir / filename
         story.extend(
             [
                 PageBreak(),
@@ -270,7 +275,7 @@ def render_packet_pdf(
                 Spacer(1, 0.08 * inch),
                 KeepTogether(
                     [
-                        _scaled_image(image_path),
+                        _scaled_image(image_source),
                         Spacer(1, 0.1 * inch),
                         Paragraph("EVIDENCE ACCEPTED FOR SUFFICIENCY", styles["eyebrow"]),
                         Paragraph(escape(assessment.explanation), styles["body"]),

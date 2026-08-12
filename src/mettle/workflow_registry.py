@@ -23,6 +23,7 @@ from mettle.workflow import (
 
 
 NoticeExtractor = Callable[[str], InspectionNotice]
+PhotoAssessor = Callable[..., EvidenceAssessment]
 
 
 class WorkflowNotFound(RuntimeError):
@@ -98,6 +99,16 @@ class SubmitEvidenceRequest(BaseModel):
     )
 
 
+class SubmitPhotoEvidenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    citation_id: str = Field(min_length=1, max_length=50)
+
+
+class AgentCorePhotoEvidenceRequest(SubmitPhotoEvidenceRequest):
+    image_base64: str = Field(min_length=4, max_length=6_700_000)
+
+
 class PreparePacketRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -133,6 +144,7 @@ class _WorkflowEntry:
         self.resume_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
         self.evidence: list[EvidenceAssessment] = []
         self.evidence_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
+        self.uploaded_photos: dict[str, bytes] = {}
         self.packet: PacketRecord | None = None
         self.packet_prepare_replays: dict[str, WorkflowEnvelope] = {}
         self.packet_approval_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
@@ -151,11 +163,13 @@ class WorkflowRegistry:
         *,
         capacity: int = 50,
         bedrock_intake: NoticeExtractor | None = None,
+        photo_assessor: PhotoAssessor | None = None,
     ) -> None:
         if capacity < 1:
             raise ValueError("capacity must be positive")
         self._capacity = capacity
         self._bedrock_intake = bedrock_intake
+        self._photo_assessor = photo_assessor
         self._lock = Lock()
         self._entries: dict[str, _WorkflowEntry] = {}
         self._create_replays: dict[str, tuple[str, str, WorkflowEnvelope]] = {}
@@ -163,6 +177,27 @@ class WorkflowRegistry:
     @property
     def bedrock_enabled(self) -> bool:
         return self._bedrock_intake is not None
+
+    @property
+    def vision_enabled(self) -> bool:
+        return self._photo_assessor is not None
+
+    @staticmethod
+    def _effective_citation(entry: _WorkflowEntry, citation_id: str):
+        notice = entry.snapshot.notice
+        if notice is None:
+            raise EvidenceSubmissionError("workflow notice is not available")
+        citation = next(
+            (item for item in notice.citations if item.citation_id == citation_id),
+            None,
+        )
+        if citation is None:
+            raise EvidenceSubmissionError("citation does not belong to this workflow")
+        if not citation.evidence_requirements and entry.snapshot.contractor_decision:
+            return citation.model_copy(
+                update={"evidence_requirements": [entry.snapshot.contractor_decision]}
+            )
+        return citation
 
     def create(
         self,
@@ -282,26 +317,7 @@ class WorkflowRegistry:
                     )
                 return envelope.model_copy(deep=True)
 
-            notice = entry.snapshot.notice
-            if notice is None:
-                raise EvidenceSubmissionError("workflow notice is not available")
-            citation = next(
-                (
-                    item
-                    for item in notice.citations
-                    if item.citation_id == payload.citation_id
-                ),
-                None,
-            )
-            if citation is None:
-                raise EvidenceSubmissionError("citation does not belong to this workflow")
-            effective_citation = citation
-            if not citation.evidence_requirements and entry.snapshot.contractor_decision:
-                effective_citation = citation.model_copy(
-                    update={
-                        "evidence_requirements": [entry.snapshot.contractor_decision]
-                    }
-                )
+            effective_citation = self._effective_citation(entry, payload.citation_id)
             try:
                 assessment = assess_sample(
                     citation=effective_citation,
@@ -311,6 +327,47 @@ class WorkflowRegistry:
             except EvidenceSampleNotFound as exc:
                 raise EvidenceSubmissionError(str(exc)) from exc
             entry.evidence.append(assessment)
+            envelope = self._envelope(workflow_id, entry)
+            entry.evidence_replays[idempotency_key] = (fingerprint, envelope)
+            return envelope
+
+    def submit_photo_evidence(
+        self,
+        workflow_id: str,
+        payload: SubmitPhotoEvidenceRequest,
+        *,
+        image: bytes,
+        idempotency_key: str,
+    ) -> WorkflowEnvelope:
+        with self._lock:
+            entry = self._entries.get(workflow_id)
+        if entry is None:
+            raise WorkflowNotFound("workflow does not exist")
+        if self._photo_assessor is None:
+            raise WorkflowConfigurationError("live photo assessment is not enabled")
+
+        fingerprint = sha256(
+            payload.model_dump_json().encode("utf-8") + b"\0" + image
+        ).hexdigest()
+        with entry.lock:
+            replay = entry.evidence_replays.get(idempotency_key)
+            if replay is not None:
+                existing_fingerprint, envelope = replay
+                if existing_fingerprint != fingerprint:
+                    raise WorkflowConflict(
+                        "idempotency key was already used with different evidence"
+                    )
+                return envelope.model_copy(deep=True)
+
+            citation = self._effective_citation(entry, payload.citation_id)
+            assessment_id = f"evidence-{token_urlsafe(9)}"
+            assessment = self._photo_assessor(
+                citation=citation,
+                image=image,
+                assessment_id=assessment_id,
+            )
+            entry.evidence.append(assessment)
+            entry.uploaded_photos[assessment_id] = bytes(image)
             envelope = self._envelope(workflow_id, entry)
             entry.evidence_replays[idempotency_key] = (fingerprint, envelope)
             return envelope
@@ -422,6 +479,7 @@ class WorkflowRegistry:
                 deliveries=list(entry.snapshot.deliveries),
                 packet=packet,
                 evidence_dir=evidence_dir,
+                uploaded_photos=dict(entry.uploaded_photos),
             )
 
     @staticmethod

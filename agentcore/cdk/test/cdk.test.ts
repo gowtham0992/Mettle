@@ -30,7 +30,7 @@ test('AgentCoreStack synthesizes with empty spec', () => {
   });
 });
 
-test('Mettle runtime explicitly denies every Bedrock model except Nova Micro', () => {
+test('Mettle runtime allows only the two approved Nova models', () => {
   const app = new cdk.App();
   const stack = new AgentCoreStack(app, 'TestMettleStack', {
     spec: {
@@ -71,7 +71,10 @@ test('Mettle runtime explicitly denies every Bedrock model except Nova Micro', (
         {
           Action: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream', 'bedrock:CountTokens'],
           Effect: 'Deny',
-          NotResource: 'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0',
+          NotResource: [
+            'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0',
+            'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0',
+          ],
         },
       ]),
     },

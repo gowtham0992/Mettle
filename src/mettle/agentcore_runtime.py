@@ -9,6 +9,8 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from mettle.agents.bedrock import BedrockIntakeError
+from mettle.agents.vision import BedrockVisionError
+from mettle.photo_upload import PhotoUploadError, normalize_photo
 from mettle.workflow import WorkflowConfigurationError
 from mettle.workflow_registry import (
     ApprovePacketRequest,
@@ -19,6 +21,8 @@ from mettle.workflow_registry import (
     PreparePacketRequest,
     ResumeWorkflowRequest,
     SubmitEvidenceRequest,
+    AgentCorePhotoEvidenceRequest,
+    SubmitPhotoEvidenceRequest,
     WorkflowCapacityReached,
     WorkflowConflict,
     WorkflowNotFound,
@@ -67,6 +71,19 @@ class _SubmitEvidenceInvocation(BaseModel):
     payload: SubmitEvidenceRequest
 
 
+class _SubmitPhotoEvidenceInvocation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation: Literal["submit_photo_evidence"]
+    idempotency_key: str = Field(
+        min_length=8,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
+    workflow_id: str = Field(min_length=1, max_length=64)
+    payload: AgentCorePhotoEvidenceRequest
+
+
 class _PreparePacketInvocation(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -104,6 +121,7 @@ AgentCoreInvocation = Annotated[
     _StartInvocation
     | _ResumeInvocation
     | _SubmitEvidenceInvocation
+    | _SubmitPhotoEvidenceInvocation
     | _PreparePacketInvocation
     | _ApprovePacketInvocation
     | _RenderPacketInvocation,
@@ -168,6 +186,25 @@ class MettleAgentCoreRuntime:
                 )
                 replayed = False
                 operation = "submit_evidence"
+            elif isinstance(invocation, _SubmitPhotoEvidenceInvocation):
+                try:
+                    encoded = base64.b64decode(
+                        invocation.payload.image_base64,
+                        validate=True,
+                    )
+                    image = normalize_photo(encoded)
+                except (ValueError, PhotoUploadError) as exc:
+                    raise EvidenceSubmissionError("uploaded photo is invalid") from exc
+                envelope = self._workflows.submit_photo_evidence(
+                    invocation.workflow_id,
+                    SubmitPhotoEvidenceRequest(
+                        citation_id=invocation.payload.citation_id
+                    ),
+                    image=image,
+                    idempotency_key=invocation.idempotency_key,
+                )
+                replayed = False
+                operation = "submit_photo_evidence"
             elif isinstance(invocation, _PreparePacketInvocation):
                 envelope = self._workflows.prepare_packet(
                     invocation.workflow_id,
@@ -220,6 +257,9 @@ class MettleAgentCoreRuntime:
                 session_reference,
             )
             return _error("bedrock_intake_failed", str(exc))
+        except BedrockVisionError as exc:
+            LOGGER.warning("agentcore_vision_failed session=%s", session_reference)
+            return _error("bedrock_vision_failed", str(exc))
         except EvidenceSubmissionError as exc:
             return _error("invalid_evidence_submission", str(exc))
         except PacketNotReady as exc:

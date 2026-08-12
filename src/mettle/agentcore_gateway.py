@@ -22,6 +22,8 @@ from mettle.workflow_registry import (
     PreparePacketRequest,
     ResumeWorkflowRequest,
     SubmitEvidenceRequest,
+    AgentCorePhotoEvidenceRequest,
+    SubmitPhotoEvidenceRequest,
     WorkflowCapacityReached,
     WorkflowConflict,
     WorkflowEnvelope,
@@ -160,6 +162,25 @@ class AgentCoreWorkflowGateway:
             workflow_id,
             operation="submit_evidence",
             payload=payload,
+            idempotency_key=idempotency_key,
+        )
+
+    def submit_photo_evidence(
+        self,
+        workflow_id: str,
+        payload: SubmitPhotoEvidenceRequest,
+        *,
+        image: bytes,
+        idempotency_key: str,
+    ) -> WorkflowEnvelope:
+        cloud_payload = AgentCorePhotoEvidenceRequest(
+            citation_id=payload.citation_id,
+            image_base64=base64.b64encode(image).decode("ascii"),
+        )
+        return self._mutate(
+            workflow_id,
+            operation="submit_photo_evidence",
+            payload=cloud_payload,
             idempotency_key=idempotency_key,
         )
 
@@ -307,6 +328,8 @@ class AgentCoreWorkflowGateway:
             raise WorkflowConfigurationError(safe_message)
         if code == "bedrock_intake_failed":
             raise BedrockIntakeError(safe_message)
+        if code == "bedrock_vision_failed":
+            raise AgentCoreGatewayError(safe_message)
         if code == "invalid_evidence_submission":
             raise EvidenceSubmissionError(safe_message)
         if code == "packet_not_ready":

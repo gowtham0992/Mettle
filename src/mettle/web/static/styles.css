@@ -131,6 +131,16 @@ h2 { font-size: 13px; font-weight: 900; }
 .judgment--resolved { border-top-color: var(--moss); background: var(--moss-wash); }
 .judgment--resolved p { margin-bottom: 0; color: var(--moss); font-weight: 700; }
 .evidence-panel__mode { padding: 4px 6px; border-radius: 2px; background: var(--amber-wash); color: var(--amber); font: 700 8px/1 var(--mono); letter-spacing: 1px; }
+.photo-evidence { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(110px, .6fr); gap: 10px; margin-bottom: 16px; padding: 14px; border: 1px solid var(--line-strong); border-top: 3px solid var(--orange); background: var(--paper); }
+.photo-evidence__copy { display: grid; align-content: start; gap: 4px; }
+.photo-evidence__copy .panel__kicker { margin: 0; }
+.photo-evidence__copy strong { font-size: 13px; }
+.photo-evidence__copy > span, .photo-evidence label > span { color: var(--faint); font: 8.5px/1.45 var(--mono); letter-spacing: .5px; text-transform: uppercase; }
+.photo-evidence label { display: grid; align-content: start; gap: 5px; }
+.photo-evidence select, .photo-evidence input { width: 100%; min-height: 38px; padding: 7px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--ink); font-size: 10px; }
+.photo-evidence__file { grid-column: 1 / -1; }
+.photo-evidence .button { grid-column: 1 / -1; }
+.photo-evidence__error { grid-column: 1 / -1; margin: 0; color: var(--oxide); font-size: 10px; }
 .evidence-fixtures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .evidence-fixture { overflow: hidden; display: grid; align-content: start; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
 .evidence-fixture img { width: 100%; height: 132px; display: block; object-fit: cover; background: var(--well); }
@@ -283,6 +293,7 @@ h2 { font-size: 13px; font-weight: 900; }
   .notice-dialog__actions { display: grid; grid-template-columns: 1fr; }
   .notice-dialog__footer .button { width: 100%; justify-items: center; text-align: center; }
   .evidence-fixtures { grid-template-columns: 1fr; }
+  .photo-evidence { grid-template-columns: 1fr; }
   .evidence-fixture { grid-template-columns: 105px minmax(0, 1fr); }
   .evidence-fixture img { height: 100%; min-height: 125px; grid-row: 1 / span 2; }
 }

@@ -2,10 +2,13 @@ from io import BytesIO
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from PIL import Image
 from pypdf import PdfReader
 
 from mettle.agents.bedrock import BedrockIntakeError
 from mettle.demo import DemoStore
+from mettle.domain import Citation
+from mettle.evidence import EvidenceAssessment, EvidenceStatus
 from mettle.notice_parser import parse_notice
 from mettle.web.app import create_app
 from mettle.workflow_registry import WorkflowRegistry
@@ -16,7 +19,10 @@ NOTICE = Path("examples/notices/failed-rough-in.txt").read_text(encoding="utf-8"
 
 class FakeAgentCoreGateway:
     def __init__(self) -> None:
-        self.registry = WorkflowRegistry(bedrock_intake=parse_notice)
+        self.registry = WorkflowRegistry(
+            bedrock_intake=parse_notice,
+            photo_assessor=accept_photo,
+        )
 
     def create(self, payload, *, idempotency_key):
         return self.registry.create(payload, idempotency_key=idempotency_key)
@@ -32,6 +38,14 @@ class FakeAgentCoreGateway:
     def submit_evidence(self, workflow_id, payload, *, idempotency_key):
         return self.registry.submit_evidence(
             workflow_id, payload, idempotency_key=idempotency_key
+        )
+
+    def submit_photo_evidence(self, workflow_id, payload, *, image, idempotency_key):
+        return self.registry.submit_photo_evidence(
+            workflow_id,
+            payload,
+            image=image,
+            idempotency_key=idempotency_key,
         )
 
     def prepare_packet(self, workflow_id, payload, *, idempotency_key):
@@ -62,6 +76,19 @@ def workflow_payload(*, notice_text: str = NOTICE, intake_provider: str = "local
             {"trade": "mechanical", "name": "Luis Vega", "phone": "+13035550103"},
         ],
     }
+
+
+def accept_photo(*, citation: Citation, image: bytes, assessment_id: str):
+    assert image.startswith(b"\xff\xd8\xff")
+    return EvidenceAssessment(
+        assessment_id=assessment_id,
+        citation_id=citation.citation_id,
+        sample_id=f"upload_{assessment_id}",
+        image_url="",
+        status=EvidenceStatus.ACCEPTED,
+        matched_requirements=citation.evidence_requirements,
+        explanation="Every requested item is visibly shown; this is not a code-compliance decision.",
+    )
 
 
 def ready_workflow(browser: TestClient) -> tuple[str, dict]:
@@ -102,6 +129,63 @@ def client(*, workflows: WorkflowRegistry | None = None, agentcore=None) -> Test
     return TestClient(
         create_app(store=DemoStore(), workflows=workflows, agentcore=agentcore)
     )
+
+
+def jpeg_photo() -> bytes:
+    output = BytesIO()
+    Image.new("RGB", (80, 60), (195, 185, 160)).save(output, format="JPEG")
+    return output.getvalue()
+
+
+def test_real_photo_upload_is_normalized_assessed_and_idempotent() -> None:
+    workflows = WorkflowRegistry(photo_assessor=accept_photo)
+    with client(workflows=workflows) as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "photo_workflow_123"},
+        ).json()
+        workflow_id = created["workflow_id"]
+        headers = {
+            "Content-Type": "image/jpeg",
+            "Idempotency-Key": "photo_evidence_123",
+        }
+        first = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/photo?citation_id=1",
+            content=jpeg_photo(),
+            headers=headers,
+        )
+        replay = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/photo?citation_id=1",
+            content=jpeg_photo(),
+            headers=headers,
+        )
+
+    assert first.status_code == 200
+    assert first.json()["evidence"][-1]["status"] == "accepted"
+    assert replay.json() == first.json()
+    assert len(replay.json()["evidence"]) == 1
+
+
+def test_real_photo_upload_rejects_spoofed_content_and_oversize() -> None:
+    workflows = WorkflowRegistry(photo_assessor=accept_photo)
+    with client(workflows=workflows) as browser:
+        workflow_id = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "bad_photo_workflow_123"},
+        ).json()["workflow_id"]
+        spoofed = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/photo?citation_id=1",
+            content=b"<svg><script>alert(1)</script></svg>",
+            headers={
+                "Content-Type": "image/png",
+                "Idempotency-Key": "spoofed_photo_123",
+            },
+        )
+
+    assert spoofed.status_code == 422
+    assert spoofed.json()["error"]["code"] == "invalid_photo"
 
 
 def test_dashboard_and_campaign_api_load() -> None:
@@ -217,6 +301,7 @@ def test_live_bedrock_workflow_runs_inside_graph_and_replays_without_second_call
     assert capabilities.json() == {
         "bedrock_intake": True,
         "agentcore_runtime": False,
+        "photo_evidence": False,
     }
     assert first.status_code == 201
     assert replay.status_code == 200
@@ -238,6 +323,7 @@ def test_live_bedrock_workflow_fails_closed_when_server_has_not_enabled_it() -> 
     assert capabilities.json() == {
         "bedrock_intake": False,
         "agentcore_runtime": False,
+        "photo_evidence": False,
     }
     assert response.status_code == 422
     assert response.json()["error"] == {
@@ -322,6 +408,7 @@ def test_agentcore_http_boundary_starts_restores_and_resumes_cloud_workflow() ->
     assert capabilities.json() == {
         "bedrock_intake": False,
         "agentcore_runtime": True,
+        "photo_evidence": True,
     }
     assert created.status_code == 201
     assert restored.json() == created.json()
