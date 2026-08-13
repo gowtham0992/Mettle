@@ -58,6 +58,68 @@ END CITATION
     )
 
 
+def test_parse_representative_municipal_comments_derives_recovery_fields() -> None:
+    notice = parse_notice(
+        """
+DOUGLAS COUNTY BUILDING DIVISION
+INSPECTION CORRECTION NOTICE
+Permit: DEMO-2026-0417
+Inspection date: 08/07/2026
+Property: 100 Demo Way, Castle Pines, CO
+Corrections must be completed before reinspection on 08/17/2026.
+
+Inspection comments:
+1. NEC 110.26 — Maintain the required working clearance in front of the service panel.
+2. IRC R602.6 — Protect bored framing members where the edge distance is less than required.
+3. IMC 304.10 — Provide clearance and service access at the installed mechanical equipment.
+"""
+    )
+
+    assert notice.notice_id == "DEMO-2026-0417"
+    assert notice.issued_on == date(2026, 8, 7)
+    assert notice.reinspection_due_on == date(2026, 8, 17)
+    assert [citation.code_reference for citation in notice.citations] == [
+        "NEC 110.26",
+        "IRC R602.6",
+        "IMC 304.10",
+    ]
+    assert [citation.trade for citation in notice.citations] == [
+        Trade.ELECTRICAL,
+        Trade.FRAMING,
+        Trade.MECHANICAL,
+    ]
+    assert notice.citations[0].evidence_requirements == [
+        "Wide photo showing the complete service panel area",
+        "Photo with a tape measure showing the working clearance",
+    ]
+    assert notice.citations[2].evidence_requirements == []
+    assert "does not state observable evidence requirements" in (
+        notice.citations[2].ambiguity_reason or ""
+    )
+
+
+def test_parse_numbered_corrections_accepts_iso_dates_and_site_alias() -> None:
+    notice = parse_notice(
+        """
+CORRECTION NOTICE #CN-82
+Date issued: 2026-08-07
+Reinspection required by: 2026-08-17
+Site: 200 Example Street
+
+Items requiring correction
+1) [NEC 110.26] Maintain working clearance at the electrical panel.
+2) IRC R602.6: Install protection plates at bored framing members.
+"""
+    )
+
+    assert notice.notice_id == "CN-82"
+    assert notice.property_label == "200 Example Street"
+    assert len(notice.citations) == 2
+    assert notice.citations[1].notice_text == (
+        "Install protection plates at bored framing members."
+    )
+
+
 @pytest.mark.parametrize(
     ("text", "message"),
     [

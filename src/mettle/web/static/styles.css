@@ -91,10 +91,12 @@ h2 { font-size: 13px; font-weight: 900; }
 
 .citation-list { display: grid; gap: 12px; }
 .citation { position: relative; overflow: hidden; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 16px; padding: 18px 18px 18px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.citation > div:nth-child(2) { min-width: 0; }
 .citation::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: repeating-linear-gradient(to bottom, var(--line-strong) 0 1px, transparent 1px 7px); }
 .citation__number { width: 38px; height: 28px; display: grid; place-items: center; background: var(--ink); color: var(--paper); border-radius: 2px; font: 700 10px/1 var(--mono); letter-spacing: 1px; }
 .citation__code { margin: 0 0 8px; color: var(--muted); font: 600 10px/1.2 var(--mono); letter-spacing: 1px; }
 .citation__finding { max-width: 72ch; margin: 0; padding: 9px 12px; border-left: 3px solid var(--ink); background: var(--well); font: 12px/1.55 var(--mono); }
+.citation__finding, .citation__meta, .citation__requirements li { overflow-wrap: anywhere; }
 .citation__meta { margin: 11px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .citation__requirements { display: grid; gap: 4px; margin: 10px 0 0; padding: 0; list-style: none; color: var(--body); font-size: 11px; }
 .citation__requirements li::before { content: "□"; margin-right: 7px; color: var(--faint); }
@@ -187,6 +189,14 @@ h2 { font-size: 13px; font-weight: 900; }
 .packet-row__state--ready { color: var(--moss); }
 .packet-note { margin: 10px 0 0; color: var(--faint); font: 9px/1.6 var(--mono); letter-spacing: .5px; text-transform: uppercase; }
 .packet-action { width: 100%; margin-top: 12px; }
+.packet-preview { position: relative; margin-top: 12px; padding: 18px 16px 14px; overflow: hidden; border: 1px solid var(--line-strong); background: #fffdf7; box-shadow: 0 8px 18px rgba(35,38,42,.08); }
+.packet-preview::before { content: ""; position: absolute; inset: 0 0 auto; height: 5px; background: var(--orange); }
+.packet-preview__header { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 2px solid var(--ink); }
+.packet-preview__header span { color: var(--orange-ink); font: 700 7.5px/1.2 var(--mono); letter-spacing: 1px; }
+.packet-preview__header strong { font-size: 18px; letter-spacing: -.02em; }
+.packet-preview > p { margin: 12px 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.packet-preview__summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.packet-preview__summary span { padding: 7px 5px; border: 1px solid var(--line); background: var(--well); color: var(--moss); font: 700 7px/1.35 var(--mono); text-align: center; }
 
 .event-list { max-height: 430px; overflow-y: auto; margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); background: var(--card); }
 .event { display: grid; grid-template-columns: 60px 64px minmax(0, 1fr); gap: 9px; align-items: baseline; padding: 9px 11px; border-bottom: 1px solid #f0ebda; }
@@ -282,8 +292,11 @@ h2 { font-size: 13px; font-weight: 900; }
   .side-column { grid-template-columns: 1fr; }
   .log-panel, .safety-note { grid-column: auto; }
   .metrics-list { grid-template-columns: repeat(2, 1fr); row-gap: 24px; }
-  .demo-driver { left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); }
+  .demo-driver { left: 12px; right: 12px; width: auto; max-width: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; overflow: hidden; bottom: max(12px, env(safe-area-inset-bottom)); }
   .demo-button span { display: none; }
+  #load-notice-button span, #reset-button span { display: inline; }
+  #load-notice-button, #reset-button { min-width: 0; padding-inline: 7px; font-size: 8px; }
+  .demo-button { min-width: 0; width: 100%; justify-content: center; }
   .demo-button--next span:last-child { display: inline; }
   .notice-dialog { width: calc(100% - 20px); max-height: calc(100dvh - 20px); }
   .notice-dialog__header, .field--notice, .run-settings, .notice-dialog__footer { padding-inline: 18px; }

@@ -4,7 +4,22 @@
 
 **From failed inspection to reinspection-ready.**
 
+**Live guided demo:** https://d1ytth8asjpes8.cloudfront.net
+
 Mettle turns a municipal failed-inspection notice into a deadline-driven recovery campaign for small residential contractors. It preserves the notice's language, organizes citation-specific work, follows the recovery clock, and asks the contractor only for decisions that require licensed judgment.
+
+## Why Mettle is different
+
+Mettle is not a chatbot wrapped around a punch list. An unstructured correction
+notice starts the campaign, while code—not prompting—defines what the agent may
+decide. Strands coordinates the work across time; deterministic policy owns
+deadlines, idempotency, approval gates, and safety claims; the contractor owns
+code interpretation, deadline tradeoffs, and final approval.
+
+![Mettle bounded-autonomy architecture](assets/architecture/mettle-architecture.png)
+
+The diagram was designed in Pencil; its editable web export lives at
+[`assets/architecture/mettle-architecture-pencil.html`](assets/architecture/mettle-architecture-pencil.html).
 
 ## The first working slice
 
@@ -32,10 +47,11 @@ in this local mode.
 
 The command center exposes three execution choices under **Load notice**:
 free local execution, local Strands with live Bedrock intake, and the deployed
-AgentCore runtime. The deterministic **demo controls** remain the complete
-six-event judge scenario: accepted evidence, rejected evidence with a precise
-re-request, deadline escalation, human judgment, and a contractor-approved
-final packet.
+AgentCore runtime. The public **guided demo** compresses the same recovery arc
+into one autoplay control: accepted evidence, rejected evidence with a precise
+re-request, deadline escalation, two meaningful human pauses, and a real,
+contractor-approved four-page PDF. It is labeled as guided; it does not pretend
+that browser playback is a production scheduler.
 
 The deterministic core is intentional. Strands orchestrates the recovery graph, while Bedrock can replace only the intake node. Domain rules remain testable without a model.
 
@@ -52,7 +68,14 @@ uv run pytest
 
 Open [http://127.0.0.1:4310](http://127.0.0.1:4310) after starting the server. The demo binds only to the local machine.
 
-Select **Load notice** to use the included synthetic notice and roster. The local communication adapter records every proposed message but never sends SMS. Resolve the mechanical evidence specification, accept or reject evidence in **Evidence lab**, and use **Recovery clock** to compress the next server-selected scheduled check into the demo. At T−2 Mettle asks whether to keep the current date; once all evidence is accepted, the chase loop stands down automatically. Then prepare and approve the downloadable packet.
+Select **Run compressed recovery** for the reliable judge journey, or choose
+**Load notice** to start a Strands workflow from the included representative
+notice and synthetic roster. The notice mirrors the prose and numbered-comment
+shape visible in public Douglas County inspection records; it deliberately
+contains no `TRADE` or `EVIDENCE` fields. The local communication adapter
+records every proposed message but never sends SMS. At T−2 Mettle asks whether
+to keep the current date; once all evidence is accepted, the chase loop stands
+down automatically. The packet remains unavailable until final approval.
 
 Strands is installed as a core dependency, but no AWS credentials are needed
 for the example or tests. Amazon Bedrock intake is deliberately opt-in, so

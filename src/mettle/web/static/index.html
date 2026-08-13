@@ -148,6 +148,7 @@
               <strong id="packet-status" class="packet-stamp">LOCKED</strong>
             </div>
             <div id="packet-list" class="packet-list"></div>
+            <div class="packet-preview" id="packet-preview" hidden></div>
             <p class="packet-note" id="packet-note">Assembles as evidence is accepted. Nothing reaches the inspector until you approve it.</p>
             <button class="button packet-action" id="packet-action" type="button" hidden>Prepare packet for approval</button>
           </section>
@@ -166,11 +167,11 @@
     </main>
 
     <div class="demo-driver" aria-label="Demo controls">
-      <span class="demo-driver__tag">DEMO</span>
+      <span class="demo-driver__tag">GUIDED DEMO</span>
       <span id="demo-step">0 · OPENING CAMPAIGN</span>
-      <button class="demo-button" id="load-notice-button" type="button">＋ <span>LOAD NOTICE</span></button>
+      <button class="demo-button" id="load-notice-button" type="button" aria-label="Load notice">＋ <span>LOAD</span></button>
       <button class="demo-button" id="reset-button" type="button" title="Reset demo (R)">↺ <span>RESET</span></button>
-      <button class="demo-button demo-button--next" id="advance-button" type="button"><span>Run next agent event</span><span aria-hidden="true">NEXT ▸</span></button>
+      <button class="demo-button demo-button--next" id="advance-button" type="button"><span>Run compressed recovery</span><span aria-hidden="true">AUTO ▶</span></button>
     </div>
 
     <dialog class="notice-dialog" id="notice-dialog" aria-labelledby="notice-dialog-title">
@@ -182,34 +183,23 @@
           </div>
           <button class="dialog-close" id="close-notice-button" type="button" aria-label="Close notice loader">×</button>
         </div>
-        <p class="notice-dialog__intro">Mettle derives the citation docket and outreach plan directly from the notice. Run it locally, use live Nova Micro intake in this process, or explicitly send the full Strands recovery graph to the deployed AgentCore runtime. AWS options consume a small amount of credit; messages remain recorded demonstrations—nothing is sent.</p>
+        <p class="notice-dialog__intro">This representative notice mirrors the prose and numbered-comment shape used in public Douglas County inspection records. It contains no trade assignments or evidence checklist. Mettle derives those only where bounded policy supports them and asks you when it cannot.</p>
 
         <label class="field field--notice">
           <span>CORRECTION NOTICE · PLAIN TEXT</span>
-          <textarea id="notice-text" name="notice_text" required maxlength="100000" spellcheck="false">NOTICE ID: CR-2026-0417
-ISSUED: 2026-08-07
-REINSPECTION DEADLINE: 2026-08-17
-PROPERTY: 100 Demo Way, Castle Pines, CO
+          <textarea id="notice-text" name="notice_text" required maxlength="100000" spellcheck="false">DOUGLAS COUNTY BUILDING DIVISION
+INSPECTION CORRECTION NOTICE
+Permit: CR-2026-0417
+Inspection: Residential rough-in
+Result: DISAPPROVED
+Inspection date: 08/07/2026
+Property: 100 Demo Way, Castle Pines, CO
+Corrections must be completed before reinspection on 08/17/2026.
 
-CITATION 1
-CODE: NEC 110.26
-TRADE: Electrical
-FINDING: Maintain the required working clearance in front of the service panel.
-EVIDENCE: Wide photo showing the complete service panel area; photo with a tape measure showing the clearance
-END CITATION
-
-CITATION 2
-CODE: IRC R602.6
-TRADE: Framing
-FINDING: Protect bored framing members where the edge distance is less than required.
-EVIDENCE: Close photo of each installed protection plate; wide photo identifying each corrected wall location
-END CITATION
-
-CITATION 3
-CODE: IMC 304.10
-TRADE: Mechanical
-FINDING: Provide clearance and service access at the installed mechanical equipment.
-END CITATION</textarea>
+Inspection comments:
+1. NEC 110.26 — Maintain the required working clearance in front of the service panel.
+2. IRC R602.6 — Protect bored framing members where the edge distance is less than required.
+3. IMC 304.10 — Provide clearance and service access at the installed mechanical equipment.</textarea>
         </label>
 
         <div class="run-settings">

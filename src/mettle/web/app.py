@@ -34,6 +34,7 @@ from mettle.request_identity import (
     reset_principal,
     set_principal,
 )
+from mettle.notice_parser import NoticeParseError
 from mettle.workflow_registry import (
     ApprovePacketRequest,
     CreateWorkflowRequest,
@@ -273,6 +274,21 @@ def create_app(
             },
         )
 
+    @app.exception_handler(NoticeParseError)
+    async def unsupported_notice_format(_request: Request, _exc: NoticeParseError):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "code": "unsupported_notice_format",
+                    "message": (
+                        "The notice format is not supported by local intake. "
+                        "Use the representative example or run live Bedrock intake."
+                    ),
+                }
+            },
+        )
+
     @app.exception_handler(BedrockIntakeError)
     async def bedrock_intake_error(_request: Request, exc: BedrockIntakeError):
         return JSONResponse(
@@ -414,6 +430,22 @@ def create_app(
     @app.post("/api/demo/reset", response_model=DemoCampaign)
     async def reset_demo(request: Request) -> DemoCampaign:
         return request.app.state.store.reset()
+
+    @app.get("/api/demo/packet.pdf")
+    async def download_demo_packet(request: Request) -> Response:
+        pdf = await run_in_threadpool(
+            request.app.state.store.render_packet,
+            evidence_dir=STATIC_DIR / "evidence",
+        )
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": (
+                    'attachment; filename="mettle-guided-reinspection-packet.pdf"'
+                )
+            },
+        )
 
     @app.post("/api/judgments/{judgment_id}/resolve", response_model=DemoCampaign)
     async def resolve_judgment(

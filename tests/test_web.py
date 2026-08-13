@@ -374,6 +374,40 @@ def test_advance_replay_is_idempotent_at_http_boundary() -> None:
     assert replay.json()["metrics"] == first.json()["metrics"]
 
 
+def test_guided_demo_packet_requires_approval_then_downloads_pdf() -> None:
+    with client() as browser:
+        blocked = browser.get("/api/demo/packet.pdf")
+        browser.post(
+            "/api/judgments/code-c3/resolve",
+            json={"decision": "Wide photo showing equipment and measured service clearance"},
+        )
+        for step in range(3):
+            browser.post(
+                "/api/demo/advance",
+                json={"idempotency_key": f"demo_packet_before_{step}"},
+            )
+        browser.post(
+            "/api/judgments/deadline-choice/resolve",
+            json={"decision": "Keep the date and continue critical recovery"},
+        )
+        for step in range(3, 6):
+            campaign = browser.post(
+                "/api/demo/advance",
+                json={"idempotency_key": f"demo_packet_after_{step}"},
+            ).json()
+        browser.post(
+            "/api/judgments/final-approval/resolve",
+            json={"decision": "Approve packet for reinspection scheduling"},
+        )
+        downloaded = browser.get("/api/demo/packet.pdf")
+
+    assert blocked.status_code == 409
+    assert campaign["packet_status"] == "awaiting_approval"
+    assert downloaded.status_code == 200
+    assert downloaded.headers["content-type"] == "application/pdf"
+    assert len(PdfReader(BytesIO(downloaded.content)).pages) == 4
+
+
 def test_api_rejects_oversized_decision_and_unknown_fields() -> None:
     with client() as browser:
         oversized = browser.post(
@@ -423,6 +457,23 @@ def test_workflow_api_runs_real_strands_graph_and_restores_snapshot() -> None:
     assert created.json()["snapshot"]["status"] == "interrupted"
     assert len(created.json()["snapshot"]["deliveries"]) == 2
     assert created.json()["snapshot"]["interrupts"][0]["name"] == "contractor-judgment"
+
+
+def test_workflow_api_returns_actionable_error_for_unsupported_notice() -> None:
+    with client() as browser:
+        response = browser.post(
+            "/api/workflows",
+            json=workflow_payload(notice_text="A correction happened somewhere."),
+            headers={"Idempotency-Key": "unsupported_notice_123"},
+        )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {
+            "code": "unsupported_notice_format",
+            "message": "The notice format is not supported by local intake. Use the representative example or run live Bedrock intake.",
+        }
+    }
 
 
 def test_workflow_create_replay_is_idempotent_and_changed_replay_conflicts() -> None:

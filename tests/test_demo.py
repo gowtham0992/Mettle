@@ -9,6 +9,28 @@ def test_demo_opening_events_have_distinct_chronology() -> None:
     assert campaign.events[0].happened_at > campaign.events[1].happened_at
 
 
+def test_demo_full_journey_preserves_distinct_event_timestamps() -> None:
+    store = DemoStore()
+    store.resolve_judgment(
+        "code-c3",
+        decision="Wide photo showing equipment and measured service clearance",
+    )
+    for step in range(3):
+        store.advance(idempotency_key=f"timestamp-before-deadline-{step}")
+    store.resolve_judgment(
+        "deadline-choice",
+        decision="Keep the current reinspection target and continue critical recovery",
+    )
+    for step in range(3, 6):
+        campaign = store.advance(idempotency_key=f"timestamp-after-deadline-{step}")
+    store.resolve_judgment("final-approval", decision="Approved for download")
+    campaign = store.snapshot()
+
+    timestamps = [event.happened_at for event in campaign.events]
+    assert len(timestamps) == len(set(timestamps))
+    assert timestamps == sorted(timestamps, reverse=True)
+
+
 def test_demo_rejects_insufficient_evidence_then_accepts_replacement() -> None:
     store = DemoStore()
 
@@ -21,6 +43,10 @@ def test_demo_rejects_insufficient_evidence_then_accepts_replacement() -> None:
     assert rejected.events[0].kind == "evidence_rejected"
 
     store.advance(idempotency_key="step-three")
+    store.resolve_judgment(
+        "deadline-choice",
+        decision="Keep the current reinspection target and continue critical recovery",
+    )
     accepted = store.advance(idempotency_key="step-four")
     framing = next(item for item in accepted.citations if item.citation_id == "2")
     assert framing.stage is CitationStage.READY
@@ -49,6 +75,15 @@ def test_demo_escalates_and_interrupts_near_deadline() -> None:
     assert campaign.days_remaining == 2
     assert any(item.judgment_id == "deadline-choice" for item in campaign.judgments)
 
+    blocked = store.advance(idempotency_key="four")
+    assert blocked.scenario_step == campaign.scenario_step
+
+    resumed = store.resolve_judgment(
+        "deadline-choice",
+        decision="Keep the current reinspection target and continue critical recovery",
+    )
+    assert resumed.metrics.contractor_decisions == 1
+
 
 def test_resolving_code_gate_resumes_only_the_affected_citation() -> None:
     store = DemoStore()
@@ -76,8 +111,14 @@ def test_final_packet_gate_appears_only_after_all_citations_are_ready() -> None:
         decision="Wide photo showing equipment and measured service clearance",
     )
 
+    for step in range(3):
+        store.advance(idempotency_key=f"event-{step}")
+    store.resolve_judgment(
+        "deadline-choice",
+        decision="Keep the current reinspection target and continue critical recovery",
+    )
     before_packet = None
-    for step in range(5):
+    for step in range(3, 5):
         before_packet = store.advance(idempotency_key=f"event-{step}")
 
     assert before_packet is not None
@@ -94,9 +135,16 @@ def test_final_packet_gate_appears_only_after_all_citations_are_ready() -> None:
 def test_mechanical_evidence_event_waits_for_contractor_judgment() -> None:
     store = DemoStore()
 
-    for step in range(5):
+    for step in range(4):
         campaign = store.advance(idempotency_key=f"blocked-{step}")
 
+    assert campaign.scenario_step == 3
+    store.resolve_judgment(
+        "deadline-choice",
+        decision="Keep the current reinspection target and continue critical recovery",
+    )
+    store.advance(idempotency_key="framing-after-deadline")
+    campaign = store.advance(idempotency_key="blocked-on-code")
     assert campaign.scenario_step == 4
     mechanical = next(item for item in campaign.citations if item.citation_id == "3")
     assert mechanical.stage is CitationStage.NEEDS_JUDGMENT

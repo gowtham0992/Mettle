@@ -34,6 +34,7 @@ const elements = {
   metrics: document.querySelector("#metrics-list"),
   packet: document.querySelector("#packet-status"),
   packetList: document.querySelector("#packet-list"),
+  packetPreview: document.querySelector("#packet-preview"),
   packetNote: document.querySelector("#packet-note"),
   packetAction: document.querySelector("#packet-action"),
   demoStep: document.querySelector("#demo-step"),
@@ -73,6 +74,7 @@ let agentCoreEnabled = false;
 let photoEvidenceEnabled = false;
 let workflowCreateKey = null;
 let workflowCreateProvider = null;
+let demoRunning = false;
 let authConfig = null;
 let accessToken = sessionStorage.getItem("mettle_access_token");
 
@@ -446,23 +448,24 @@ function renderEvent(event) {
   return item;
 }
 
-function decisionDefaults(judgment) {
+function decisionPrompt(judgment) {
   if (judgment.kind === "final_packet_approval") {
-    return ["Approve packet for reinspection scheduling", "Approve packet"];
+    return ["Type your approval decision", "Approve packet"];
   }
   if (judgment.kind === "deadline_tradeoff") {
-    return ["Keep the current reinspection date and continue four-hour follow-ups", "Keep the date"];
+    return ["Keep the date, or request a new one?", "Record deadline decision"];
   }
-  return ["Wide photo showing equipment clearance with the access panel open", "Use this evidence spec"];
+  return ["Describe the evidence the trade must provide", "Set evidence requirement"];
 }
 
 function renderJudgment(judgment) {
+  const isPacketApproval = judgment.packet_approval || judgment.kind === "final_packet_approval";
   const card = node("article", "judgment");
   card.append(node("div", "judgment__kind", `${titleCase(judgment.kind)}${judgment.citation_id ? ` · C${judgment.citation_id}` : ""}`));
   card.append(node("h3", "", judgment.question));
   card.append(node("p", "", judgment.reason));
 
-  const [defaultDecision, buttonLabel] = decisionDefaults(judgment);
+  const [placeholder, buttonLabel] = decisionPrompt(judgment);
   const form = document.createElement("form");
   const label = node("label", "sr-only", "Contractor decision");
   const input = document.createElement("input");
@@ -472,7 +475,7 @@ function renderJudgment(judgment) {
   input.required = true;
   input.minLength = 3;
   input.maxLength = 500;
-  input.value = defaultDecision;
+  input.placeholder = placeholder;
   const button = node("button", "button", buttonLabel);
   button.type = "submit";
   form.append(label, input, button);
@@ -482,7 +485,7 @@ function renderJudgment(judgment) {
     if (decision.length < 3) return;
     setBusy(button, true);
     try {
-      if (activeWorkflowId && judgment.packet_approval) {
+      if (activeWorkflowId && isPacketApproval) {
         const workflowRoot = activeWorkflowTarget === "agentcore"
           ? "/api/agentcore/workflows"
           : "/api/workflows";
@@ -509,7 +512,7 @@ function renderJudgment(judgment) {
         });
       }
       render(campaign);
-      showToast(judgment.packet_approval
+      showToast(isPacketApproval
         ? "Final approval recorded. The reinspection PDF is ready to download."
         : "Your decision is logged. Mettle resumed the recovery run.");
     } catch (error) {
@@ -555,6 +558,26 @@ function renderPacket(data) {
   elements.packet.className = "packet-stamp";
   if (data.packet_status === "approved") elements.packet.classList.add("packet-stamp--approved");
   if (data.packet_status === "awaiting_approval") elements.packet.classList.add("packet-stamp--awaiting");
+
+  elements.packetPreview.hidden = data.packet_status !== "approved";
+  if (data.packet_status === "approved") {
+    const header = node("div", "packet-preview__header");
+    header.append(
+      node("span", "", "METTLE / REINSPECTION EVIDENCE PACKET"),
+      node("strong", "", data.notice_id),
+    );
+    const summary = node("div", "packet-preview__summary");
+    summary.append(
+      node("span", "", `${data.metrics.citations_total} CITATIONS`),
+      node("span", "", `${data.metrics.citations_ready} EVIDENCE SETS`),
+      node("span", "", "CONTRACTOR APPROVED"),
+    );
+    elements.packetPreview.replaceChildren(
+      header,
+      node("p", "", "Notice language, accepted evidence, recovery history, and the human approval record—assembled into one reviewable artifact."),
+      summary,
+    );
+  }
 }
 
 function renderRecoveryClock(data) {
@@ -666,20 +689,25 @@ function render(data) {
       button.title = button.disabled ? "Resolve the mechanical evidence specification first" : "";
     }
   }
-  elements.packetAction.hidden = !isWorkflow
-    || (data.metrics.citations_ready < data.metrics.citations_total && data.packet_status !== "approved");
+  elements.packetAction.hidden = isWorkflow
+    ? data.metrics.citations_ready < data.metrics.citations_total && data.packet_status !== "approved"
+    : data.packet_status !== "approved";
   elements.packetAction.textContent = data.packet_status === "approved"
     ? "Download approved PDF"
     : data.packet_status === "awaiting_approval" ? "Awaiting your approval" : "Prepare packet for approval";
   elements.packetAction.disabled = data.packet_status === "awaiting_approval";
-  elements.packetNote.textContent = "Assembles as evidence is accepted. Nothing reaches the inspector until you approve it.";
+  elements.packetNote.textContent = data.packet_status === "approved"
+    ? "The approved artifact is ready. Download the same packet the contractor reviewed."
+    : "Assembles as evidence is accepted. Nothing reaches the inspector until you approve it.";
   elements.demoStep.textContent = isWorkflow
     ? `${isAgentCore ? "AGENTCORE + " : ""}${data.intake_provider === "bedrock" ? "BEDROCK + " : ""}STRANDS · ${data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH COMPLETE"}`
     : `${data.scenario_step} · ${stepLabels[data.scenario_step] || "RECOVERY RUN"}`;
-  elements.advance.disabled = isWorkflow || data.scenario_complete;
+  elements.advance.disabled = isWorkflow || data.scenario_complete || demoRunning;
+  elements.reset.disabled = demoRunning;
+  elements.loadNotice.disabled = demoRunning;
   const advanceLabels = elements.advance.querySelectorAll("span");
-  advanceLabels[0].textContent = isWorkflow ? "Real workflow active" : data.scenario_complete ? "Scenario complete" : "Run next agent event";
-  advanceLabels[1].textContent = isWorkflow ? "LIVE" : data.scenario_complete ? "DONE ✓" : "NEXT ▸";
+  advanceLabels[0].textContent = isWorkflow ? "Real workflow active" : data.scenario_complete ? "Scenario complete" : demoRunning ? "Recovery running" : "Run compressed recovery";
+  advanceLabels[1].textContent = isWorkflow ? "LIVE" : data.scenario_complete ? "DONE ✓" : demoRunning ? "WORKING…" : "AUTO ▶";
   elements.reset.querySelector("span").textContent = isWorkflow ? "RETURN TO DEMO" : "RESET";
 }
 
@@ -772,24 +800,32 @@ elements.photoForm.addEventListener("submit", async (event) => {
 });
 
 elements.advance.addEventListener("click", async () => {
-  const previousStep = campaign?.scenario_step;
-  setBusy(elements.advance, true);
+  if (demoRunning || activeWorkflowId || campaign?.scenario_complete) return;
+  demoRunning = true;
+  render(campaign);
   try {
-    const updated = await request("/api/demo/advance", {
-      method: "POST",
-      body: JSON.stringify({ idempotency_key: crypto.randomUUID().replaceAll("-", "_") }),
-    });
-    render(updated);
-    if (updated.scenario_step === previousStep) {
-      showToast("Mettle is waiting for your judgment before it can continue.");
-      document.querySelector(".judgment input")?.focus();
-    } else {
-      showToast("Agent event processed. The recovery record is updated.");
+    while (!campaign.scenario_complete) {
+      const previousStep = campaign.scenario_step;
+      const updated = await request("/api/demo/advance", {
+        method: "POST",
+        body: JSON.stringify({ idempotency_key: crypto.randomUUID().replaceAll("-", "_") }),
+      });
+      campaign = updated;
+      render(updated);
+      if (updated.scenario_step === previousStep) {
+        showToast("Mettle paused the campaign for your judgment.");
+        document.querySelector(".judgment input")?.focus();
+        break;
+      }
+      if (!updated.scenario_complete) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1400));
+      }
     }
   } catch (error) {
     showError(error);
   } finally {
-    if (campaign && !campaign.scenario_complete) setBusy(elements.advance, false);
+    demoRunning = false;
+    if (campaign) render(campaign);
   }
 });
 
@@ -855,6 +891,8 @@ elements.noticeForm.addEventListener("submit", async (event) => {
           { trade: "electrical", name: "Mike Alvarez", phone: "+13035550101" },
           { trade: "framing", name: "Jen Ortiz", phone: "+13035550102" },
           { trade: "mechanical", name: "Luis Vega", phone: "+13035550103" },
+          { trade: "plumbing", name: "Priya Shah", phone: "+13035550104" },
+          { trade: "general", name: "Jordan Lee", phone: "+13035550105" },
         ],
       }),
     });
@@ -946,7 +984,12 @@ elements.clockAction.addEventListener("click", async () => {
 });
 
 elements.packetAction.addEventListener("click", async () => {
-  if (!activeWorkflowId) return;
+  if (!activeWorkflowId) {
+    if (campaign?.packet_status === "approved") {
+      window.location.assign("/api/demo/packet.pdf");
+    }
+    return;
+  }
   const workflowRoot = activeWorkflowTarget === "agentcore"
     ? "/api/agentcore/workflows"
     : "/api/workflows";

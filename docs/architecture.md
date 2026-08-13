@@ -122,7 +122,7 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 
 1. **Notice to campaign plan:** prove traceable extraction, deadline behavior, and judgment routing without a model.
 2. **Local Strands orchestration:** run deterministic contract nodes, recorded outreach, and a resumable human interrupt. **Complete.**
-3. **Deadline chase loop:** replan open citations, record scheduled follow-ups with replay safety, stop on accepted evidence, and interrupt at the T−2 tradeoff. **Complete locally and through the AgentCore-compatible contract; cloud redeploy pending.**
+3. **Deadline chase loop:** replan open citations, record scheduled follow-ups with replay safety, stop on accepted evidence, and interrupt at the T−2 tradeoff. **Complete locally and through the deployed AgentCore-compatible contract.**
 4. **Evidence assessment:** compare trusted fixtures or normalized real photos to notice-anchored requirements and produce a specific re-request or judgment interrupt. **Local and Bedrock Vision adapters complete.**
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
 6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF. **Complete.**
@@ -134,7 +134,8 @@ Putting all behavior inside agent prompts would produce an impressive but untest
    integrity in one AgentCore session.**
 8. **Public durability:** user-scoped AgentCore session mapping, idempotency,
    private packet storage, Cognito authentication, and a CloudFront/Lambda edge.
-   **Implemented and locally verified; AWS deployment pending.**
+   **Deployed behind CloudFront with private origins, WAF, Cognito-protected
+   paid routes, and a public deterministic judge journey.**
 9. **Live integrations:** add AgentCore Memory where it creates demonstrable
    value and an SMS adapter only after partner validation.
 

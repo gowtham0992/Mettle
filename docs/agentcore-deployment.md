@@ -230,8 +230,12 @@ before deciding whether to delete them.
 
 ## Tooling caveat
 
-The supported `@aws/agentcore` 0.26.0 CLI is pinned as a development-only
-dependency. Its current transitive dependency tree reports upstream npm audit
-findings, and npm's automated fix attempts to install an AIX-only esbuild
-package on macOS. Node tooling is excluded from the Python runtime artifact;
-do not force incompatible dependency overrides into the deployable product.
+The supported `@aws/agentcore` 0.27.0 CLI is pinned as a development-only
+dependency. Its bundled toolchain currently reports three upstream npm audit
+findings: unbounded brace expansion in its CDK copy, a zero-length custom-
+generator loop in Nano ID, and a Windows-only esbuild development-server file-
+read issue. Mettle imports none of these packages, runs no untrusted patterns or
+ID-generator input through this toolchain, and ships none of them in the Python
+runtime or browser bundle. The latest CLI still bundles the affected versions,
+so an override would violate its internal version ranges; upgrade again when
+AWS publishes a patched CLI.

@@ -7,6 +7,7 @@ name = "mettle-recovery"
 version = "0.1.0"
 description = "Deadline-driven failed-inspection recovery for small residential contractors."
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12,<3.14"
 dependencies = [
   "bedrock-agentcore>=1,<2",

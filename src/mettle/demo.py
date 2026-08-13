@@ -6,8 +6,28 @@ from threading import Lock
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from mettle.campaign import build_campaign_plan
+from mettle.communication import Recipient, RecordedDelivery
 from mettle.domain import Priority, Trade
+from mettle.evidence import EvidenceAssessment, EvidenceStatus
 from mettle.notice_parser import parse_notice
+from mettle.packet import PacketRecord, PacketStatus, render_packet_pdf
+
+
+REPRESENTATIVE_NOTICE_TEXT = """DOUGLAS COUNTY BUILDING DIVISION
+INSPECTION CORRECTION NOTICE
+Permit: CR-2026-0417
+Inspection: Residential rough-in
+Result: DISAPPROVED
+Inspection date: 08/07/2026
+Property: 100 Demo Way, Castle Pines, CO
+Corrections must be completed before reinspection on 08/17/2026.
+
+Inspection comments:
+1. NEC 110.26 — Maintain the required working clearance in front of the service panel.
+2. IRC R602.6 — Protect bored framing members where the edge distance is less than required.
+3. IMC 304.10 — Provide clearance and service access at the installed mechanical equipment.
+"""
 
 
 class CitationStage(StrEnum):
@@ -128,6 +148,8 @@ class DemoStore:
                 self._accept_mechanical_evidence,
                 self._prepare_final_packet,
             )
+            if self._step == 3 and self._pending("deadline-choice"):
+                return self._snapshot_unlocked()
             if self._step == 4 and self._citation("3").stage is CitationStage.NEEDS_JUDGMENT:
                 return self._snapshot_unlocked()
             if self._step == 5 and any(
@@ -138,6 +160,63 @@ class DemoStore:
                 handlers[self._step]()
                 self._step += 1
             return self._snapshot_unlocked()
+
+    def render_packet(self, *, evidence_dir) -> bytes:
+        with self._lock:
+            if self._packet_status != "approved":
+                raise DemoConflict("contractor approval is required before download")
+            samples = {
+                "1": "panel_wide_measured",
+                "2": "framing_plates_complete",
+                "3": "mechanical_access_wide",
+            }
+            evidence = [
+                EvidenceAssessment(
+                    assessment_id=f"demo-evidence-{citation.citation_id}",
+                    citation_id=citation.citation_id,
+                    sample_id=samples[citation.citation_id],
+                    image_url=f"/static/evidence/{samples[citation.citation_id]}.png",
+                    status=EvidenceStatus.ACCEPTED,
+                    matched_requirements=list(citation.evidence_requirements),
+                    explanation=citation.evidence_note or "Contractor-reviewed evidence accepted.",
+                )
+                for citation in self._citations
+            ]
+            recipients = {
+                "1": Recipient(name="Mike Alvarez · Brightline Electric", phone="+13035550101"),
+                "2": Recipient(name="Jen Ortiz · Front Range Framing", phone="+13035550102"),
+                "3": Recipient(name="Alex Kim · Alpine Mechanical", phone="+13035550103"),
+            }
+            deliveries = [
+                RecordedDelivery(
+                    message_id=f"demo-message-{citation.citation_id}",
+                    notice_id=self._notice.notice_id,
+                    citation_id=citation.citation_id,
+                    recipient=recipients[citation.citation_id],
+                    body=f"Correction request anchored to {citation.code_reference}.",
+                    idempotency_key=f"demo:delivery:{citation.citation_id}",
+                    scheduled_on=date(2026, 8, 10),
+                    attempt_count=1,
+                )
+                for citation in self._citations
+            ]
+            packet = PacketRecord(
+                packet_id="demo-packet-cr-2026-0417",
+                status=PacketStatus.APPROVED,
+                prepared_on=self._as_of,
+                citations_total=len(self._citations),
+                citations_ready=len(self._citations),
+                approval_id="final-approval",
+                approval_decision=self._resolved_decisions["final-approval"],
+            )
+            return render_packet_pdf(
+                notice=self._notice,
+                plan=build_campaign_plan(self._notice, as_of=date(2026, 8, 10)),
+                evidence=evidence,
+                deliveries=deliveries,
+                packet=packet,
+                evidence_dir=evidence_dir,
+            )
 
     def resolve_judgment(self, judgment_id: str, *, decision: str) -> DemoCampaign:
         with self._lock:
@@ -178,33 +257,7 @@ class DemoStore:
             return self._snapshot_unlocked()
 
     def _reset_unlocked(self) -> None:
-        fixture = """
-NOTICE ID: CR-2026-0417
-ISSUED: 2026-08-07
-REINSPECTION DEADLINE: 2026-08-17
-PROPERTY: 100 Demo Way, Castle Pines, CO
-
-CITATION 1
-CODE: NEC 110.26
-TRADE: Electrical
-FINDING: Maintain the required working clearance in front of the service panel.
-EVIDENCE: Wide photo showing the complete service panel area; photo with a tape measure showing the clearance
-END CITATION
-
-CITATION 2
-CODE: IRC R602.6
-TRADE: Framing
-FINDING: Protect bored framing members where the edge distance is less than required.
-EVIDENCE: Close photo of each installed protection plate; wide photo identifying each corrected wall location
-END CITATION
-
-CITATION 3
-CODE: IMC 304.10
-TRADE: Mechanical
-FINDING: Provide clearance and service access at the installed mechanical equipment.
-END CITATION
-"""
-        notice = parse_notice(fixture)
+        notice = parse_notice(REPRESENTATIVE_NOTICE_TEXT)
         assignees = {
             "1": "Mike Alvarez · Brightline Electric",
             "2": "Jen Ortiz · Front Range Framing",
@@ -425,6 +478,12 @@ END CITATION
     def _citation(self, citation_id: str) -> DemoCitation:
         return next(item for item in self._citations if item.citation_id == citation_id)
 
+    def _pending(self, judgment_id: str) -> bool:
+        return any(
+            item.judgment_id == judgment_id and item.status is GateStatus.PENDING
+            for item in self._judgments
+        )
+
     def _event(
         self,
         *,
@@ -436,7 +495,12 @@ END CITATION
         citation_id: str | None = None,
     ) -> DemoEvent:
         base = datetime(2026, 8, 10, 15, 30, tzinfo=timezone.utc)
-        offset_minutes = len(getattr(self, "_events", [])) * 17
+        offsets = (0, 4, 1022, 1119, 7245, 7298, 7390, 7521, 7684, 7810, 7897, 8014)
+        event_count = len(getattr(self, "_events", []))
+        if event_count < len(offsets):
+            offset_minutes = offsets[event_count]
+        else:
+            offset_minutes = offsets[-1] + (event_count - len(offsets) + 1) * 37
         return DemoEvent(
             event_id=event_id,
             happened_at=base + timedelta(minutes=offset_minutes),
