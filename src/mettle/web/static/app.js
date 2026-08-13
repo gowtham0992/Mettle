@@ -3,6 +3,12 @@ const elements = {
   campaignStrip: document.querySelector(".campaign-strip"),
   loading: document.querySelector("#loading-state"),
   dashboard: document.querySelector("#dashboard"),
+  nextAction: document.querySelector("#next-action"),
+  nextActionEyebrow: document.querySelector("#next-action-eyebrow"),
+  nextActionTitle: document.querySelector("#next-action-title"),
+  nextActionCopy: document.querySelector("#next-action-copy"),
+  nextActionButton: document.querySelector("#next-action-button"),
+  nextActionMeta: document.querySelector("#next-action-meta"),
   error: document.querySelector("#error-banner"),
   errorMessage: document.querySelector("#error-message"),
   noticeId: document.querySelector("#notice-id"),
@@ -26,6 +32,7 @@ const elements = {
   evidencePanel: document.querySelector("#evidence-panel"),
   evidenceResult: document.querySelector("#evidence-result"),
   evidenceButtons: [...document.querySelectorAll(".evidence-submit")],
+  demoEvidence: document.querySelector("#demo-evidence"),
   photoForm: document.querySelector("#photo-evidence-form"),
   photoCitation: document.querySelector("#photo-citation"),
   photoFile: document.querySelector("#photo-file"),
@@ -38,6 +45,7 @@ const elements = {
   packetNote: document.querySelector("#packet-note"),
   packetAction: document.querySelector("#packet-action"),
   demoStep: document.querySelector("#demo-step"),
+  driverTag: document.querySelector("#driver-tag"),
   advance: document.querySelector("#advance-button"),
   reset: document.querySelector("#reset-button"),
   loadNotice: document.querySelector("#load-notice-button"),
@@ -53,6 +61,21 @@ const elements = {
   retry: document.querySelector("#retry-button"),
   toast: document.querySelector("#toast"),
   auth: document.querySelector("#auth-button"),
+  welcomeDialog: document.querySelector("#welcome-dialog"),
+  startRecoveryEntry: document.querySelector("#start-recovery-entry"),
+  trySampleEntry: document.querySelector("#try-sample-entry"),
+  setupStepLabel: document.querySelector("#setup-step-label"),
+  setupPanes: [...document.querySelectorAll("[data-setup-pane]")],
+  setupProgress: [...document.querySelectorAll("[data-setup-progress]")],
+  setupBack: document.querySelector("#setup-back-button"),
+  setupNext: document.querySelector("#setup-next-button"),
+  setupFooterNote: document.querySelector("#setup-footer-note"),
+  primaryContactName: document.querySelector("#primary-contact-name"),
+  primaryContactPhone: document.querySelector("#primary-contact-phone"),
+  contactNames: [...document.querySelectorAll("[data-contact-name]")],
+  contactPhones: [...document.querySelectorAll("[data-contact-phone]")],
+  reviewNoticeSummary: document.querySelector("#review-notice-summary"),
+  reviewContactSummary: document.querySelector("#review-contact-summary"),
 };
 
 const stepLabels = [
@@ -71,12 +94,13 @@ let activeWorkflowTarget = "local";
 let toastTimer = null;
 let bedrockEnabled = false;
 let agentCoreEnabled = false;
-let photoEvidenceEnabled = false;
 let workflowCreateKey = null;
 let workflowCreateProvider = null;
 let demoRunning = false;
 let authConfig = null;
 let accessToken = sessionStorage.getItem("mettle_access_token");
+let setupStep = 1;
+let nextActionHandler = null;
 
 function base64Url(bytes) {
   return btoa(String.fromCharCode(...new Uint8Array(bytes)))
@@ -402,6 +426,181 @@ function setBusy(button, busy) {
   button.setAttribute("aria-busy", String(busy));
 }
 
+function normalizedPhone(value) {
+  return value.trim().replace(/[\s().-]/g, "");
+}
+
+function activePhotoEnabled() {
+  return activeWorkflowTarget === "agentcore" ? agentCoreEnabled : bedrockEnabled;
+}
+
+function setSetupStep(step) {
+  setupStep = Math.max(1, Math.min(3, step));
+  elements.setupStepLabel.textContent = `STEP ${setupStep} OF 3`;
+  for (const pane of elements.setupPanes) pane.hidden = Number(pane.dataset.setupPane) !== setupStep;
+  for (const marker of elements.setupProgress) {
+    const markerStep = Number(marker.dataset.setupProgress);
+    marker.classList.toggle("setup-progress__step--active", markerStep === setupStep);
+    marker.classList.toggle("setup-progress__step--complete", markerStep < setupStep);
+  }
+  elements.setupBack.hidden = setupStep === 1;
+  elements.setupNext.hidden = setupStep === 3;
+  elements.startWorkflow.hidden = setupStep !== 3;
+  elements.startBedrock.hidden = setupStep !== 3;
+  elements.startAgentCore.hidden = setupStep !== 3;
+  elements.setupFooterNote.textContent = setupStep === 1
+    ? "REPORT FIRST · NO PROJECT SETUP"
+    : setupStep === 2 ? "SUBS USE THEIR PHONE · NO NEW ACCOUNT" : "DRAFT ONLY · CONTRACTOR APPROVAL STAYS REQUIRED";
+  elements.setupNext.textContent = setupStep === 1 ? "Next · add people" : "Next · review launch";
+  const heading = setupStep === 1
+    ? "Start with the failed-inspection report"
+    : setupStep === 2 ? "Who owns the corrections?" : "Confirm the recovery handoff";
+  document.querySelector("#notice-dialog-title").textContent = heading;
+}
+
+function validateSetupStep() {
+  elements.workflowError.hidden = true;
+  if (setupStep === 1) {
+    if (!elements.noticeText.value.trim()) {
+      elements.noticeText.setCustomValidity("Paste the failed-inspection report or comments.");
+      elements.noticeText.reportValidity();
+      elements.noticeText.setCustomValidity("");
+      return false;
+    }
+    if (!elements.workflowAsOf.value) {
+      elements.workflowAsOf.reportValidity();
+      return false;
+    }
+  }
+  if (setupStep === 2) {
+    const name = elements.primaryContactName.value.trim();
+    const phone = normalizedPhone(elements.primaryContactPhone.value);
+    if (!name) {
+      elements.primaryContactName.reportValidity();
+      return false;
+    }
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+      elements.primaryContactPhone.setCustomValidity("Use an international phone number such as +13035550100.");
+      elements.primaryContactPhone.reportValidity();
+      elements.primaryContactPhone.setCustomValidity("");
+      return false;
+    }
+    for (const nameInput of elements.contactNames) {
+      const trade = nameInput.dataset.contactName;
+      const phoneInput = elements.contactPhones.find((item) => item.dataset.contactPhone === trade);
+      const hasName = Boolean(nameInput.value.trim());
+      const tradePhone = normalizedPhone(phoneInput.value);
+      if (hasName !== Boolean(tradePhone)) {
+        const incomplete = hasName ? phoneInput : nameInput;
+        incomplete.setCustomValidity("Add both a contact name and phone number, or leave both blank.");
+        incomplete.reportValidity();
+        incomplete.setCustomValidity("");
+        return false;
+      }
+      if (tradePhone && !/^\+[1-9]\d{7,14}$/.test(tradePhone)) {
+        phoneInput.setCustomValidity("Use an international phone number such as +13035550101.");
+        phoneInput.reportValidity();
+        phoneInput.setCustomValidity("");
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function buildRoster() {
+  const fallback = {
+    name: elements.primaryContactName.value.trim(),
+    phone: normalizedPhone(elements.primaryContactPhone.value),
+  };
+  return ["electrical", "framing", "mechanical", "plumbing", "general"].map((trade) => {
+    const name = elements.contactNames.find((item) => item.dataset.contactName === trade)?.value.trim();
+    const phone = normalizedPhone(elements.contactPhones.find((item) => item.dataset.contactPhone === trade)?.value || "");
+    return { trade, name: name || fallback.name, phone: phone || fallback.phone };
+  });
+}
+
+function updateLaunchReview() {
+  const reportLines = elements.noticeText.value.split("\n").filter((line) => line.trim()).length;
+  const namedTrades = elements.contactNames.filter((item) => item.value.trim()).length;
+  elements.reviewNoticeSummary.textContent = `${reportLines} report lines · ${formatDate(elements.workflowAsOf.value)}`;
+  elements.reviewContactSummary.textContent = `${elements.primaryContactName.value.trim()} + ${namedTrades} trade contact${namedTrades === 1 ? "" : "s"}`;
+}
+
+function openRecoverySetup() {
+  elements.workflowError.hidden = true;
+  setSetupStep(1);
+  elements.noticeDialog.showModal();
+  window.setTimeout(() => elements.noticeText.focus(), 0);
+}
+
+function configureNextAction(data) {
+  const isWorkflow = data.source_mode === "workflow";
+  const pending = data.judgments.filter((item) => item.status === "pending");
+  const openCitation = data.citations.find((item) => item.stage !== "ready");
+  elements.nextAction.hidden = false;
+  elements.nextAction.classList.toggle("next-action--sample", !isWorkflow);
+  elements.nextActionEyebrow.textContent = isWorkflow ? "YOUR NEXT MOVE" : "SAMPLE CAMPAIGN";
+  elements.nextActionMeta.textContent = isWorkflow ? "ONE ACTION · CONTRACTOR CONTROLLED" : "SYNTHETIC DATA · 90 SECONDS";
+
+  if (!isWorkflow) {
+    if (data.scenario_complete) {
+      elements.nextActionTitle.textContent = "The sample recovery is complete";
+      elements.nextActionCopy.textContent = "Start a redacted recovery to see Mettle derive a new docket from report text.";
+      elements.nextActionButton.textContent = "Start a recovery";
+      nextActionHandler = openRecoverySetup;
+    } else if (pending.length) {
+      elements.nextActionTitle.textContent = "Make the one decision Mettle cannot";
+      elements.nextActionCopy.textContent = pending[0].question;
+      elements.nextActionButton.textContent = "Review decision";
+      nextActionHandler = () => document.querySelector(".judgment input")?.focus();
+    } else {
+      elements.nextActionTitle.textContent = "Watch Mettle run the recovery";
+      elements.nextActionCopy.textContent = "The sample compresses days of evidence chasing, escalation, and packet assembly into one guided run.";
+      elements.nextActionButton.textContent = "Run sample recovery";
+      nextActionHandler = () => elements.advance.click();
+    }
+    return;
+  }
+
+  if (pending.length) {
+    elements.nextActionTitle.textContent = pending[0].kind === "final_packet_approval" ? "Approve the final packet" : "Resolve the blocked decision";
+    elements.nextActionCopy.textContent = pending[0].question;
+    elements.nextActionButton.textContent = "Review decision";
+    nextActionHandler = () => {
+      document.querySelector(".judgment-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      window.setTimeout(() => document.querySelector(".judgment input")?.focus(), 300);
+    };
+  } else if (openCitation) {
+    elements.nextActionTitle.textContent = `Collect proof for C${openCitation.citation_id}`;
+    elements.nextActionCopy.textContent = openCitation.stage === "evidence_rejected"
+      ? "The last photo did not visibly show everything requested. Review the feedback and replace it."
+      : "Choose the citation and add the photo or document the contractor expects to use for closure.";
+    elements.nextActionButton.textContent = activePhotoEnabled() ? "Add evidence" : "Open evidence options";
+    nextActionHandler = () => {
+      elements.photoCitation.value = openCitation.citation_id;
+      elements.evidencePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (!activePhotoEnabled()) elements.demoEvidence.open = true;
+      window.setTimeout(() => elements.photoFile.focus(), 300);
+    };
+  } else if (data.packet_status === "blocked") {
+    elements.nextActionTitle.textContent = "Assemble the review packet";
+    elements.nextActionCopy.textContent = "Every citation has accepted evidence. Prepare the packet before giving final approval.";
+    elements.nextActionButton.textContent = "Prepare packet";
+    nextActionHandler = () => elements.packetAction.click();
+  } else if (data.packet_status === "approved") {
+    elements.nextActionTitle.textContent = "Download the approved packet";
+    elements.nextActionCopy.textContent = "The notice, evidence, recovery history, and your approval are ready in one artifact.";
+    elements.nextActionButton.textContent = "Download PDF";
+    nextActionHandler = () => elements.packetAction.click();
+  } else {
+    elements.nextActionTitle.textContent = "Run the next scheduled check";
+    elements.nextActionCopy.textContent = "Mettle will replan only open citations and adjust follow-up intensity against the deadline.";
+    elements.nextActionButton.textContent = "Run scheduled check";
+    nextActionHandler = () => elements.clockAction.click();
+  }
+}
+
 function conditionFor(data) {
   if (data.packet_status === "approved") return ["REINSPECTION READY", "ready"];
   if (data.packet_status === "awaiting_approval") return ["AWAITING APPROVAL", "approval"];
@@ -612,7 +811,7 @@ function renderRecoveryClock(data) {
     elements.clockCopy.textContent = `${open} open citation${open === 1 ? "" : "s"}. Mettle will replan only those citations, then run ${behavior}.`;
   }
   elements.clockAction.disabled = closed || waiting || expired || data.packet_status !== "blocked";
-  elements.clockAction.textContent = waiting ? "Resolve decision to continue" : closed ? "Campaign stood down" : expired ? "Deadline reached" : "Run next scheduled check";
+  elements.clockAction.textContent = waiting ? "Resolve decision to continue" : closed ? "Campaign stood down" : expired ? "Deadline reached" : "Simulate scheduled check";
 }
 
 function render(data) {
@@ -626,6 +825,7 @@ function render(data) {
   elements.asOf.textContent = `AS OF ${formatDate(data.as_of).toUpperCase()}`;
   elements.progressLabel.textContent = `${data.metrics.citations_ready} / ${data.metrics.citations_total} CITATIONS READY`;
   elements.progressBar.style.width = `${(data.metrics.citations_ready / data.metrics.citations_total) * 100}%`;
+  configureNextAction(data);
 
   const [conditionLabel, conditionTone] = conditionFor(data);
   elements.conditionLabel.textContent = conditionLabel;
@@ -657,6 +857,7 @@ function render(data) {
   const isAgentCore = isWorkflow && data.execution_target === "agentcore";
   elements.evidencePanel.hidden = !isWorkflow;
   elements.recoveryClock.hidden = !isWorkflow;
+  elements.driverTag.textContent = isWorkflow ? "RECOVERY" : "SAMPLE";
   if (isWorkflow) renderRecoveryClock(data);
   if (isWorkflow) {
     const selectedCitation = elements.photoCitation.value;
@@ -668,8 +869,9 @@ function render(data) {
     if ([...elements.photoCitation.options].some((option) => option.value === selectedCitation)) {
       elements.photoCitation.value = selectedCitation;
     }
-    elements.photoSubmit.disabled = !photoEvidenceEnabled || !elements.photoFile.files?.length;
-    elements.photoSubmit.title = photoEvidenceEnabled
+    const canAssessPhoto = activePhotoEnabled();
+    elements.photoSubmit.disabled = !canAssessPhoto || !elements.photoFile.files?.length;
+    elements.photoSubmit.title = canAssessPhoto
       ? "This live vision check consumes a small amount of AWS credit"
       : "Start Mettle with Bedrock or AgentCore enabled to assess real photos";
     const latestEvidence = data.evidence.at(-1);
@@ -703,12 +905,14 @@ function render(data) {
     ? `${isAgentCore ? "AGENTCORE + " : ""}${data.intake_provider === "bedrock" ? "BEDROCK + " : ""}STRANDS · ${data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH COMPLETE"}`
     : `${data.scenario_step} · ${stepLabels[data.scenario_step] || "RECOVERY RUN"}`;
   elements.advance.disabled = isWorkflow || data.scenario_complete || demoRunning;
+  elements.advance.hidden = isWorkflow;
   elements.reset.disabled = demoRunning;
   elements.loadNotice.disabled = demoRunning;
   const advanceLabels = elements.advance.querySelectorAll("span");
   advanceLabels[0].textContent = isWorkflow ? "Real workflow active" : data.scenario_complete ? "Scenario complete" : demoRunning ? "Recovery running" : "Run compressed recovery";
   advanceLabels[1].textContent = isWorkflow ? "LIVE" : data.scenario_complete ? "DONE ✓" : demoRunning ? "WORKING…" : "AUTO ▶";
-  elements.reset.querySelector("span").textContent = isWorkflow ? "RETURN TO DEMO" : "RESET";
+  elements.loadNotice.querySelector("span").textContent = isWorkflow ? "NEW" : "LOAD";
+  elements.reset.querySelector("span").textContent = isWorkflow ? "SAMPLE" : "RESET";
 }
 
 async function loadCampaign() {
@@ -732,6 +936,9 @@ async function loadCampaign() {
       activeWorkflowId = null;
       activeWorkflowTarget = "local";
       render(await request("/api/campaign"));
+      if (!sessionStorage.getItem("mettle_entry_selected") && !elements.welcomeDialog.open) {
+        elements.welcomeDialog.showModal();
+      }
     }
   } catch (error) { showError(error); }
 }
@@ -741,11 +948,9 @@ async function loadCapabilities() {
     const capabilities = await request("/api/capabilities");
     bedrockEnabled = capabilities.bedrock_intake === true;
     agentCoreEnabled = capabilities.agentcore_runtime === true;
-    photoEvidenceEnabled = capabilities.photo_evidence === true;
   } catch (_error) {
     bedrockEnabled = false;
     agentCoreEnabled = false;
-    photoEvidenceEnabled = false;
   }
   elements.startBedrock.disabled = !bedrockEnabled;
   elements.startBedrock.title = bedrockEnabled
@@ -759,12 +964,12 @@ async function loadCapabilities() {
 
 elements.photoFile.addEventListener("change", () => {
   elements.photoError.hidden = true;
-  elements.photoSubmit.disabled = !photoEvidenceEnabled || !elements.photoFile.files?.length;
+  elements.photoSubmit.disabled = !activePhotoEnabled() || !elements.photoFile.files?.length;
 });
 
 elements.photoForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!activeWorkflowId || !elements.photoFile.files?.length || !photoEvidenceEnabled) return;
+  if (!activeWorkflowId || !elements.photoFile.files?.length || !activePhotoEnabled()) return;
   const file = elements.photoFile.files[0];
   elements.photoError.hidden = true;
   setBusy(elements.photoSubmit, true);
@@ -794,7 +999,7 @@ elements.photoForm.addEventListener("submit", async (event) => {
     elements.photoError.textContent = error.message;
     elements.photoError.hidden = false;
   } finally {
-    elements.photoSubmit.disabled = !photoEvidenceEnabled || !elements.photoFile.files?.length;
+    elements.photoSubmit.disabled = !activePhotoEnabled() || !elements.photoFile.files?.length;
     elements.photoSubmit.setAttribute("aria-busy", "false");
   }
 });
@@ -846,16 +1051,41 @@ elements.reset.addEventListener("click", async () => {
   }
 });
 
-elements.loadNotice.addEventListener("click", () => {
-  elements.workflowError.hidden = true;
-  elements.noticeDialog.showModal();
-  elements.noticeText.focus();
+elements.nextActionButton.addEventListener("click", () => nextActionHandler?.());
+
+elements.startRecoveryEntry.addEventListener("click", () => {
+  sessionStorage.setItem("mettle_entry_selected", "recovery");
+  elements.welcomeDialog.close();
+  openRecoverySetup();
 });
+
+elements.trySampleEntry.addEventListener("click", () => {
+  sessionStorage.setItem("mettle_entry_selected", "sample");
+  elements.welcomeDialog.close();
+  elements.nextActionButton.focus();
+});
+
+elements.setupNext.addEventListener("click", () => {
+  if (!validateSetupStep()) return;
+  if (setupStep === 2) updateLaunchReview();
+  setSetupStep(setupStep + 1);
+  const pane = elements.setupPanes.find((item) => Number(item.dataset.setupPane) === setupStep);
+  pane?.querySelector("input, textarea, button")?.focus();
+});
+
+elements.setupBack.addEventListener("click", () => {
+  setSetupStep(setupStep - 1);
+  const pane = elements.setupPanes.find((item) => Number(item.dataset.setupPane) === setupStep);
+  pane?.querySelector("input, textarea, button")?.focus();
+});
+
+elements.loadNotice.addEventListener("click", openRecoverySetup);
 
 elements.closeNotice.addEventListener("click", () => elements.noticeDialog.close());
 
 elements.noticeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (setupStep !== 3) return;
   const noticeText = elements.noticeText.value.trim();
   if (!noticeText) return;
   const executionTarget = event.submitter?.value === "agentcore" ? "agentcore" : "local";
@@ -887,13 +1117,7 @@ elements.noticeForm.addEventListener("submit", async (event) => {
         notice_text: noticeText,
         intake_provider: provider,
         as_of: elements.workflowAsOf.value,
-        roster: [
-          { trade: "electrical", name: "Mike Alvarez", phone: "+13035550101" },
-          { trade: "framing", name: "Jen Ortiz", phone: "+13035550102" },
-          { trade: "mechanical", name: "Luis Vega", phone: "+13035550103" },
-          { trade: "plumbing", name: "Priya Shah", phone: "+13035550104" },
-          { trade: "general", name: "Jordan Lee", phone: "+13035550105" },
-        ],
+        roster: buildRoster(),
       }),
     });
     activeWorkflowId = envelope.workflow_id;
@@ -1037,7 +1261,7 @@ elements.auth.addEventListener("click", async () => {
     await beginLogin();
   }
 });
-initializeAuth().then(() => {
-  loadCapabilities();
-  loadCampaign();
+initializeAuth().then(async () => {
+  await loadCapabilities();
+  await loadCampaign();
 });

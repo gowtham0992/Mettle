@@ -353,10 +353,12 @@ def test_dashboard_and_campaign_api_load() -> None:
 
     assert page.status_code == 200
     assert "Recovery command center" in page.text
-    assert "Load a failed-inspection notice" in page.text
-    assert "Run on AgentCore" in page.text
+    assert "Start with the failed-inspection report" in page.text
+    assert "Start a recovery" in page.text
+    assert "Try the sample campaign" in page.text
+    assert "Launch on AgentCore" in page.text
     assert "Recovery clock" in page.text
-    assert "Run next scheduled check" in page.text
+    assert "Simulate scheduled check" in page.text
     assert page.headers["content-security-policy"].startswith("default-src 'self'")
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"

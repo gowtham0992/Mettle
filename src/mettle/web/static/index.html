@@ -55,6 +55,19 @@
         <div class="skeleton skeleton--wide"></div><div class="skeleton"></div>
       </div>
 
+      <section class="next-action" id="next-action" aria-labelledby="next-action-title" hidden>
+        <div class="next-action__marker" aria-hidden="true">→</div>
+        <div class="next-action__body">
+          <p class="mono-label" id="next-action-eyebrow">YOUR NEXT MOVE</p>
+          <h1 id="next-action-title">Review the recovery</h1>
+          <p id="next-action-copy">Mettle will keep one consequential action in front of you.</p>
+        </div>
+        <div class="next-action__control">
+          <button class="button button--orange" id="next-action-button" type="button">Continue</button>
+          <span id="next-action-meta">CONTRACTOR CONTROLLED</span>
+        </div>
+      </section>
+
       <div id="dashboard" class="dashboard" hidden>
         <section class="main-column" aria-labelledby="docket-title">
           <div class="section-heading">
@@ -90,14 +103,14 @@
               <strong id="clock-title">Waiting for a recovery run</strong>
               <p id="clock-copy">Mettle will choose the next scheduled checkpoint from the reinspection deadline.</p>
             </div>
-            <button class="button clock-action" id="clock-action" type="button">Run next scheduled check</button>
-            <p class="clock-note">DEMO TIME COMPRESSION · THE SAME SERVER-SIDE ENGINE IS SCHEDULER-READY</p>
+            <button class="button clock-action" id="clock-action" type="button">Simulate scheduled check</button>
+            <p class="clock-note">PROTOTYPE CONTROL · A PRODUCTION RUN ADVANCES FROM THE SCHEDULER</p>
           </section>
 
           <section class="panel evidence-panel" id="evidence-panel" hidden>
             <div class="panel__header">
-              <div><span class="section-index">04</span><h2>Evidence lab</h2></div>
-              <span class="evidence-panel__mode">VISION + FIXTURES</span>
+              <div><span class="section-index">04</span><h2>Evidence review</h2></div>
+              <span class="evidence-panel__mode">VISIBLE PROOF</span>
             </div>
             <form class="photo-evidence" id="photo-evidence-form">
               <div class="photo-evidence__copy">
@@ -116,8 +129,10 @@
               <button class="button button--orange" id="photo-submit" type="submit" disabled>Assess with Bedrock Vision</button>
               <p class="photo-evidence__error" id="photo-error" role="alert" hidden></p>
             </form>
-            <p class="panel__kicker">OR RUN RELIABLE SYNTHETIC DEMO FIXTURES</p>
-            <div class="evidence-fixtures">
+            <details class="demo-evidence" id="demo-evidence">
+              <summary>Open synthetic evidence for demo use</summary>
+              <p class="panel__kicker">RELIABLE FIXTURES · NEVER PRESENTED AS JOB-SITE EVIDENCE</p>
+              <div class="evidence-fixtures">
               <article class="evidence-fixture">
                 <img src="/static/evidence/panel-closeup-insufficient.png" alt="Synthetic close-up of an electrical panel that does not show working clearance">
                 <div><strong>Tight close-up</strong><span>No scale or full working area</span></div>
@@ -138,7 +153,8 @@
                 <div><strong>Mechanical access</strong><span>Wide clearance + open service panel</span></div>
                 <button class="button evidence-submit" type="button" data-citation="3" data-sample="mechanical_access_wide" data-requires-decision="true">Assess mechanical photo</button>
               </article>
-            </div>
+              </div>
+            </details>
             <div class="evidence-result" id="evidence-result" aria-live="polite" hidden></div>
           </section>
 
@@ -167,27 +183,58 @@
     </main>
 
     <div class="demo-driver" aria-label="Demo controls">
-      <span class="demo-driver__tag">GUIDED DEMO</span>
+      <span class="demo-driver__tag" id="driver-tag">SAMPLE</span>
       <span id="demo-step">0 · OPENING CAMPAIGN</span>
       <button class="demo-button" id="load-notice-button" type="button" aria-label="Load notice">＋ <span>LOAD</span></button>
       <button class="demo-button" id="reset-button" type="button" title="Reset demo (R)">↺ <span>RESET</span></button>
       <button class="demo-button demo-button--next" id="advance-button" type="button"><span>Run compressed recovery</span><span aria-hidden="true">AUTO ▶</span></button>
     </div>
 
+    <dialog class="welcome-dialog" id="welcome-dialog" aria-labelledby="welcome-title">
+      <div class="welcome-dialog__brand">
+        <img src="/static/mettle-mark.png" alt="" width="54" height="54">
+        <span>METTLE / FAILED-INSPECTION RECOVERY</span>
+      </div>
+      <div class="welcome-dialog__copy">
+        <p class="mono-label">NOTICE IN → RECOVERY OUT</p>
+        <h1 id="welcome-title">Get the correction work back under control.</h1>
+        <p>Mettle reads the failed-inspection report, organizes the responsible trades and proof, follows the deadline, and interrupts you only for decisions.</p>
+      </div>
+      <div class="welcome-dialog__choices">
+        <button class="entry-choice entry-choice--primary" id="start-recovery-entry" type="button">
+          <span class="entry-choice__index">01</span>
+          <strong>Start a recovery</strong>
+          <span>Paste a redacted inspection report and guide the setup.</span>
+        </button>
+        <button class="entry-choice" id="try-sample-entry" type="button">
+          <span class="entry-choice__index">02</span>
+          <strong>Try the sample campaign</strong>
+          <span>Use synthetic data and see the full recovery loop.</span>
+        </button>
+      </div>
+      <p class="public-demo-note"><strong>Public prototype:</strong> use the sample or redact addresses, names, phone numbers, and permit details. Live projects belong behind sign-in.</p>
+    </dialog>
+
     <dialog class="notice-dialog" id="notice-dialog" aria-labelledby="notice-dialog-title">
       <form id="notice-form">
         <div class="notice-dialog__header">
           <div>
-            <p class="mono-label">NEW RECOVERY RUN · STRANDS GRAPH</p>
-            <h2 id="notice-dialog-title">Load a failed-inspection notice</h2>
+            <p class="mono-label">NEW RECOVERY · <span id="setup-step-label">STEP 1 OF 3</span></p>
+            <h2 id="notice-dialog-title">Start with the failed-inspection report</h2>
           </div>
           <button class="dialog-close" id="close-notice-button" type="button" aria-label="Close notice loader">×</button>
         </div>
-        <p class="notice-dialog__intro">This representative notice mirrors the prose and numbered-comment shape used in public Douglas County inspection records. It contains no trade assignments or evidence checklist. Mettle derives those only where bounded policy supports them and asks you when it cannot.</p>
+        <nav class="setup-progress" aria-label="Recovery setup progress">
+          <span class="setup-progress__step setup-progress__step--active" data-setup-progress="1">1 · Notice</span>
+          <span class="setup-progress__step" data-setup-progress="2">2 · People</span>
+          <span class="setup-progress__step" data-setup-progress="3">3 · Review</span>
+        </nav>
 
-        <label class="field field--notice">
-          <span>CORRECTION NOTICE · PLAIN TEXT</span>
-          <textarea id="notice-text" name="notice_text" required maxlength="100000" spellcheck="false">DOUGLAS COUNTY BUILDING DIVISION
+        <section class="setup-pane" data-setup-pane="1">
+          <p class="notice-dialog__intro">Paste the report text or inspection comments. Mettle anchors every task to the authority’s words and asks when the report is ambiguous.</p>
+          <label class="field field--notice">
+            <span>FAILED-INSPECTION REPORT · PLAIN TEXT</span>
+            <textarea id="notice-text" name="notice_text" required maxlength="100000" spellcheck="false">DOUGLAS COUNTY BUILDING DIVISION
 INSPECTION CORRECTION NOTICE
 Permit: CR-2026-0417
 Inspection: Residential rough-in
@@ -200,32 +247,56 @@ Inspection comments:
 1. NEC 110.26 — Maintain the required working clearance in front of the service panel.
 2. IRC R602.6 — Protect bored framing members where the edge distance is less than required.
 3. IMC 304.10 — Provide clearance and service access at the installed mechanical equipment.</textarea>
-        </label>
-
-        <div class="run-settings">
-          <label class="field">
-            <span>CAMPAIGN AS-OF</span>
-            <input id="workflow-as-of" name="as_of" type="date" value="2026-08-10" required>
           </label>
-          <div class="roster-summary" aria-label="Synthetic trade roster">
-            <span class="roster-summary__label">SYNTHETIC TRADE ROSTER</span>
-            <span><b>Electrical</b> Mike Alvarez · +1 303 555 0101</span>
-            <span><b>Framing</b> Jen Ortiz · +1 303 555 0102</span>
-            <span><b>Mechanical</b> Luis Vega · +1 303 555 0103</span>
+          <div class="run-settings">
+            <label class="field">
+              <span>WORKING DATE</span>
+              <input id="workflow-as-of" name="as_of" type="date" value="2026-08-10" required>
+            </label>
+            <div class="setup-guidance">
+              <strong>Include the report’s permit, address, inspection date, deadline, and numbered comments.</strong>
+              <span>For this public prototype, replace identifying details with synthetic values.</span>
+            </div>
           </div>
-        </div>
+        </section>
+
+        <section class="setup-pane" data-setup-pane="2" hidden>
+          <p class="notice-dialog__intro">Give Mettle one accountable contact. Add trade contacts when you have them; unassigned items stay with the primary contractor until you decide.</p>
+          <div class="contact-grid">
+            <label class="field contact-card contact-card--primary">
+              <span>PRIMARY CONTRACTOR · REQUIRED</span>
+              <input id="primary-contact-name" name="primary_name" autocomplete="name" maxlength="120" placeholder="Your name" required>
+              <input id="primary-contact-phone" name="primary_phone" autocomplete="tel" inputmode="tel" placeholder="+1 303 555 0100" required>
+            </label>
+            <label class="field contact-card"><span>ELECTRICAL · OPTIONAL</span><input data-contact-name="electrical" maxlength="120" placeholder="Contact name"><input data-contact-phone="electrical" inputmode="tel" placeholder="+1 303 555 0101"></label>
+            <label class="field contact-card"><span>FRAMING · OPTIONAL</span><input data-contact-name="framing" maxlength="120" placeholder="Contact name"><input data-contact-phone="framing" inputmode="tel" placeholder="+1 303 555 0102"></label>
+            <label class="field contact-card"><span>MECHANICAL · OPTIONAL</span><input data-contact-name="mechanical" maxlength="120" placeholder="Contact name"><input data-contact-phone="mechanical" inputmode="tel" placeholder="+1 303 555 0103"></label>
+            <label class="field contact-card"><span>PLUMBING · OPTIONAL</span><input data-contact-name="plumbing" maxlength="120" placeholder="Contact name"><input data-contact-phone="plumbing" inputmode="tel" placeholder="+1 303 555 0104"></label>
+          </div>
+        </section>
+
+        <section class="setup-pane" data-setup-pane="3" hidden>
+          <p class="notice-dialog__intro">Review the handoff. Mettle will extract citations, draft notice-anchored requests, and pause for ambiguous evidence or deadline decisions.</p>
+          <div class="launch-review">
+            <div><span>INPUT</span><strong id="review-notice-summary">Report ready</strong><small>Authority language remains attached to every citation.</small></div>
+            <div><span>PEOPLE</span><strong id="review-contact-summary">Primary contractor ready</strong><small>Missing trade contacts route to the primary contractor.</small></div>
+            <div><span>SAFETY</span><strong>Draft and record only</strong><small>No live SMS. No inspector contact. No code-compliance certification.</small></div>
+          </div>
+        </section>
 
         <p class="form-error" id="workflow-form-error" role="alert" hidden></p>
         <div class="notice-dialog__footer">
-          <span>ZERO CONFIGURATION · NO LIVE SMS</span>
+          <button class="button button--outline" id="setup-back-button" type="button" hidden>Back</button>
+          <span id="setup-footer-note">REPORT FIRST · NO PROJECT SETUP</span>
           <div class="notice-dialog__actions">
-            <button class="button" id="start-workflow-button" type="submit" value="local">Start local · free</button>
-            <button class="button button--outline" id="start-bedrock-button" type="submit" value="bedrock" disabled title="Start the server with Bedrock enabled to use live intake">
-              Run live Bedrock
+            <button class="button button--orange" id="setup-next-button" type="button">Next · add people</button>
+            <button class="button" id="start-workflow-button" type="submit" value="local" hidden>Start draft recovery</button>
+            <button class="button button--outline" id="start-bedrock-button" type="submit" value="bedrock" disabled hidden title="Start the server with Bedrock enabled to use live intake">
+              Ground with Bedrock
               <small>NOVA MICRO · USES AWS CREDIT</small>
             </button>
-            <button class="button button--orange" id="start-agentcore-button" type="submit" value="agentcore" disabled title="Start the server with AgentCore enabled to use the deployed runtime">
-              Run on AgentCore
+            <button class="button button--orange" id="start-agentcore-button" type="submit" value="agentcore" disabled hidden title="Start the server with AgentCore enabled to use the deployed runtime">
+              Launch on AgentCore
               <small>DEPLOYED STRANDS · USES AWS CREDIT</small>
             </button>
           </div>
