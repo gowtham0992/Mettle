@@ -349,6 +349,7 @@ def test_reinspection_packet_with_chase_history_has_stable_structure() -> None:
 def test_dashboard_and_campaign_api_load() -> None:
     with client() as browser:
         page = browser.get("/")
+        script = browser.get("/static/app.js")
         campaign = browser.get("/api/campaign")
 
     assert page.status_code == 200
@@ -360,6 +361,11 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Recovery clock" in page.text
     assert "Simulate scheduled check" in page.text
     assert page.headers["content-security-policy"].startswith("default-src 'self'")
+    assert script.status_code == 200
+    assert "function exitRecoverySetup()" in script.text
+    assert 'openRecoverySetup({ returnToWelcome: true });' in script.text
+    assert 'elements.noticeDialog.addEventListener("cancel"' in script.text
+    assert 'elements.noticeDialog.open && event.key === "Escape"' in script.text
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"
 

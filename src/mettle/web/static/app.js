@@ -100,6 +100,7 @@ let demoRunning = false;
 let authConfig = null;
 let accessToken = sessionStorage.getItem("mettle_access_token");
 let setupStep = 1;
+let setupReturnsToWelcome = false;
 let nextActionHandler = null;
 
 function base64Url(bytes) {
@@ -527,11 +528,24 @@ function updateLaunchReview() {
   elements.reviewContactSummary.textContent = `${elements.primaryContactName.value.trim()} + ${namedTrades} trade contact${namedTrades === 1 ? "" : "s"}`;
 }
 
-function openRecoverySetup() {
+function openRecoverySetup({ returnToWelcome = false } = {}) {
+  setupReturnsToWelcome = returnToWelcome;
   elements.workflowError.hidden = true;
   setSetupStep(1);
   elements.noticeDialog.showModal();
   window.setTimeout(() => elements.noticeText.focus(), 0);
+}
+
+function exitRecoverySetup() {
+  const returnToWelcome = setupReturnsToWelcome && !activeWorkflowId;
+  setupReturnsToWelcome = false;
+  elements.noticeDialog.close();
+  if (returnToWelcome) {
+    sessionStorage.removeItem("mettle_entry_selected");
+    window.setTimeout(() => {
+      if (!elements.welcomeDialog.open) elements.welcomeDialog.showModal();
+    }, 0);
+  }
 }
 
 function configureNextAction(data) {
@@ -1054,9 +1068,8 @@ elements.reset.addEventListener("click", async () => {
 elements.nextActionButton.addEventListener("click", () => nextActionHandler?.());
 
 elements.startRecoveryEntry.addEventListener("click", () => {
-  sessionStorage.setItem("mettle_entry_selected", "recovery");
   elements.welcomeDialog.close();
-  openRecoverySetup();
+  openRecoverySetup({ returnToWelcome: true });
 });
 
 elements.trySampleEntry.addEventListener("click", () => {
@@ -1079,9 +1092,14 @@ elements.setupBack.addEventListener("click", () => {
   pane?.querySelector("input, textarea, button")?.focus();
 });
 
-elements.loadNotice.addEventListener("click", openRecoverySetup);
+elements.loadNotice.addEventListener("click", () => openRecoverySetup());
 
-elements.closeNotice.addEventListener("click", () => elements.noticeDialog.close());
+elements.closeNotice.addEventListener("click", exitRecoverySetup);
+
+elements.noticeDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  exitRecoverySetup();
+});
 
 elements.noticeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1125,6 +1143,8 @@ elements.noticeForm.addEventListener("submit", async (event) => {
     const targetQuery = executionTarget === "agentcore" ? "&runtime=agentcore" : "";
     window.history.replaceState({}, "", `${window.location.pathname}?workflow=${encodeURIComponent(activeWorkflowId)}${targetQuery}`);
     render(workflowCampaign(envelope, executionTarget));
+    sessionStorage.setItem("mettle_entry_selected", "recovery");
+    setupReturnsToWelcome = false;
     elements.noticeDialog.close();
     workflowCreateKey = null;
     workflowCreateProvider = null;
@@ -1247,6 +1267,11 @@ elements.packetAction.addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (elements.noticeDialog.open && event.key === "Escape") {
+    event.preventDefault();
+    exitRecoverySetup();
+    return;
+  }
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || elements.noticeDialog.open) return;
   if (event.key === "ArrowRight" && !elements.advance.disabled) elements.advance.click();
   if (event.key.toLowerCase() === "r") elements.reset.click();
