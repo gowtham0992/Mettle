@@ -9,8 +9,8 @@ profile during normal development.
 
 - Runtime: `MettleRecovery-example`
 - ARN: `arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/MettleRecovery-example`
-- Version and status: `7`, `READY`
-- Artifact: `runtime/MettleRecovery-example.zip`, S3 version
+- Version and status: `9`, `READY`
+- Artifact: `runtime/MettleRecovery-example-arm64.zip`, S3 version
   `EXAMPLE_OBJECT_VERSION`
 - Artifact SHA-256:
   `EXAMPLE_ARTIFACT_SHA256`
@@ -18,14 +18,26 @@ profile during normal development.
 - Log group: `/aws/bedrock-agentcore/runtimes/MettleRecovery-example-DEFAULT`,
   14-day retention
 
-The version 7 acceptance workflow `77CZ9R2KfJ8JaSgn` ran Nova Micro notice
-intake, Nova Lite photo assessment, T−3 open-citation replanning, an idempotent
+The version 9 acceptance workflow `yRM1Z6fYIqrFHQ4f` ran Nova Micro notice
+intake, paused with zero deliveries for the contractor's structured correction
+review, resumed the same Strands graph, then ran Nova Lite photo assessment,
+T−3 open-citation replanning, an idempotent
 check replay with no duplicate outreach, the T−2 deadline tradeoff interrupt
 and resume, final packet approval, and PDF integrity verification in one
 AgentCore session. Citation 1 stopped receiving follow-ups after its evidence
-was accepted; only citations 2 and 3 were chased. The final 5,617,843-byte
+was accepted; only citations 2 and 3 were chased. The final 5,617,827-byte
 five-page packet had SHA-256
-`ebecd28593bd57981878db512decf57ccf0ee87787e27fbd6a8cfa0c890752a3`.
+`ab049c9019671c02a95aa06dba2570783e9f399f253cfbe2a8effb89c9a3e8b6`.
+
+Version 8 never became ready: its package accidentally included the x86_64
+web-Lambda staging tree alongside the ARM64 runtime dependencies. The package
+pruner now removes and rejects `build/`, and version 9 contains ARM64 Linux
+native extensions only.
+
+The immutable version 7 artifact remains available as the latest known-good
+rollback target: `runtime/MettleRecovery-example.zip`, S3 version
+`EXAMPLE_OBJECT_VERSION`, SHA-256
+`EXAMPLE_ARTIFACT_SHA256`.
 
 The first version 7 acceptance attempt proved the full chase loop but exposed a
 stale smoke-test assumption that every packet has exactly four pages. Seven

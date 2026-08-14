@@ -87,6 +87,16 @@ def main() -> int:
                         "name": "Luis Vega",
                         "phone": "+13035550103",
                     },
+                    {
+                        "trade": "plumbing",
+                        "name": "Gowtham (GC fallback)",
+                        "phone": "+13035550104",
+                    },
+                    {
+                        "trade": "general",
+                        "name": "Gowtham (GC fallback)",
+                        "phone": "+13035550105",
+                    },
                 ],
             },
         },
@@ -99,29 +109,49 @@ def main() -> int:
         raise AgentCoreInvocationError("start did not produce exactly one judgment")
     print(json.dumps({"start": _summary(started)}, indent=2))
 
-    resumed = invoke_json(
+    reviewed = invoke_json(
         client,
         runtime_arn=args.runtime_arn,
         session_id=session_id,
         payload={
-            "operation": "resume",
-            "idempotency_key": f"resume_{uuid.uuid4().hex}",
+            "operation": "review",
+            "idempotency_key": f"review_{uuid.uuid4().hex}",
             "workflow_id": workflow["workflow_id"],
             "payload": {
                 "interrupt_id": interrupts[0]["interrupt_id"],
-                "decision": (
-                    "Request a wide equipment-clearance photo with the access "
-                    "panel open."
-                ),
+                "citations": [
+                    {
+                        "citation_id": citation["citation_id"],
+                        "trade": (
+                            citation["trade"]
+                            if citation["trade"] != "unknown"
+                            else "general"
+                        ),
+                        "closure_route": citation.get(
+                            "closure_route", "photo_evidence"
+                        ),
+                        "evidence_requirements": (
+                            citation["evidence_requirements"]
+                            or [
+                                "Wide photo showing the completed correction "
+                                "and its location"
+                            ]
+                        ),
+                    }
+                    for citation in workflow["snapshot"]["notice"]["citations"]
+                ],
             },
         },
     )
-    if not resumed.get("ok") or resumed["workflow"]["snapshot"]["status"] != "completed":
-        raise AgentCoreInvocationError("resume operation did not complete")
-    print(json.dumps({"resume": _summary(resumed)}, indent=2))
+    if not reviewed.get("ok") or reviewed["workflow"]["snapshot"]["status"] != "completed":
+        raise AgentCoreInvocationError(
+            "contractor review did not complete: "
+            + json.dumps(reviewed, sort_keys=True)
+        )
+    print(json.dumps({"review": _summary(reviewed)}, indent=2))
 
     workflow_id = workflow["workflow_id"]
-    current = resumed
+    current = reviewed
     citation_one_closed = False
     if args.vision:
         photo = normalize_photo(

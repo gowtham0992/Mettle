@@ -147,14 +147,14 @@ allow only Nova Micro and Nova Lite plus AgentCore telemetry and restrict deploy
 Project-tagged Mettle runtimes. See
 [AgentCore deployment and rollback](docs/agentcore-deployment.md).
 
-The cloud runtime currently deployed in `us-east-1` is `MettleRecovery` version 7.
+The cloud runtime currently deployed in `us-east-1` is `MettleRecovery` version 9.
 Its tested path runs live Bedrock intake inside Strands, pauses before outreach
 for a structured contractor review, resumes the same AgentCore session, assesses a normalized real photo
 with Nova Lite, runs the T−3/T−2 chase loop with replay-safe follow-up and a
 deadline judgment interrupt, gates packet approval, and returns a verified
-five-page chased-campaign PDF. The immutable version 6 vision artifact remains
-available as the rollback target; artifact rollback and restoration were
-already exercised on this runtime.
+five-page chased-campaign PDF. The immutable version 7 artifact remains
+available as the latest known-good rollback target; artifact rollback and
+restoration were already exercised on this runtime.
 
 To expose **Run on AgentCore** in the command center, start the loopback-only
 server with the deployed runtime fixed in server configuration:

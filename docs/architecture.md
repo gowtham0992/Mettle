@@ -128,10 +128,11 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF. **Complete.**
 7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,
    package it as CodeZip, and define least-privilege deployment and rollback.
-   **Complete: runtime version 7 is deployed, immutable-artifact rollback was
+   **Complete: runtime version 9 is deployed, immutable-artifact rollback was
    exercised on the real demo runtime, and live acceptance covers start,
-   resume, vision, T−3/T−2 chase behavior, replay safety, approval, and PDF
-   integrity in one AgentCore session.**
+   contractor review with zero pre-approval outreach, resume, vision, T−3/T−2
+   chase behavior, replay safety, approval, and PDF integrity in one AgentCore
+   session.**
 8. **Public durability:** user-scoped AgentCore session mapping, idempotency,
    private packet storage, Cognito authentication, and a CloudFront/Lambda edge.
    **Deployed behind CloudFront with private origins, WAF, Cognito-protected

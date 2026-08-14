@@ -19,6 +19,7 @@ set +e
 zip_output="$(zip -q -d "${artifact_path}" \
   "Logo file and HTML usage.zip" \
   "assets/*" \
+  "build/*" \
   "docs/*" \
   "tests/*" \
   "scripts/*" \
@@ -35,7 +36,7 @@ fi
 
 zip_listing="$(unzip -Z1 "${artifact_path}")"
 if rg -q \
-  '(^|/)(\.env|\.aws|\.git|node_modules)(/|$)|^(docs|tests|scripts|assets)/|^Logo file and HTML usage\.zip$|^package(-lock)?\.json$' \
+  '(^|/)(\.env|\.aws|\.git|node_modules)(/|$)|^(build|docs|tests|scripts|assets)/|^Logo file and HTML usage\.zip$|^package(-lock)?\.json$' \
   <<< "${zip_listing}"; then
   echo "Repository-only or sensitive paths remain in ${artifact_path}." >&2
   exit 1
