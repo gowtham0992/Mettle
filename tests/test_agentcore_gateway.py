@@ -14,7 +14,7 @@ from mettle.workflow_registry import (
     ApprovePacketRequest,
     CreateWorkflowRequest,
     PreparePacketRequest,
-    ResumeWorkflowRequest,
+    ReviewWorkflowRequest,
     RunNextCheckRequest,
     SubmitEvidenceRequest,
     SubmitPhotoEvidenceRequest,
@@ -60,6 +60,24 @@ def interrupted_envelope():
     return WorkflowRegistry().create(
         create_payload(), idempotency_key="source_create_123"
     )[0]
+
+
+def review_request(envelope) -> ReviewWorkflowRequest:
+    return ReviewWorkflowRequest.model_validate(
+        {
+            "interrupt_id": envelope.snapshot.interrupts[0].interrupt_id,
+            "citations": [
+                {
+                    "citation_id": citation.citation_id,
+                    "trade": citation.trade.value if citation.trade.value != "unknown" else "general",
+                    "closure_route": citation.closure_route.value,
+                    "evidence_requirements": citation.evidence_requirements
+                    or ["Wide photo showing the completed correction and its location"],
+                }
+                for citation in envelope.snapshot.notice.citations
+            ],
+        }
+    )
 
 
 class QueueClient:
@@ -141,32 +159,28 @@ def test_changed_create_replay_is_rejected_before_agentcore_invocation() -> None
     assert len(client.requests) == 1
 
 
-def test_resume_reuses_session_and_is_locally_idempotent() -> None:
+def test_review_reuses_session_and_is_locally_idempotent() -> None:
     source = WorkflowRegistry()
     created, _ = source.create(create_payload(), idempotency_key="resume_source_123")
-    interrupt = created.snapshot.interrupts[0]
-    payload = ResumeWorkflowRequest(
-        interrupt_id=interrupt.interrupt_id,
-        decision="Use a wide photo showing equipment clearance with the panel open",
-    )
-    completed = source.resume(
+    payload = review_request(created)
+    completed = source.review(
         created.workflow_id,
         payload,
-        idempotency_key="resume_source_decision_123",
+        idempotency_key="review_source_decision_123",
     )
     client = QueueClient([success(created), success(completed)])
     gateway = AgentCoreWorkflowGateway(client=client, runtime_arn=RUNTIME_ARN)
     gateway.create(create_payload(), idempotency_key="cloud_resume_create_123")
 
-    first = gateway.resume(
+    first = gateway.review(
         created.workflow_id,
         payload,
-        idempotency_key="cloud_resume_123",
+        idempotency_key="cloud_review_123",
     )
-    replay = gateway.resume(
+    replay = gateway.review(
         created.workflow_id,
         payload,
-        idempotency_key="cloud_resume_123",
+        idempotency_key="cloud_review_123",
     )
 
     assert first == replay
@@ -227,14 +241,11 @@ def test_runtime_error_is_mapped_without_exposing_untrusted_details() -> None:
 def test_full_cloud_mutation_path_reuses_session_and_caches_verified_pdf() -> None:
     source = WorkflowRegistry()
     created, _ = source.create(create_payload(), idempotency_key="full_source_create")
-    resume_payload = ResumeWorkflowRequest(
-        interrupt_id=created.snapshot.interrupts[0].interrupt_id,
-        decision="Wide photo showing equipment clearance with the access panel open",
-    )
-    resumed = source.resume(
+    review_payload = review_request(created)
+    resumed = source.review(
         created.workflow_id,
-        resume_payload,
-        idempotency_key="full_source_resume",
+        review_payload,
+        idempotency_key="full_source_review",
     )
     envelopes = [created, resumed]
     evidence_payloads = [
@@ -279,10 +290,10 @@ def test_full_cloud_mutation_path_reuses_session_and_caches_verified_pdf() -> No
     cloud, _ = gateway.create(
         create_payload(), idempotency_key="full_cloud_create_123"
     )
-    gateway.resume(
+    gateway.review(
         cloud.workflow_id,
-        resume_payload,
-        idempotency_key="full_cloud_resume_123",
+        review_payload,
+        idempotency_key="full_cloud_review_123",
     )
     for index, payload in enumerate(evidence_payloads):
         gateway.submit_evidence(
@@ -309,7 +320,7 @@ def test_full_cloud_mutation_path_reuses_session_and_caches_verified_pdf() -> No
     operations = [json.loads(item["payload"])["operation"] for item in client.requests]
     assert operations == [
         "start",
-        "resume",
+        "review",
         "submit_evidence",
         "submit_evidence",
         "submit_evidence",

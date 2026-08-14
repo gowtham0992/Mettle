@@ -13,7 +13,7 @@
     <a class="skip-link" href="#main">Skip to campaign</a>
 
     <header class="command-band">
-      <a class="brand" href="/" aria-label="Mettle home">
+      <a class="brand" id="mettle-home" href="/" aria-label="Mettle home">
         <img src="/static/mettle-icon.png" alt="" width="44" height="44">
         <span>Mettle</span>
       </a>
@@ -211,6 +211,11 @@
           <strong>Try the sample campaign</strong>
           <span>Use synthetic data and see the full recovery loop.</span>
         </button>
+        <button class="entry-choice entry-choice--resume" id="resume-current-entry" type="button" hidden>
+          <span class="entry-choice__index">↩</span>
+          <strong>Return to current recovery</strong>
+          <span>Close this chooser without changing the recovery already in progress.</span>
+        </button>
       </div>
       <p class="public-demo-note"><strong>Public prototype:</strong> use the sample or redact addresses, names, phone numbers, and permit details. Live projects belong behind sign-in.</p>
     </dialog>
@@ -219,7 +224,7 @@
       <form id="notice-form">
         <div class="notice-dialog__header">
           <div>
-            <p class="mono-label">NEW RECOVERY · <span id="setup-step-label">STEP 1 OF 3</span></p>
+            <p class="mono-label">NEW RECOVERY · <span id="setup-step-label">STEP 1 OF 4</span></p>
             <h2 id="notice-dialog-title">Start with the failed-inspection report</h2>
           </div>
           <button class="dialog-close" id="close-notice-button" type="button" aria-label="Exit recovery setup">×</button>
@@ -227,7 +232,8 @@
         <nav class="setup-progress" aria-label="Recovery setup progress">
           <span class="setup-progress__step setup-progress__step--active" data-setup-progress="1">1 · Notice</span>
           <span class="setup-progress__step" data-setup-progress="2">2 · People</span>
-          <span class="setup-progress__step" data-setup-progress="3">3 · Review</span>
+          <span class="setup-progress__step" data-setup-progress="3">3 · Extract</span>
+          <span class="setup-progress__step" data-setup-progress="4">4 · Corrections</span>
         </nav>
 
         <section class="setup-pane" data-setup-pane="1">
@@ -276,12 +282,17 @@ Inspection comments:
         </section>
 
         <section class="setup-pane" data-setup-pane="3" hidden>
-          <p class="notice-dialog__intro">Review the handoff. Mettle will extract citations, draft notice-anchored requests, and pause for ambiguous evidence or deadline decisions.</p>
+          <p class="notice-dialog__intro">Choose how Mettle should extract the notice. The Strands workflow will stop before outreach so you can review every correction.</p>
           <div class="launch-review">
             <div><span>INPUT</span><strong id="review-notice-summary">Report ready</strong><small>Authority language remains attached to every citation.</small></div>
             <div><span>PEOPLE</span><strong id="review-contact-summary">Primary contractor ready</strong><small>Missing trade contacts route to the primary contractor.</small></div>
-            <div><span>SAFETY</span><strong>Draft and record only</strong><small>No live SMS. No inspector contact. No code-compliance certification.</small></div>
+            <div><span>SAFETY</span><strong>Extraction stops at review</strong><small>Zero outreach is recorded until you approve the correction routes.</small></div>
           </div>
+        </section>
+
+        <section class="setup-pane" data-setup-pane="4" hidden>
+          <p class="notice-dialog__intro">Confirm who owns each correction, what closes it, and exactly what proof Mettle should request. Authority language remains read-only.</p>
+          <div class="correction-review" id="correction-review-list" aria-live="polite"></div>
         </section>
 
         <p class="form-error" id="workflow-form-error" role="alert" hidden></p>
@@ -290,14 +301,18 @@ Inspection comments:
           <span id="setup-footer-note">REPORT FIRST · NO PROJECT SETUP</span>
           <div class="notice-dialog__actions">
             <button class="button button--orange" id="setup-next-button" type="button">Next · add people</button>
-            <button class="button" id="start-workflow-button" type="submit" value="local" hidden>Start draft recovery</button>
+            <button class="button" id="start-workflow-button" type="submit" value="local" hidden>Extract locally</button>
             <button class="button button--outline" id="start-bedrock-button" type="submit" value="bedrock" disabled hidden title="Start the server with Bedrock enabled to use live intake">
               Ground with Bedrock
               <small>NOVA MICRO · USES AWS CREDIT</small>
             </button>
             <button class="button button--orange" id="start-agentcore-button" type="submit" value="agentcore" disabled hidden title="Start the server with AgentCore enabled to use the deployed runtime">
-              Launch on AgentCore
+              Extract on AgentCore
               <small>DEPLOYED STRANDS · USES AWS CREDIT</small>
+            </button>
+            <button class="button button--orange" id="approve-corrections-button" type="button" hidden>
+              Approve & begin recovery
+              <small>CONTRACTOR CONTROLLED</small>
             </button>
           </div>
         </div>

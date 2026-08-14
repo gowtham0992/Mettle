@@ -22,6 +22,12 @@ class Priority(StrEnum):
     CRITICAL = "critical"
 
 
+class ClosureRoute(StrEnum):
+    PHOTO_EVIDENCE = "photo_evidence"
+    DOCUMENT_EVIDENCE = "document_evidence"
+    PHYSICAL_REINSPECTION = "physical_reinspection"
+
+
 class JudgmentKind(StrEnum):
     CODE_INTERPRETATION = "code_interpretation"
     DEADLINE_TRADEOFF = "deadline_tradeoff"
@@ -35,6 +41,7 @@ class Citation(BaseModel):
     code_reference: str = Field(min_length=1, max_length=120)
     notice_text: str = Field(min_length=1, max_length=2_000)
     trade: Trade = Trade.UNKNOWN
+    closure_route: ClosureRoute = ClosureRoute.PHOTO_EVIDENCE
     evidence_requirements: list[str] = Field(default_factory=list, max_length=10)
     ambiguity_reason: str | None = Field(default=None, max_length=500)
 

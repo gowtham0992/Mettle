@@ -28,7 +28,7 @@ into caller-facing failures. The deterministic parser remains the default.
 
 ### Orchestration
 
-The intake graph runs `intake -> plan -> coordinate -> judgment gate -> contractor-directed coordination -> finish`. A graph interrupt pauses before code interpretation, returns a judgment card to the contractor, and resumes without replaying the initial outreach. A second chase graph runs `replan open -> follow up -> deadline gate -> finish check`: deterministic policy chooses the next T−7/T−3/T−2/T−1/deadline checkpoint, removes citations with accepted evidence, records idempotent follow-ups for only the remainder, and interrupts at T−2 for the contractor's keep-date-or-reschedule judgment. The browser can compress time for a judge, but cannot choose campaign dates.
+The intake graph runs `intake -> plan -> correction review -> coordinate -> judgment gate -> contractor-directed coordination -> finish`. The first interrupt returns every extracted citation before outreach; the contractor must confirm its assigned trade, closure route, and proof requirements, and the server rejects evidence while that review remains open. The same graph session then records notice-anchored requests without replaying intake. A second chase graph runs `replan open -> follow up -> deadline gate -> finish check`: deterministic policy chooses the next T−7/T−3/T−2/T−1/deadline checkpoint, removes citations with accepted evidence, records idempotent follow-ups for only the remainder, and interrupts at T−2 for the contractor's keep-date-or-reschedule judgment. The browser can compress time for a judge, but cannot choose campaign dates.
 
 ### External ports
 
@@ -40,7 +40,7 @@ Packet generation begins only when the latest evidence for every citation is acc
 
 ### Local application boundary
 
-FastAPI exposes bounded workflow creation, retrieval, resume, evidence, packet, and next-check endpoints to the command center. A thread-safe in-memory registry owns each stateful Strands session, caps the number of runs, and protects every mutation with idempotency keys. It is a development boundary, not durable production storage; a production scheduler can invoke the same next-check operation later.
+FastAPI exposes bounded workflow creation, retrieval, correction-review, resume, evidence, packet, and next-check endpoints to the command center. A thread-safe in-memory registry owns each stateful Strands session, caps the number of runs, and protects every mutation with idempotency keys. It is a development boundary, not durable production storage; a production scheduler can invoke the same next-check operation later.
 
 ### AgentCore runtime boundary
 

@@ -52,6 +52,34 @@ def jpeg_photo() -> bytes:
     return output.getvalue()
 
 
+def review_payload(workflow: dict) -> dict:
+    return {
+        "interrupt_id": workflow["snapshot"]["interrupts"][0]["interrupt_id"],
+        "citations": [
+            {
+                "citation_id": citation["citation_id"],
+                "trade": citation["trade"] if citation["trade"] != "unknown" else "general",
+                "closure_route": citation.get("closure_route", "photo_evidence"),
+                "evidence_requirements": citation["evidence_requirements"]
+                or ["Wide photo showing the completed correction and its location"],
+            }
+            for citation in workflow["snapshot"]["notice"]["citations"]
+        ],
+    }
+
+
+def approve_review(subject, workflow, session_id, key):
+    return subject.handle(
+        {
+            "operation": "review",
+            "idempotency_key": key,
+            "workflow_id": workflow["workflow_id"],
+            "payload": review_payload(workflow),
+        },
+        session_id=session_id,
+    )
+
+
 def test_agentcore_session_starts_then_resumes_the_same_strands_graph() -> None:
     subject = runtime()
     started = subject.handle(
@@ -67,19 +95,13 @@ def test_agentcore_session_starts_then_resumes_the_same_strands_graph() -> None:
     workflow = started["workflow"]
     assert workflow["intake_provider"] == "bedrock"
     assert workflow["snapshot"]["status"] == "interrupted"
-    assert len(workflow["snapshot"]["deliveries"]) == 2
+    assert len(workflow["snapshot"]["deliveries"]) == 0
 
-    resumed = subject.handle(
-        {
-            "operation": "resume",
-            "idempotency_key": "agentcore_resume_123",
-            "workflow_id": workflow["workflow_id"],
-            "payload": {
-                "interrupt_id": workflow["snapshot"]["interrupts"][0]["interrupt_id"],
-                "decision": "Request a wide equipment-clearance photo with the access panel open.",
-            },
-        },
-        session_id="session-123456789012345678901234567890123",
+    resumed = approve_review(
+        subject,
+        workflow,
+        "session-123456789012345678901234567890123",
+        "agentcore_review_123",
     )
 
     assert resumed["ok"] is True
@@ -123,6 +145,7 @@ def test_agentcore_accepts_bounded_base64_photo_for_vision_assessment() -> None:
         },
         session_id=session_id,
     )
+    approve_review(subject, started["workflow"], session_id, "agentcore_photo_review_123")
     response = subject.handle(
         {
             "operation": "submit_photo_evidence",
@@ -152,18 +175,7 @@ def test_agentcore_runs_deadline_check_inside_the_same_session() -> None:
         session_id=session_id,
     )
     workflow = started["workflow"]
-    subject.handle(
-        {
-            "operation": "resume",
-            "idempotency_key": "agentcore_check_resume_123",
-            "workflow_id": workflow["workflow_id"],
-            "payload": {
-                "interrupt_id": workflow["snapshot"]["interrupts"][0]["interrupt_id"],
-                "decision": "Wide photo showing equipment clearance with the access panel open",
-            },
-        },
-        session_id=session_id,
-    )
+    approve_review(subject, workflow, session_id, "agentcore_check_review_123")
 
     checked = subject.handle(
         {
@@ -233,18 +245,7 @@ def test_agentcore_session_completes_evidence_approval_and_pdf_packet() -> None:
     )
     workflow = started["workflow"]
     workflow_id = workflow["workflow_id"]
-    resumed = subject.handle(
-        {
-            "operation": "resume",
-            "idempotency_key": "agentcore_full_resume_123",
-            "workflow_id": workflow_id,
-            "payload": {
-                "interrupt_id": workflow["snapshot"]["interrupts"][0]["interrupt_id"],
-                "decision": "Wide photo showing equipment clearance with the access panel open",
-            },
-        },
-        session_id=session_id,
-    )
+    resumed = approve_review(subject, workflow, session_id, "agentcore_full_review_123")
     assert resumed["ok"] is True
 
     latest = None
@@ -313,6 +314,12 @@ def test_agentcore_evidence_rejects_unknown_sample_without_echoing_it() -> None:
             "payload": workflow_payload(),
         },
         session_id=session_id,
+    )
+    approve_review(
+        subject,
+        started["workflow"],
+        session_id,
+        "agentcore_evidence_review_123",
     )
     response = subject.handle(
         {

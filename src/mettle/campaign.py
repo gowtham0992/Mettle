@@ -44,6 +44,7 @@ def build_campaign_plan(notice: InspectionNotice, *, as_of: date) -> CampaignPla
                     priority=priority,
                     citation_id=citation.citation_id,
                     notice_text=citation.notice_text,
+                    closure_route=citation.closure_route.value,
                     evidence=evidence,
                     due_on=notice.reinspection_due_on,
                 ),
@@ -102,6 +103,7 @@ def _message_for(
     priority: Priority,
     citation_id: str,
     notice_text: str,
+    closure_route: str,
     evidence: str,
     due_on: date,
 ) -> str:
@@ -113,5 +115,6 @@ def _message_for(
     }[priority]
     return (
         f"{opening} for citation {citation_id}. Notice: \"{notice_text}\" "
+        f"Closure route: {closure_route.replace('_', ' ')}. "
         f"Reply with: {evidence}. Reinspection target: {due_on.isoformat()}."
     )

@@ -256,7 +256,7 @@ h2 { font-size: 13px; font-weight: 900; }
 .auth-control { min-height: 34px; margin: 0 12px; padding: 7px 10px; border: 1px solid #51575a; border-radius: 2px; background: transparent; color: var(--paper); font: 700 8px/1.2 var(--mono); letter-spacing: .7px; text-transform: uppercase; }
 .auth-control:hover { border-color: var(--orange); color: var(--orange); }
 .notice-dialog__intro { max-width: 72ch; margin: 0; padding: 18px 26px 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
-.setup-progress { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--line); background: var(--strip); }
+.setup-progress { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); background: var(--strip); }
 .setup-progress__step { padding: 11px 14px; border-right: 1px solid var(--line); color: var(--faint); font: 700 8.5px/1.2 var(--mono); letter-spacing: .8px; text-align: center; text-transform: uppercase; }
 .setup-progress__step:last-child { border-right: 0; }
 .setup-progress__step--active { background: var(--paper); color: var(--orange-ink); box-shadow: inset 0 -3px 0 var(--orange); }
@@ -284,6 +284,18 @@ h2 { font-size: 13px; font-weight: 900; }
 .launch-review span { grid-row: 1 / span 2; align-self: center; color: var(--orange-ink); font: 700 9px/1.2 var(--mono); letter-spacing: 1px; }
 .launch-review strong { font-size: 13px; }
 .launch-review small { color: var(--faint); font: 9.5px/1.45 var(--mono); }
+.correction-review { display: grid; gap: 12px; padding: 18px 26px 26px; }
+.correction-review__card { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px 14px; padding: 16px; border: 1px solid var(--line-strong); border-top: 3px solid var(--orange); background: var(--card); }
+.correction-review__id { grid-row: 1 / span 3; color: var(--orange-ink); font: 800 17px/1 var(--mono); }
+.correction-review__authority { margin: 0; color: var(--body); font-size: 12px; font-weight: 700; line-height: 1.45; }
+.correction-review__code { color: var(--faint); font: 700 9px/1.2 var(--mono); letter-spacing: .7px; text-transform: uppercase; }
+.correction-review__fields { grid-column: 2; display: grid; grid-template-columns: minmax(140px, .7fr) minmax(180px, 1fr); gap: 10px; }
+.correction-review__fields label { display: grid; gap: 6px; color: var(--faint); font: 700 8px/1.2 var(--mono); letter-spacing: .7px; }
+.correction-review select, .correction-review textarea { width: 100%; border: 1px solid var(--line-strong); border-radius: 2px; background: var(--paper); color: var(--ink); }
+.correction-review select { min-height: 40px; padding: 8px; }
+.correction-review textarea { grid-column: 1 / -1; min-height: 74px; resize: vertical; padding: 10px; font: 11px/1.45 var(--sans); }
+.correction-review select:focus, .correction-review textarea:focus { border-color: var(--orange); outline: 2px solid var(--orange-wash); }
+.correction-review__needs-you { color: var(--oxide); font: 700 9px/1.35 var(--mono); }
 .roster-summary { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; align-content: center; padding: 12px 14px; border: 1px solid var(--line); background: var(--well); font-size: 11px; }
 .roster-summary__label { grid-row: 1 / span 3; align-self: center; max-width: 110px; }
 .roster-summary b { display: inline-block; min-width: 64px; color: var(--body); }
@@ -307,6 +319,7 @@ h2 { font-size: 13px; font-weight: 900; }
 .entry-choice { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 5px 10px; min-height: 118px; padding: 17px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--card); color: var(--ink); text-align: left; }
 .entry-choice:hover { border-color: var(--orange); transform: translateY(-1px); }
 .entry-choice--primary { background: var(--charcoal); color: var(--paper); border-color: var(--charcoal); }
+.entry-choice--resume { grid-column: 1 / -1; min-height: 82px; }
 .entry-choice__index { grid-row: 1 / span 2; color: var(--orange); font: 700 10px/1.2 var(--mono); }
 .entry-choice strong { align-self: end; font-size: 17px; }
 .entry-choice > span:last-child { color: var(--faint); font-size: 11px; line-height: 1.45; }
@@ -399,6 +412,10 @@ h2 { font-size: 13px; font-weight: 900; }
   .launch-review { padding-inline: 18px; }
   .launch-review > div { grid-template-columns: 1fr; }
   .launch-review span { grid-row: auto; }
+  .correction-review { padding-inline: 18px; }
+  .correction-review__card { grid-template-columns: 1fr; }
+  .correction-review__id, .correction-review__fields { grid-column: 1; grid-row: auto; }
+  .correction-review__fields { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

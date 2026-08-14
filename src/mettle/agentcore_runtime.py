@@ -19,6 +19,7 @@ from mettle.workflow_registry import (
     PacketNotApproved,
     PacketNotReady,
     PreparePacketRequest,
+    ReviewWorkflowRequest,
     RunNextCheckRequest,
     ResumeWorkflowRequest,
     SubmitEvidenceRequest,
@@ -57,6 +58,19 @@ class _ResumeInvocation(BaseModel):
     )
     workflow_id: str = Field(min_length=1, max_length=64)
     payload: ResumeWorkflowRequest
+
+
+class _ReviewInvocation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation: Literal["review"]
+    idempotency_key: str = Field(
+        min_length=8,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
+    workflow_id: str = Field(min_length=1, max_length=64)
+    payload: ReviewWorkflowRequest
 
 
 class _SubmitEvidenceInvocation(BaseModel):
@@ -134,6 +148,7 @@ class _RenderPacketInvocation(BaseModel):
 AgentCoreInvocation = Annotated[
     _StartInvocation
     | _ResumeInvocation
+    | _ReviewInvocation
     | _SubmitEvidenceInvocation
     | _SubmitPhotoEvidenceInvocation
     | _RunNextCheckInvocation
@@ -193,6 +208,14 @@ class MettleAgentCoreRuntime:
                 )
                 replayed = False
                 operation = "resume"
+            elif isinstance(invocation, _ReviewInvocation):
+                envelope = self._workflows.review(
+                    invocation.workflow_id,
+                    invocation.payload,
+                    idempotency_key=invocation.idempotency_key,
+                )
+                replayed = False
+                operation = "review"
             elif isinstance(invocation, _SubmitEvidenceInvocation):
                 envelope = self._workflows.submit_evidence(
                     invocation.workflow_id,

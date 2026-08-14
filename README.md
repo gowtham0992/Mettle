@@ -29,6 +29,7 @@ intake. It can:
 
 - load a realistic text-form correction notice from the command center;
 - extract its citations without interpreting building code;
+- stop before outreach so the contractor can confirm every assignee, closure route, and proof request;
 - record citation-specific trade outreach through a safe local adapter;
 - advance through server-selected T−7, T−3, T−2, T−1, and deadline checkpoints;
 - replan only open citations, stop follow-ups when evidence is accepted, and increase urgency as the reinspection deadline approaches;
@@ -39,9 +40,9 @@ intake. It can:
 - assemble an evidence packet, block download until final contractor approval, and produce a polished PDF with citation-to-evidence and communication-history traceability.
 
 The product core now runs those steps as a real Strands graph. Deterministic
-policy nodes parse and plan the campaign, an idempotent communication port
-records trade outreach, and a Strands interrupt pauses the graph for contractor
-judgment before it resumes. A second Strands chase graph runs each scheduled
+policy nodes parse and plan the campaign, a mandatory Strands review interrupt
+keeps outreach at zero until the contractor approves the correction docket, and
+an idempotent communication port records the resulting trade requests. A second Strands chase graph runs each scheduled
 recovery check, including the T−2 deadline interrupt. No cloud model is invoked
 in this local mode.
 
@@ -122,7 +123,7 @@ manual-review status; the model is never asked to certify code compliance.
 ## Run the AgentCore boundary locally
 
 The official AgentCore app lives at `agentcore_app.py`. It accepts only bounded,
-discriminated workflow operations—including `start`, `resume`, evidence,
+discriminated workflow operations—including `start`, `review`, `resume`, evidence,
 packet, and `run_next_check`—preserves the Strands workflow in the
 AgentCore session, and does not let callers select an AWS profile, region, or
 model. Start the local runtime without deploying anything:
@@ -147,8 +148,8 @@ Project-tagged Mettle runtimes. See
 [AgentCore deployment and rollback](docs/agentcore-deployment.md).
 
 The cloud runtime currently deployed in `us-east-1` is `MettleRecovery` version 7.
-Its tested path runs live Bedrock intake inside Strands, pauses for contractor
-judgment, resumes the same AgentCore session, assesses a normalized real photo
+Its tested path runs live Bedrock intake inside Strands, pauses before outreach
+for a structured contractor review, resumes the same AgentCore session, assesses a normalized real photo
 with Nova Lite, runs the T−3/T−2 chase loop with replay-safe follow-up and a
 deadline judgment interrupt, gates packet approval, and returns a verified
 five-page chased-campaign PDF. The immutable version 6 vision artifact remains

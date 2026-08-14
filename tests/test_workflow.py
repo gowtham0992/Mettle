@@ -4,10 +4,12 @@ from pathlib import Path
 import pytest
 
 from mettle.communication import RecordingMessenger, Recipient
-from mettle.domain import Trade
+from mettle.domain import ClosureRoute, Trade
 from mettle.notice_parser import parse_notice
 from mettle.workflow import (
     RecoveryWorkflowSession,
+    CorrectionReview,
+    ReviewedCitation,
     WorkflowConfigurationError,
     WorkflowStatus,
 )
@@ -19,6 +21,26 @@ ROSTER = {
     Trade.FRAMING: Recipient(name="Jen Ortiz", phone="+13035550102"),
     Trade.MECHANICAL: Recipient(name="Luis Vega", phone="+13035550103"),
 }
+
+
+def approve_corrections(session, snapshot):
+    return session.review(
+        interrupt_id=snapshot.interrupts[0].interrupt_id,
+        review=CorrectionReview(
+            citations=tuple(
+                ReviewedCitation(
+                    citation_id=citation.citation_id,
+                    trade=citation.trade,
+                    closure_route=ClosureRoute.PHOTO_EVIDENCE,
+                    evidence_requirements=tuple(
+                        citation.evidence_requirements
+                        or ["Wide photo showing the completed correction and its location"]
+                    ),
+                )
+                for citation in snapshot.notice.citations
+            )
+        ),
+    )
 
 
 def test_strands_workflow_coordinates_grounded_work_then_interrupts() -> None:
@@ -34,8 +56,13 @@ def test_strands_workflow_coordinates_grounded_work_then_interrupts() -> None:
 
     assert snapshot.status is WorkflowStatus.INTERRUPTED
     assert len(snapshot.interrupts) == 1
-    assert snapshot.interrupts[0].name == "contractor-judgment"
-    assert [item.citation_id for item in messenger.deliveries] == ["1", "2"]
+    assert snapshot.interrupts[0].name == "correction-review"
+    assert messenger.deliveries == ()
+
+    completed = approve_corrections(session, snapshot)
+
+    assert completed.status is WorkflowStatus.COMPLETED
+    assert [item.citation_id for item in messenger.deliveries] == ["1", "2", "3"]
     assert all("Notice:" in item.body for item in messenger.deliveries)
     assert all("Reinspection target:" in item.body for item in messenger.deliveries)
 
@@ -50,17 +77,14 @@ def test_strands_workflow_resumes_without_duplicate_outreach() -> None:
     )
     interrupted = session.start()
 
-    completed = session.resume(
-        interrupt_id=interrupted.interrupts[0].interrupt_id,
-        decision="Request a wide equipment-clearance photo with the access panel open.",
-    )
+    completed = approve_corrections(session, interrupted)
 
     assert completed.status is WorkflowStatus.COMPLETED
-    assert completed.contractor_decision.startswith("Request a wide")
+    assert completed.contractor_decision is None
     assert completed.interrupts == []
     assert len(messenger.deliveries) == 3
     assert messenger.deliveries[-1].recipient.name == "Luis Vega"
-    assert "Contractor direction:" in messenger.deliveries[-1].body
+    assert "Wide photo showing the completed correction" in messenger.deliveries[-1].body
 
 
 def test_missing_trade_recipient_fails_before_any_message_is_recorded() -> None:
@@ -72,8 +96,9 @@ def test_missing_trade_recipient_fails_before_any_message_is_recorded() -> None:
         messenger=messenger,
     )
 
+    started = session.start()
     with pytest.raises(WorkflowConfigurationError, match="framing"):
-        session.start()
+        approve_corrections(session, started)
 
     assert messenger.deliveries == ()
 
@@ -115,7 +140,9 @@ def test_strands_workflow_uses_injected_intake_without_changing_later_nodes() ->
 
     assert extracted == [NOTICE]
     assert snapshot.status is WorkflowStatus.INTERRUPTED
-    assert [item.citation_id for item in messenger.deliveries] == ["1", "2"]
+    assert messenger.deliveries == ()
+    approve_corrections(session, snapshot)
+    assert [item.citation_id for item in messenger.deliveries] == ["1", "2", "3"]
 
 
 def _completed_session() -> tuple[RecoveryWorkflowSession, RecordingMessenger]:
@@ -127,10 +154,7 @@ def _completed_session() -> tuple[RecoveryWorkflowSession, RecordingMessenger]:
         messenger=messenger,
     )
     interrupted = session.start()
-    session.resume(
-        interrupt_id=interrupted.interrupts[0].interrupt_id,
-        decision="Request a wide equipment-clearance photo with the access panel open.",
-    )
+    approve_corrections(session, interrupted)
     return session, messenger
 
 

@@ -6,7 +6,7 @@ from enum import StrEnum
 from hashlib import blake2s
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from strands.agent.agent_result import AgentResult
 from strands.hooks import BeforeNodeCallEvent, HookProvider, HookRegistry
 from strands.multiagent import GraphBuilder
@@ -15,7 +15,13 @@ from strands.telemetry.metrics import EventLoopMetrics
 
 from mettle.campaign import build_campaign_plan, next_campaign_check
 from mettle.communication import Messenger, OutboundMessage, Recipient, RecordedDelivery
-from mettle.domain import CampaignPlan, InspectionNotice, JudgmentKind, Trade
+from mettle.domain import (
+    CampaignPlan,
+    ClosureRoute,
+    InspectionNotice,
+    JudgmentKind,
+    Trade,
+)
 from mettle.notice_parser import parse_notice
 
 
@@ -66,6 +72,45 @@ class ResumeDecision(BaseModel):
         if len(normalized) < 3:
             raise ValueError("decision must contain at least 3 visible characters")
         return normalized
+
+
+class ReviewedCitation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    citation_id: str = Field(min_length=1, max_length=64)
+    trade: Trade
+    closure_route: ClosureRoute
+    evidence_requirements: tuple[str, ...] = Field(min_length=1, max_length=10)
+
+    @field_validator("trade")
+    @classmethod
+    def require_known_trade(cls, value: Trade) -> Trade:
+        if value is Trade.UNKNOWN:
+            raise ValueError("reviewed citations require an assigned trade")
+        return value
+
+    @field_validator("evidence_requirements")
+    @classmethod
+    def normalize_evidence(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        normalized = tuple(" ".join(value.split()) for value in values)
+        if any(not value or len(value) > 500 for value in normalized):
+            raise ValueError(
+                "evidence requirements must contain 1 to 500 visible characters"
+            )
+        return normalized
+
+
+class CorrectionReview(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    citations: tuple[ReviewedCitation, ...] = Field(min_length=1, max_length=50)
+
+    @model_validator(mode="after")
+    def require_unique_citations(self) -> CorrectionReview:
+        identifiers = [item.citation_id for item in self.citations]
+        if len(identifiers) != len(set(identifiers)):
+            raise ValueError("correction review citation identifiers must be unique")
+        return self
 
 
 NodeFunction = Callable[[str | list[dict[str, Any]], dict[str, Any]], str]
@@ -142,6 +187,61 @@ class ContractorJudgmentHook(HookProvider):
             decision=str(response),
         )
         event.invocation_state["contractor_decision"] = decision.decision
+
+
+class CorrectionReviewHook(HookProvider):
+    """Stop outreach until the contractor confirms every correction route."""
+
+    def register_hooks(self, registry: HookRegistry) -> None:
+        registry.add_callback(BeforeNodeCallEvent, self.require_review)
+
+    def require_review(self, event: BeforeNodeCallEvent) -> None:
+        if event.node_id != "review_gate" or event.invocation_state is None:
+            return
+        notice = event.invocation_state.get("notice")
+        if not isinstance(notice, InspectionNotice):
+            return
+
+        response = event.interrupt(
+            "correction-review",
+            reason={
+                "notice_id": notice.notice_id,
+                "citations": [
+                    citation.model_dump(mode="json") for citation in notice.citations
+                ],
+            },
+        )
+        review = CorrectionReview.model_validate_json(str(response))
+        expected_ids = {citation.citation_id for citation in notice.citations}
+        reviewed_ids = {citation.citation_id for citation in review.citations}
+        if reviewed_ids != expected_ids:
+            raise WorkflowStateError(
+                "correction review must include every notice citation exactly once"
+            )
+        by_id = {citation.citation_id: citation for citation in review.citations}
+        reviewed_notice = notice.model_copy(
+            update={
+                "citations": [
+                    citation.model_copy(
+                        update={
+                            "trade": by_id[citation.citation_id].trade,
+                            "closure_route": by_id[citation.citation_id].closure_route,
+                            "evidence_requirements": list(
+                                by_id[citation.citation_id].evidence_requirements
+                            ),
+                            "ambiguity_reason": None,
+                        }
+                    )
+                    for citation in notice.citations
+                ]
+            }
+        )
+        event.invocation_state["notice"] = reviewed_notice
+        event.invocation_state["plan"] = build_campaign_plan(
+            reviewed_notice,
+            as_of=event.invocation_state["as_of"],
+        )
+        event.invocation_state["correction_review"] = review
 
 
 class DeadlineJudgmentHook(HookProvider):
@@ -283,6 +383,35 @@ class RecoveryWorkflowSession:
         )
         return self._snapshot()
 
+    def review(
+        self,
+        *,
+        interrupt_id: str,
+        review: CorrectionReview,
+    ) -> WorkflowSnapshot:
+        if not self._started or self._last_result is None:
+            raise WorkflowStateError("workflow has not started")
+        if self._last_result.status is not Status.INTERRUPTED:
+            raise WorkflowStateError("workflow is not waiting for a correction review")
+        matching = next(
+            (item for item in self._last_result.interrupts if item.id == interrupt_id),
+            None,
+        )
+        if matching is None or matching.name != "correction-review":
+            raise WorkflowStateError("interrupt is not the active correction review")
+        self._last_result = self._active_graph(
+            [
+                {
+                    "interruptResponse": {
+                        "interruptId": interrupt_id,
+                        "response": review.model_dump_json(),
+                    }
+                }
+            ],
+            invocation_state=self._state,
+        )
+        return self._snapshot()
+
     def _build_chase_graph(self) -> MultiAgentBase:
         builder = GraphBuilder()
         builder.add_node(
@@ -321,6 +450,10 @@ class RecoveryWorkflowSession:
             "plan",
         )
         builder.add_node(
+            DeterministicNode(name="review_gate", function=self._review_gate),
+            "review_gate",
+        )
+        builder.add_node(
             DeterministicNode(name="coordinate", function=self._coordinate),
             "coordinate",
         )
@@ -340,14 +473,15 @@ class RecoveryWorkflowSession:
             "finish",
         )
         builder.add_edge("intake", "plan")
-        builder.add_edge("plan", "coordinate")
+        builder.add_edge("plan", "review_gate")
+        builder.add_edge("review_gate", "coordinate")
         builder.add_edge("coordinate", "judgment_gate")
         builder.add_edge("judgment_gate", "coordinate_decision")
         builder.add_edge("coordinate_decision", "finish")
         builder.set_entry_point("intake")
-        builder.set_max_node_executions(6)
+        builder.set_max_node_executions(7)
         builder.set_execution_timeout(15)
-        builder.set_hook_providers([ContractorJudgmentHook()])
+        builder.set_hook_providers([CorrectionReviewHook(), ContractorJudgmentHook()])
         return builder.build()
 
     @staticmethod
@@ -485,6 +619,15 @@ class RecoveryWorkflowSession:
         plan = build_campaign_plan(notice, as_of=as_of)
         state["plan"] = plan
         return f"Planned {len(plan.actions)} autonomous outreach actions."
+
+    @staticmethod
+    def _review_gate(
+        _task: str | list[dict[str, Any]], state: dict[str, Any]
+    ) -> str:
+        review = state.get("correction_review")
+        if not isinstance(review, CorrectionReview):
+            raise WorkflowConfigurationError("contractor correction review is missing")
+        return f"Contractor reviewed {len(review.citations)} correction(s)."
 
     @staticmethod
     def _coordinate(_task: str | list[dict[str, Any]], state: dict[str, Any]) -> str:

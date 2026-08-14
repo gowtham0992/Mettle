@@ -22,6 +22,7 @@ from mettle.workflow_registry import (
     PacketNotApproved,
     PacketNotReady,
     PreparePacketRequest,
+    ReviewWorkflowRequest,
     ResumeWorkflowRequest,
     RunNextCheckRequest,
     SubmitEvidenceRequest,
@@ -168,6 +169,9 @@ class DurableAgentCoreWorkflowGateway:
 
     def resume(self, workflow_id: str, payload: ResumeWorkflowRequest, *, idempotency_key: str) -> WorkflowEnvelope:
         return self._mutate(workflow_id, "resume", payload, idempotency_key)
+
+    def review(self, workflow_id: str, payload: ReviewWorkflowRequest, *, idempotency_key: str) -> WorkflowEnvelope:
+        return self._mutate(workflow_id, "review", payload, idempotency_key)
 
     def submit_evidence(self, workflow_id: str, payload: SubmitEvidenceRequest, *, idempotency_key: str) -> WorkflowEnvelope:
         return self._mutate(workflow_id, "submit_evidence", payload, idempotency_key)

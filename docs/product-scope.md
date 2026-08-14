@@ -23,6 +23,7 @@ A contractor will delegate the recovery campaign if the system anchors every act
 ## What must be excellent
 
 - **Notice anchoring:** every derived task and evidence request points back to the source citation.
+- **Contractor-controlled launch:** no outreach starts until every correction has a confirmed assignee, closure route, and proof request.
 - **Campaign behavior:** urgency and escalation change as the deadline approaches.
 - **Principled deference:** ambiguous code language and final submission always stop for human judgment.
 - **Demo clarity:** judges can see the agent handle many coordination events while the contractor makes only a few decisions.
@@ -40,7 +41,7 @@ A contractor will delegate the recovery campaign if the system anchors every act
 
 ## Demo success
 
-The three-minute demo succeeds when one notice produces a visible recovery timeline, one insufficient response triggers a precise re-request, one ambiguous citation pauses for contractor judgment, urgency changes near the deadline, and the final packet is blocked until contractor approval.
+The three-minute demo succeeds when one notice becomes a reviewed correction docket before any outreach, one insufficient response triggers a precise re-request, urgency changes near the deadline, and the final packet is blocked until contractor approval.
 
 ## Evidence that would change the plan
 

@@ -43,6 +43,7 @@ from mettle.workflow_registry import (
     PacketNotApproved,
     PacketNotReady,
     PreparePacketRequest,
+    ReviewWorkflowRequest,
     RunNextCheckRequest,
     ResumeWorkflowRequest,
     SubmitEvidenceRequest,
@@ -485,6 +486,28 @@ def create_app(
         return request.app.state.workflows.get(workflow_id)
 
     @app.post(
+        "/api/workflows/{workflow_id}/review",
+        response_model=WorkflowEnvelope,
+    )
+    def review_workflow(
+        workflow_id: str,
+        payload: ReviewWorkflowRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        if not workflow_id or len(workflow_id) > 64:
+            raise WorkflowNotFound("workflow does not exist")
+        return request.app.state.workflows.review(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
         "/api/workflows/{workflow_id}/resume",
         response_model=WorkflowEnvelope,
     )
@@ -565,6 +588,28 @@ def create_app(
         if not workflow_id or len(workflow_id) > 64:
             raise WorkflowNotFound("AgentCore workflow does not exist on this server")
         return require_agentcore(request).resume(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
+        "/api/agentcore/workflows/{workflow_id}/review",
+        response_model=WorkflowEnvelope,
+    )
+    def review_agentcore_workflow(
+        workflow_id: str,
+        payload: ReviewWorkflowRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        if not workflow_id or len(workflow_id) > 64:
+            raise WorkflowNotFound("AgentCore workflow does not exist")
+        return require_agentcore(request).review(
             workflow_id,
             payload,
             idempotency_key=idempotency_key,

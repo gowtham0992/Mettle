@@ -61,9 +61,11 @@ const elements = {
   retry: document.querySelector("#retry-button"),
   toast: document.querySelector("#toast"),
   auth: document.querySelector("#auth-button"),
+  home: document.querySelector("#mettle-home"),
   welcomeDialog: document.querySelector("#welcome-dialog"),
   startRecoveryEntry: document.querySelector("#start-recovery-entry"),
   trySampleEntry: document.querySelector("#try-sample-entry"),
+  resumeCurrentEntry: document.querySelector("#resume-current-entry"),
   setupStepLabel: document.querySelector("#setup-step-label"),
   setupPanes: [...document.querySelectorAll("[data-setup-pane]")],
   setupProgress: [...document.querySelectorAll("[data-setup-progress]")],
@@ -76,6 +78,8 @@ const elements = {
   contactPhones: [...document.querySelectorAll("[data-contact-phone]")],
   reviewNoticeSummary: document.querySelector("#review-notice-summary"),
   reviewContactSummary: document.querySelector("#review-contact-summary"),
+  correctionReviewList: document.querySelector("#correction-review-list"),
+  approveCorrections: document.querySelector("#approve-corrections-button"),
 };
 
 const stepLabels = [
@@ -101,6 +105,8 @@ let authConfig = null;
 let accessToken = sessionStorage.getItem("mettle_access_token");
 let setupStep = 1;
 let setupReturnsToWelcome = false;
+let pendingCorrectionReview = null;
+let correctionReviewKey = null;
 let nextActionHandler = null;
 
 function base64Url(bytes) {
@@ -246,6 +252,7 @@ function workflowCampaign(envelope, executionTarget = "local") {
   for (const assessment of envelope.evidence || []) evidenceByCitation.set(assessment.citation_id, assessment);
   const pendingInterrupt = snapshot.interrupts[0] || null;
   const pendingJudgments = pendingInterrupt?.reason?.judgments || [];
+  const correctionReviewRequired = pendingInterrupt?.name === "correction-review";
   const judgmentByCitation = new Map(pendingJudgments.map((item) => [item.citation_id, item]));
   const timestamp = (hour, minute = 0) => `${plan.as_of}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00Z`;
 
@@ -360,6 +367,9 @@ function workflowCampaign(envelope, executionTarget = "local") {
     execution_target: executionTarget,
     intake_provider: envelope.intake_provider || "local",
     workflow_status: snapshot.status,
+    correction_review_required: correctionReviewRequired,
+    correction_review_interrupt: correctionReviewRequired ? pendingInterrupt.interrupt_id : null,
+    review_citations: correctionReviewRequired ? pendingInterrupt.reason.citations : [],
     notice_id: notice.notice_id,
     property_label: notice.property_label,
     as_of: plan.as_of,
@@ -436,26 +446,29 @@ function activePhotoEnabled() {
 }
 
 function setSetupStep(step) {
-  setupStep = Math.max(1, Math.min(3, step));
-  elements.setupStepLabel.textContent = `STEP ${setupStep} OF 3`;
+  setupStep = Math.max(1, Math.min(4, step));
+  elements.setupStepLabel.textContent = `STEP ${setupStep} OF 4`;
   for (const pane of elements.setupPanes) pane.hidden = Number(pane.dataset.setupPane) !== setupStep;
   for (const marker of elements.setupProgress) {
     const markerStep = Number(marker.dataset.setupProgress);
     marker.classList.toggle("setup-progress__step--active", markerStep === setupStep);
     marker.classList.toggle("setup-progress__step--complete", markerStep < setupStep);
   }
-  elements.setupBack.hidden = setupStep === 1;
-  elements.setupNext.hidden = setupStep === 3;
+  elements.setupBack.hidden = setupStep === 1 || setupStep === 4;
+  elements.setupNext.hidden = setupStep >= 3;
   elements.startWorkflow.hidden = setupStep !== 3;
   elements.startBedrock.hidden = setupStep !== 3;
   elements.startAgentCore.hidden = setupStep !== 3;
+  elements.approveCorrections.hidden = setupStep !== 4;
   elements.setupFooterNote.textContent = setupStep === 1
     ? "REPORT FIRST · NO PROJECT SETUP"
-    : setupStep === 2 ? "SUBS USE THEIR PHONE · NO NEW ACCOUNT" : "DRAFT ONLY · CONTRACTOR APPROVAL STAYS REQUIRED";
+    : setupStep === 2 ? "SUBS USE THEIR PHONE · NO NEW ACCOUNT"
+      : setupStep === 3 ? "EXTRACT ONLY · ZERO OUTREACH BEFORE REVIEW" : "YOU APPROVE · METTLE COORDINATES";
   elements.setupNext.textContent = setupStep === 1 ? "Next · add people" : "Next · review launch";
   const heading = setupStep === 1
     ? "Start with the failed-inspection report"
-    : setupStep === 2 ? "Who owns the corrections?" : "Confirm the recovery handoff";
+    : setupStep === 2 ? "Who owns the corrections?"
+      : setupStep === 3 ? "Extract the correction docket" : "Review every correction before outreach";
   document.querySelector("#notice-dialog-title").textContent = heading;
 }
 
@@ -506,7 +519,104 @@ function validateSetupStep() {
       }
     }
   }
+  if (setupStep === 4) {
+    for (const card of elements.correctionReviewList.querySelectorAll("[data-review-citation]")) {
+      const proof = card.querySelector("textarea");
+      const requirements = proof.value.split("\n").map((item) => item.trim()).filter(Boolean);
+      if (!requirements.length || requirements.some((item) => item.length > 500)) {
+        proof.setCustomValidity("Add at least one proof request; keep each line under 500 characters.");
+        proof.reportValidity();
+        proof.setCustomValidity("");
+        return false;
+      }
+    }
+  }
   return true;
+}
+
+function renderCorrectionReview(data) {
+  pendingCorrectionReview = data;
+  correctionReviewKey = null;
+  const tradeLabels = {
+    electrical: "Electrical",
+    framing: "Framing",
+    mechanical: "Mechanical",
+    plumbing: "Plumbing",
+    general: "General contractor",
+  };
+  const routeLabels = {
+    photo_evidence: "Photo evidence",
+    document_evidence: "Document or letter",
+    physical_reinspection: "Physical reinspection",
+  };
+  const cards = data.review_citations.map((citation) => {
+    const card = node("article", "correction-review__card");
+    card.dataset.reviewCitation = citation.citation_id;
+    card.append(node("span", "correction-review__id", `C${citation.citation_id}`));
+    card.append(node("span", "correction-review__code", `${citation.code_reference} · authority language`));
+    card.append(node("p", "correction-review__authority", `“${citation.notice_text}”`));
+    if (citation.ambiguity_reason) card.append(node("span", "correction-review__needs-you", `Needs your judgment: ${citation.ambiguity_reason}`));
+
+    const fields = node("div", "correction-review__fields");
+    const tradeLabel = node("label", "", "ASSIGN TO");
+    const tradeSelect = node("select");
+    tradeSelect.dataset.reviewTrade = "";
+    tradeSelect.setAttribute("aria-label", `Trade for citation ${citation.citation_id}`);
+    for (const [value, label] of Object.entries(tradeLabels)) {
+      const option = node("option", "", label);
+      option.value = value;
+      option.selected = value === citation.trade || (citation.trade === "unknown" && value === "general");
+      tradeSelect.append(option);
+    }
+    tradeLabel.append(tradeSelect);
+
+    const routeLabel = node("label", "", "CLOSURE ROUTE");
+    const routeSelect = node("select");
+    routeSelect.dataset.reviewRoute = "";
+    routeSelect.setAttribute("aria-label", `Closure route for citation ${citation.citation_id}`);
+    for (const [value, label] of Object.entries(routeLabels)) {
+      const option = node("option", "", label);
+      option.value = value;
+      option.selected = value === (citation.closure_route || "photo_evidence");
+      routeSelect.append(option);
+    }
+    routeLabel.append(routeSelect);
+
+    const proofLabel = node("label", "", "WHAT MUST COME BACK · ONE REQUIREMENT PER LINE");
+    const proof = node("textarea");
+    proof.dataset.reviewProof = "";
+    proof.required = true;
+    proof.maxLength = 5000;
+    proof.placeholder = "Example: Wide photo showing the completed correction and its location";
+    proof.setAttribute("aria-label", `Required proof for citation ${citation.citation_id}`);
+    proof.value = (citation.evidence_requirements || []).join("\n");
+    proofLabel.append(proof);
+    fields.append(tradeLabel, routeLabel, proofLabel);
+    card.append(fields);
+    return card;
+  });
+  elements.correctionReviewList.replaceChildren(...cards);
+}
+
+function buildCorrectionReviewPayload() {
+  return {
+    interrupt_id: pendingCorrectionReview.correction_review_interrupt,
+    citations: [...elements.correctionReviewList.querySelectorAll("[data-review-citation]")].map((card) => ({
+      citation_id: card.dataset.reviewCitation,
+      trade: card.querySelector("[data-review-trade]").value,
+      closure_route: card.querySelector("[data-review-route]").value,
+      evidence_requirements: card.querySelector("[data-review-proof]").value
+        .split("\n").map((item) => item.trim()).filter(Boolean),
+    })),
+  };
+}
+
+function openPendingCorrectionReview(data) {
+  renderCorrectionReview(data);
+  elements.workflowError.hidden = true;
+  setSetupStep(4);
+  if (!elements.noticeDialog.open) elements.noticeDialog.showModal();
+  window.setTimeout(() => elements.correctionReviewList.querySelector("select, textarea")?.focus(), 0);
 }
 
 function buildRoster() {
@@ -537,7 +647,7 @@ function openRecoverySetup({ returnToWelcome = false } = {}) {
 }
 
 function exitRecoverySetup() {
-  const returnToWelcome = setupReturnsToWelcome && !activeWorkflowId;
+  const returnToWelcome = setupReturnsToWelcome;
   setupReturnsToWelcome = false;
   elements.noticeDialog.close();
   if (returnToWelcome) {
@@ -556,6 +666,14 @@ function configureNextAction(data) {
   elements.nextAction.classList.toggle("next-action--sample", !isWorkflow);
   elements.nextActionEyebrow.textContent = isWorkflow ? "YOUR NEXT MOVE" : "SAMPLE CAMPAIGN";
   elements.nextActionMeta.textContent = isWorkflow ? "ONE ACTION · CONTRACTOR CONTROLLED" : "SYNTHETIC DATA · 90 SECONDS";
+
+  if (isWorkflow && data.correction_review_required) {
+    elements.nextActionTitle.textContent = "Review the extracted corrections";
+    elements.nextActionCopy.textContent = "No outreach has started. Confirm each assignee, closure route, and proof request first.";
+    elements.nextActionButton.textContent = "Continue review";
+    nextActionHandler = () => openPendingCorrectionReview(data);
+    return;
+  }
 
   if (!isWorkflow) {
     if (data.scenario_complete) {
@@ -1067,13 +1185,36 @@ elements.reset.addEventListener("click", async () => {
 
 elements.nextActionButton.addEventListener("click", () => nextActionHandler?.());
 
+elements.home.addEventListener("click", (event) => {
+  event.preventDefault();
+  setupReturnsToWelcome = false;
+  if (elements.noticeDialog.open) elements.noticeDialog.close();
+  elements.resumeCurrentEntry.hidden = !activeWorkflowId;
+  if (!elements.welcomeDialog.open) elements.welcomeDialog.showModal();
+});
+
 elements.startRecoveryEntry.addEventListener("click", () => {
   elements.welcomeDialog.close();
   openRecoverySetup({ returnToWelcome: true });
 });
 
-elements.trySampleEntry.addEventListener("click", () => {
+elements.trySampleEntry.addEventListener("click", async () => {
   sessionStorage.setItem("mettle_entry_selected", "sample");
+  elements.welcomeDialog.close();
+  if (activeWorkflowId) {
+    activeWorkflowId = null;
+    activeWorkflowTarget = "local";
+    window.history.replaceState({}, "", window.location.pathname);
+    try {
+      render(await request("/api/campaign"));
+    } catch (error) {
+      showError(error);
+    }
+  }
+  elements.nextActionButton.focus();
+});
+
+elements.resumeCurrentEntry.addEventListener("click", () => {
   elements.welcomeDialog.close();
   elements.nextActionButton.focus();
 });
@@ -1142,17 +1283,22 @@ elements.noticeForm.addEventListener("submit", async (event) => {
     activeWorkflowTarget = executionTarget;
     const targetQuery = executionTarget === "agentcore" ? "&runtime=agentcore" : "";
     window.history.replaceState({}, "", `${window.location.pathname}?workflow=${encodeURIComponent(activeWorkflowId)}${targetQuery}`);
-    render(workflowCampaign(envelope, executionTarget));
+    const workflowView = workflowCampaign(envelope, executionTarget);
+    render(workflowView);
     sessionStorage.setItem("mettle_entry_selected", "recovery");
-    setupReturnsToWelcome = false;
-    elements.noticeDialog.close();
     workflowCreateKey = null;
     workflowCreateProvider = null;
-    showToast(executionTarget === "agentcore"
-      ? "AgentCore ran the deployed Strands recovery graph and paused only for your judgment."
-      : provider === "bedrock"
-        ? "Nova Micro grounded the notice; Strands ran recovery and paused only for your judgment."
-      : "Local intake and Strands ran recovery, then paused only for your judgment.");
+    if (workflowView.correction_review_required) {
+      openPendingCorrectionReview(workflowView);
+      showToast(executionTarget === "agentcore"
+        ? "AgentCore extracted the docket and paused before outreach for your review."
+        : provider === "bedrock"
+          ? "Nova Micro grounded the notice; Strands paused before outreach for your review."
+          : "Local intake extracted the docket; Strands paused before outreach for your review.");
+    } else {
+      setupReturnsToWelcome = false;
+      elements.noticeDialog.close();
+    }
   } catch (error) {
     elements.workflowError.textContent = error.message;
     elements.workflowError.hidden = false;
@@ -1165,9 +1311,39 @@ elements.noticeForm.addEventListener("submit", async (event) => {
   }
 });
 
+elements.approveCorrections.addEventListener("click", async () => {
+  if (!pendingCorrectionReview || !activeWorkflowId || !validateSetupStep()) return;
+  if (!correctionReviewKey) correctionReviewKey = crypto.randomUUID().replaceAll("-", "_");
+  const workflowRoot = activeWorkflowTarget === "agentcore"
+    ? "/api/agentcore/workflows"
+    : "/api/workflows";
+  setBusy(elements.approveCorrections, true);
+  elements.workflowError.hidden = true;
+  try {
+    const envelope = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/review`, {
+      method: "POST",
+      headers: { "Idempotency-Key": correctionReviewKey },
+      body: JSON.stringify(buildCorrectionReviewPayload()),
+    });
+    const workflowView = workflowCampaign(envelope, activeWorkflowTarget);
+    render(workflowView);
+    pendingCorrectionReview = null;
+    correctionReviewKey = null;
+    setupReturnsToWelcome = false;
+    elements.noticeDialog.close();
+    showToast(`Review approved. Mettle recorded ${envelope.snapshot.deliveries.length} notice-anchored request${envelope.snapshot.deliveries.length === 1 ? "" : "s"}.`);
+  } catch (error) {
+    elements.workflowError.textContent = error.message;
+    elements.workflowError.hidden = false;
+  } finally {
+    setBusy(elements.approveCorrections, false);
+  }
+});
+
 elements.noticeForm.addEventListener("input", () => {
   workflowCreateKey = null;
   workflowCreateProvider = null;
+  correctionReviewKey = null;
 });
 
 for (const button of elements.evidenceButtons) {

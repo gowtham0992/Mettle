@@ -35,6 +35,11 @@ class FakeAgentCoreGateway:
             workflow_id, payload, idempotency_key=idempotency_key
         )
 
+    def review(self, workflow_id, payload, *, idempotency_key):
+        return self.registry.review(
+            workflow_id, payload, idempotency_key=idempotency_key
+        )
+
     def submit_evidence(self, workflow_id, payload, *, idempotency_key):
         return self.registry.submit_evidence(
             workflow_id, payload, idempotency_key=idempotency_key
@@ -97,6 +102,37 @@ def accept_photo(*, citation: Citation, image: bytes, assessment_id: str):
     )
 
 
+def review_payload(created: dict) -> dict:
+    interrupt = created["snapshot"]["interrupts"][0]
+    return {
+        "interrupt_id": interrupt["interrupt_id"],
+        "citations": [
+            {
+                "citation_id": citation["citation_id"],
+                "trade": citation["trade"] if citation["trade"] != "unknown" else "general",
+                "closure_route": citation.get("closure_route", "photo_evidence"),
+                "evidence_requirements": citation["evidence_requirements"]
+                or ["Wide photo showing the completed correction and its location"],
+            }
+            for citation in created["snapshot"]["notice"]["citations"]
+        ],
+    }
+
+
+def approve_review(
+    browser: TestClient,
+    created: dict,
+    *,
+    key: str = "approve_review_123",
+    root: str = "/api/workflows",
+):
+    return browser.post(
+        f"{root}/{created['workflow_id']}/review",
+        json=review_payload(created),
+        headers={"Idempotency-Key": key},
+    )
+
+
 def ready_workflow(browser: TestClient) -> tuple[str, dict]:
     created = browser.post(
         "/api/workflows",
@@ -104,16 +140,8 @@ def ready_workflow(browser: TestClient) -> tuple[str, dict]:
         headers={"Idempotency-Key": "packet_workflow_123"},
     ).json()
     workflow_id = created["workflow_id"]
-    interrupt_id = created["snapshot"]["interrupts"][0]["interrupt_id"]
-    resumed = browser.post(
-        f"/api/workflows/{workflow_id}/resume",
-        json={
-            "interrupt_id": interrupt_id,
-            "decision": "Wide photo showing equipment clearance with the access panel open",
-        },
-        headers={"Idempotency-Key": "packet_resume_123"},
-    )
-    assert resumed.status_code == 200
+    reviewed = approve_review(browser, created, key="packet_review_123")
+    assert reviewed.status_code == 200
     for index, (citation_id, sample_id) in enumerate(
         [
             ("1", "panel_wide_measured"),
@@ -152,6 +180,7 @@ def test_real_photo_upload_is_normalized_assessed_and_idempotent() -> None:
             headers={"Idempotency-Key": "photo_workflow_123"},
         ).json()
         workflow_id = created["workflow_id"]
+        approve_review(browser, created, key="photo_review_123")
         headers = {
             "Content-Type": "image/jpeg",
             "Idempotency-Key": "photo_evidence_123",
@@ -202,14 +231,7 @@ def test_recovery_check_is_idempotent_stops_closed_citation_and_interrupts_at_t_
             headers={"Idempotency-Key": "check_workflow_123"},
         ).json()
         workflow_id = created["workflow_id"]
-        browser.post(
-            f"/api/workflows/{workflow_id}/resume",
-            json={
-                "interrupt_id": created["snapshot"]["interrupts"][0]["interrupt_id"],
-                "decision": "Wide photo showing equipment clearance with the access panel open",
-            },
-            headers={"Idempotency-Key": "check_resume_123"},
-        )
+        approve_review(browser, created, key="check_review_123")
         browser.post(
             f"/api/workflows/{workflow_id}/evidence",
             json={"citation_id": "1", "sample_id": "panel_wide_measured"},
@@ -284,14 +306,7 @@ def test_reinspection_packet_with_chase_history_has_stable_structure() -> None:
             headers={"Idempotency-Key": "chase_packet_workflow_123"},
         ).json()
         workflow_id = created["workflow_id"]
-        browser.post(
-            f"/api/workflows/{workflow_id}/resume",
-            json={
-                "interrupt_id": created["snapshot"]["interrupts"][0]["interrupt_id"],
-                "decision": "Wide photo showing equipment clearance with the access panel open",
-            },
-            headers={"Idempotency-Key": "chase_packet_resume_123"},
-        )
+        approve_review(browser, created, key="chase_packet_review_123")
         browser.post(
             f"/api/workflows/{workflow_id}/evidence",
             json={"citation_id": "1", "sample_id": "panel_wide_measured"},
@@ -357,7 +372,9 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Start with the failed-inspection report" in page.text
     assert "Start a recovery" in page.text
     assert "Try the sample campaign" in page.text
-    assert "Launch on AgentCore" in page.text
+    assert "Extract on AgentCore" in page.text
+    assert "Extract locally" in page.text
+    assert "Approve & begin recovery" in page.text
     assert "Recovery clock" in page.text
     assert "Simulate scheduled check" in page.text
     assert page.headers["content-security-policy"].startswith("default-src 'self'")
@@ -463,8 +480,8 @@ def test_workflow_api_runs_real_strands_graph_and_restores_snapshot() -> None:
     assert restored.status_code == 200
     assert created.json() == restored.json()
     assert created.json()["snapshot"]["status"] == "interrupted"
-    assert len(created.json()["snapshot"]["deliveries"]) == 2
-    assert created.json()["snapshot"]["interrupts"][0]["name"] == "contractor-judgment"
+    assert len(created.json()["snapshot"]["deliveries"]) == 0
+    assert created.json()["snapshot"]["interrupts"][0]["name"] == "correction-review"
 
 
 def test_workflow_api_returns_actionable_error_for_unsupported_notice() -> None:
@@ -585,14 +602,11 @@ def test_agentcore_http_boundary_starts_restores_and_resumes_cloud_workflow() ->
         )
         workflow_id = created.json()["workflow_id"]
         restored = browser.get(f"/api/agentcore/workflows/{workflow_id}")
-        interrupt_id = created.json()["snapshot"]["interrupts"][0]["interrupt_id"]
-        resumed = browser.post(
-            f"/api/agentcore/workflows/{workflow_id}/resume",
-            json={
-                "interrupt_id": interrupt_id,
-                "decision": "Use a wide equipment-clearance photo with the panel open",
-            },
-            headers={"Idempotency-Key": "agentcore_resume_123"},
+        resumed = approve_review(
+            browser,
+            created.json(),
+            key="agentcore_review_123",
+            root="/api/agentcore/workflows",
         )
         evidence_responses = []
         for index, (citation_id, sample_id) in enumerate(
@@ -668,7 +682,7 @@ def test_agentcore_http_boundary_fails_closed_without_explicit_server_enablement
     )
 
 
-def test_workflow_resume_is_idempotent_and_does_not_duplicate_outreach() -> None:
+def test_workflow_review_is_idempotent_and_does_not_duplicate_outreach() -> None:
     with client() as browser:
         created = browser.post(
             "/api/workflows",
@@ -676,14 +690,10 @@ def test_workflow_resume_is_idempotent_and_does_not_duplicate_outreach() -> None
             headers={"Idempotency-Key": "create_workflow_789"},
         ).json()
         workflow_id = created["workflow_id"]
-        interrupt_id = created["snapshot"]["interrupts"][0]["interrupt_id"]
-        payload = {
-            "interrupt_id": interrupt_id,
-            "decision": "Use a wide equipment-clearance photo with the panel open.",
-        }
-        headers = {"Idempotency-Key": "resume_workflow_789"}
-        first = browser.post(f"/api/workflows/{workflow_id}/resume", json=payload, headers=headers)
-        replay = browser.post(f"/api/workflows/{workflow_id}/resume", json=payload, headers=headers)
+        payload = review_payload(created)
+        headers = {"Idempotency-Key": "review_workflow_789"}
+        first = browser.post(f"/api/workflows/{workflow_id}/review", json=payload, headers=headers)
+        replay = browser.post(f"/api/workflows/{workflow_id}/review", json=payload, headers=headers)
 
     assert first.status_code == 200
     assert replay.status_code == 200
@@ -691,6 +701,33 @@ def test_workflow_resume_is_idempotent_and_does_not_duplicate_outreach() -> None
     assert first.json()["snapshot"]["status"] == "completed"
     assert len(first.json()["snapshot"]["deliveries"]) == 3
     assert first.json()["snapshot"]["deliveries"][-1]["recipient"]["name"] == "Luis Vega"
+
+
+def test_workflow_blocks_actions_until_complete_valid_correction_review() -> None:
+    with client() as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "review_boundary_create_123"},
+        ).json()
+        evidence_before_review = browser.post(
+            f"/api/workflows/{created['workflow_id']}/evidence",
+            json={"citation_id": "1", "sample_id": "panel_wide_measured"},
+            headers={"Idempotency-Key": "review_boundary_evidence_123"},
+        )
+        invalid = review_payload(created)
+        invalid["citations"][0]["evidence_requirements"] = []
+        invalid_review = browser.post(
+            f"/api/workflows/{created['workflow_id']}/review",
+            json=invalid,
+            headers={"Idempotency-Key": "review_boundary_invalid_123"},
+        )
+
+    assert created["snapshot"]["deliveries"] == []
+    assert evidence_before_review.status_code == 422
+    assert evidence_before_review.json()["error"]["code"] == "invalid_evidence_submission"
+    assert invalid_review.status_code == 422
+    assert invalid_review.json()["error"]["code"] == "invalid_request"
 
 
 def test_workflow_api_rejects_bad_boundaries_and_unknown_runs() -> None:
@@ -719,16 +756,17 @@ def test_workflow_api_explains_missing_trade_configuration() -> None:
     payload = workflow_payload()
     payload["roster"] = payload["roster"][:1]
     with client() as browser:
-        response = browser.post(
+        created = browser.post(
             "/api/workflows",
             json=payload,
             headers={"Idempotency-Key": "missing_roster_123"},
-        )
+        ).json()
+        response = approve_review(browser, created, key="missing_roster_review_123")
 
     assert response.status_code == 422
     assert response.json()["error"] == {
         "code": "workflow_configuration_error",
-        "message": "missing recipient for trade(s): framing",
+        "message": "missing recipient for trade(s): framing, mechanical",
     }
 
 
@@ -742,6 +780,7 @@ def test_evidence_api_rejects_then_accepts_notice_anchored_samples() -> None:
         )
         created = created_response.json()
         workflow_id = created["workflow_id"]
+        approve_review(browser, created, key="evidence_review_123")
         rejected = browser.post(
             f"/api/workflows/{workflow_id}/evidence",
             json={"citation_id": "1", "sample_id": "panel_closeup_insufficient"},
@@ -775,6 +814,7 @@ def test_evidence_replay_is_idempotent_and_changed_replay_conflicts() -> None:
             json=workflow_payload(),
             headers={"Idempotency-Key": "evidence_workflow_456"},
         ).json()
+        approve_review(browser, created, key="evidence_replay_review_456")
         path = f"/api/workflows/{created['workflow_id']}/evidence"
         headers = {"Idempotency-Key": "evidence_replay_456"}
         payload = {"citation_id": "1", "sample_id": "panel_closeup_insufficient"}

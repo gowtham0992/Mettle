@@ -15,7 +15,9 @@ from mettle.domain import InspectionNotice, Trade
 from mettle.evidence import EvidenceAssessment, EvidenceSampleNotFound, assess_sample
 from mettle.packet import PacketRecord, PacketStatus, render_packet_pdf
 from mettle.workflow import (
+    CorrectionReview,
     RecoveryWorkflowSession,
+    ReviewedCitation,
     WorkflowConfigurationError,
     WorkflowSnapshot,
     WorkflowStateError,
@@ -88,6 +90,18 @@ class ResumeWorkflowRequest(BaseModel):
     decision: str = Field(min_length=3, max_length=500)
 
 
+class ReviewWorkflowRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    interrupt_id: str = Field(min_length=1, max_length=240)
+    citations: tuple[ReviewedCitation, ...] = Field(min_length=1, max_length=50)
+
+    @model_validator(mode="after")
+    def validate_review(self) -> ReviewWorkflowRequest:
+        CorrectionReview(citations=self.citations)
+        return self
+
+
 class SubmitEvidenceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -146,6 +160,7 @@ class _WorkflowEntry:
         self.intake_provider = intake_provider
         self.lock = Lock()
         self.resume_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
+        self.review_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
         self.evidence: list[EvidenceAssessment] = []
         self.evidence_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
         self.check_replays: dict[str, WorkflowEnvelope] = {}
@@ -189,6 +204,13 @@ class WorkflowRegistry:
 
     @staticmethod
     def _effective_citation(entry: _WorkflowEntry, citation_id: str):
+        if any(
+            interrupt.name == "correction-review"
+            for interrupt in entry.snapshot.interrupts
+        ):
+            raise EvidenceSubmissionError(
+                "complete the contractor correction review before submitting evidence"
+            )
         notice = entry.snapshot.notice
         if notice is None:
             raise EvidenceSubmissionError("workflow notice is not available")
@@ -297,6 +319,40 @@ class WorkflowRegistry:
             entry.snapshot = snapshot
             envelope = self._envelope(workflow_id, entry)
             entry.resume_replays[idempotency_key] = (fingerprint, envelope)
+            return envelope
+
+    def review(
+        self,
+        workflow_id: str,
+        payload: ReviewWorkflowRequest,
+        *,
+        idempotency_key: str,
+    ) -> WorkflowEnvelope:
+        with self._lock:
+            entry = self._entries.get(workflow_id)
+        if entry is None:
+            raise WorkflowNotFound("workflow does not exist")
+
+        fingerprint = _fingerprint(payload)
+        with entry.lock:
+            replay = entry.review_replays.get(idempotency_key)
+            if replay is not None:
+                existing_fingerprint, envelope = replay
+                if existing_fingerprint != fingerprint:
+                    raise WorkflowConflict(
+                        "idempotency key was already used with a different correction review"
+                    )
+                return envelope.model_copy(deep=True)
+            try:
+                snapshot = entry.session.review(
+                    interrupt_id=payload.interrupt_id,
+                    review=CorrectionReview(citations=payload.citations),
+                )
+            except WorkflowStateError as exc:
+                raise WorkflowConflict(str(exc)) from exc
+            entry.snapshot = snapshot
+            envelope = self._envelope(workflow_id, entry)
+            entry.review_replays[idempotency_key] = (fingerprint, envelope)
             return envelope
 
     def submit_evidence(
