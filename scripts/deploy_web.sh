@@ -13,7 +13,7 @@ region="us-east-1"
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 template="${repo_dir}/infra/web/template.yaml"
 packaged_template="${repo_dir}/build/web-packaged.yaml"
-runtime_arn="arn:aws:bedrock-agentcore:${region}:123456789012:runtime/MettleRecovery-example"
+runtime_arn="${METTLE_AGENTCORE_RUNTIME_ARN:?Set METTLE_AGENTCORE_RUNTIME_ARN to the deployed Mettle runtime ARN}"
 
 if [[ "${METTLE_SKIP_WEB_BUILD:-0}" != "1" ]]; then
   "${repo_dir}/scripts/build_web_lambda.sh"
