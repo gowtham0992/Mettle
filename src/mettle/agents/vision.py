@@ -70,6 +70,7 @@ def create_vision_model(settings: BedrockVisionSettings) -> BedrockModel:
         boto_client_config=config,
         max_tokens=settings.max_output_tokens,
         temperature=0.0,
+        streaming=False,
     )
 
 

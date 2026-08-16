@@ -7,6 +7,7 @@ from mettle.agents.vision import (
     _VisionResult,
     assess_visible_evidence_with_agent,
     assess_photo_with_bedrock,
+    create_vision_model,
 )
 from mettle.domain import Citation, Trade
 from mettle.evidence import EvidenceStatus
@@ -115,6 +116,20 @@ def test_vision_fails_closed_if_model_changes_or_omits_requirements() -> None:
 def test_vision_settings_reject_more_expensive_or_text_only_models() -> None:
     with pytest.raises(ValueError, match="Nova Lite"):
         BedrockVisionSettings(model_id="anthropic.claude-sonnet-4-20250514-v1:0")
+
+
+def test_vision_model_uses_non_streaming_converse_to_preserve_least_privilege(monkeypatch) -> None:
+    captured = {}
+
+    class FakeModel:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(vision_module, "BedrockModel", FakeModel)
+    create_vision_model(BedrockVisionSettings())
+
+    assert captured["streaming"] is False
+    assert captured["model_id"] == "amazon.nova-lite-v1:0"
 
 
 def test_evidence_agent_receives_multimodal_prompt_and_structured_contract(monkeypatch) -> None:
