@@ -125,12 +125,12 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 1. **Notice to campaign plan:** prove traceable extraction, deadline behavior, and judgment routing without a model.
 2. **Local Strands orchestration:** run deterministic contract nodes, recorded outreach, and a resumable human interrupt. **Complete.**
 3. **Deadline chase loop:** replan open citations, record scheduled follow-ups with replay safety, stop on accepted evidence, and interrupt at the T−2 tradeoff. **Complete locally and through the deployed AgentCore-compatible contract.**
-4. **Evidence assessment:** compare trusted fixtures or normalized real photos to notice-anchored requirements and produce a specific re-request or judgment interrupt. **Local fixture adapter and dedicated Strands Evidence Agent on Bedrock complete.**
+4. **Evidence assessment:** compare trusted fixtures or normalized real photos to notice-anchored requirements and produce a specific re-request or judgment interrupt. **Local fixture adapter and dedicated Strands Evidence Agent on Bedrock complete; its model adapter forces one validated evidence-decision tool rather than accepting free-form output.**
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
 6. **Demo interface and packet:** show the recovery timeline, inspectable Agent Run, and citation-to-evidence PDF. **Complete.**
 7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,
    package it as CodeZip, and define least-privilege deployment and rollback.
-   **Complete: runtime version 9 is deployed, immutable-artifact rollback was
+   **Complete: runtime version 12 is deployed, immutable-artifact rollback was
    exercised on the real demo runtime, and live acceptance covers start,
    contractor review with zero pre-approval outreach, resume, vision, T−3/T−2
    chase behavior, replay safety, approval, and PDF integrity in one AgentCore

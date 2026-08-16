@@ -46,6 +46,11 @@ The **Agent run** panel makes the orchestration inspectable: judges can see spec
 
 The browser playback is clearly labeled as a guided demonstration. The repository also includes the working Strands workflow, opt-in Bedrock execution, and deployed AgentCore boundary used by the live cloud path.
 
+<p align="center">
+  <img src="assets/submission/03-agent-run.png" width="48%" alt="Mettle Agent Run showing intake, coordination, and evidence specialist handoffs">
+  <img src="assets/submission/05-approved-packet.png" width="48%" alt="Mettle approved reinspection packet and completed agent run">
+</p>
+
 ## Architecture
 
 ![Mettle bounded-autonomy architecture](assets/architecture/mettle-architecture.png)
@@ -134,7 +139,7 @@ uv run pytest
 npx agentcore validate --json
 ```
 
-The test suite exercises notice parsing, campaign policy, Strands node tracing, interruptions and resume, multimodal evidence-agent contracts, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
+The 107-test suite exercises notice parsing, campaign policy, Strands node tracing, interruptions and resume, multimodal evidence-agent contracts, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
 
 ## Security and cost boundaries
 
@@ -161,6 +166,7 @@ agentcore_app.py         Amazon Bedrock AgentCore entrypoint
 infra/web/template.yaml  Secure public AWS stack
 examples/                Representative synthetic notice
 tests/                   Offline and boundary-focused test suite
+assets/submission/       Devpost-ready product screenshots
 docs/                    Architecture, scope, research, and operations
 ```
 

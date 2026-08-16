@@ -9,7 +9,7 @@ profile during normal development.
 
 - Runtime: `MettleRecovery-example`
 - ARN: `arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/MettleRecovery-example`
-- Version and status: `9`, `READY`
+- Version and status: `12`, `READY`
 - Artifact: `runtime/MettleRecovery-example-arm64.zip`, S3 version
   `EXAMPLE_OBJECT_VERSION`
 - Artifact SHA-256:
@@ -18,7 +18,7 @@ profile during normal development.
 - Log group: `/aws/bedrock-agentcore/runtimes/MettleRecovery-example-DEFAULT`,
   14-day retention
 
-The version 9 acceptance workflow `yRM1Z6fYIqrFHQ4f` ran Nova Micro notice
+The version 12 acceptance workflow `Mo8bhSE6RnAbTnpu` ran Nova Micro notice
 intake, paused with zero deliveries for the contractor's structured correction
 review, resumed the same Strands graph, then ran Nova Lite photo assessment,
 T−3 open-citation replanning, an idempotent
@@ -27,7 +27,13 @@ and resume, final packet approval, and PDF integrity verification in one
 AgentCore session. Citation 1 stopped receiving follow-ups after its evidence
 was accepted; only citations 2 and 3 were chased. The final 5,617,827-byte
 five-page packet had SHA-256
-`ab049c9019671c02a95aa06dba2570783e9f399f253cfbe2a8effb89c9a3e8b6`.
+`6a1467aa7c83bd5bf2b574c095ef29b669075fb68e5b32645156c1075208499e`.
+
+Versions 10 and 11 failed closed during acceptance because the default
+structured-output path exposed a generic tool schema that Nova Lite did not
+select reliably. Version 12 keeps evidence analysis inside a dedicated Strands
+Agent but forces the single exact Pydantic output tool, so invalid or missing
+structured output cannot advance a citation.
 
 Version 8 never became ready: its package accidentally included the x86_64
 web-Lambda staging tree alongside the ARM64 runtime dependencies. The package
