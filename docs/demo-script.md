@@ -56,11 +56,11 @@ Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, not
 
 ## 3:55–4:28 — Architecture and technical credibility
 
-**On screen:** Show `assets/architecture/mettle-architecture.png` full-screen. Move the pointer along the three authority lanes and then the AWS boundary.
+**On screen:** Show `assets/architecture/mettle-product-architecture.png` first. Trace the campaign loop and its three human judgment gates. Then switch to `assets/architecture/mettle-aws-architecture.png` and trace the authenticated request path into AgentCore.
 
 **Narration:**
 
-> Mettle separates authority three ways. Amazon Nova models handle notice language and visible evidence. Deterministic Python controls state, deadlines, retries, and permissions. The licensed contractor decides interpretation, schedule tradeoffs, and release. The same typed operations are deployed on Amazon Bedrock AgentCore Runtime behind Cognito, API Gateway, Lambda, DynamoDB, private S3, CloudFront, and WAF.
+> Mettle separates authority three ways. Amazon Nova models handle notice language and visible evidence. Deterministic Python controls state, deadlines, retries, and permissions. The licensed contractor decides interpretation, schedule tradeoffs, and release. In AWS, the public browser reaches one authenticated Lambda gateway before the same typed operations run on Amazon Bedrock AgentCore Runtime; credentials, model access, state, and private evidence stay server-side.
 
 ## 4:28–4:35 — Close
 

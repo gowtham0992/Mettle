@@ -8,7 +8,8 @@
 
 <p align="center">
   <a href="https://d1ytth8asjpes8.cloudfront.net">Live guided demo</a> ·
-  <a href="assets/architecture/mettle-architecture.png">Architecture diagram</a> ·
+  <a href="assets/architecture/mettle-product-architecture.png">Product architecture</a> ·
+  <a href="assets/architecture/mettle-aws-architecture.png">AWS architecture</a> ·
   <a href="LICENSE">MIT license</a>
 </p>
 
@@ -55,11 +56,19 @@ The unauthenticated Strands route keeps workflow state in one warm Lambda instan
 
 ## Architecture
 
-![Mettle bounded-autonomy architecture](assets/architecture/mettle-architecture.png)
+### Product architecture: autonomy with visible stopping points
 
-The architecture makes authority explicit: models handle language and visible evidence, deterministic code controls deadlines and permissions, and the licensed contractor owns interpretation, tradeoffs, and final approval.
+![Mettle product architecture showing the recovery campaign and three human judgment gates](assets/architecture/mettle-product-architecture.png)
 
-The submission-ready PNG is [`assets/architecture/mettle-architecture.png`](assets/architecture/mettle-architecture.png). Its editable Pencil export is [`assets/architecture/mettle-architecture-pencil.html`](assets/architecture/mettle-architecture-pencil.html), and the deeper design rationale lives in [`docs/architecture.md`](docs/architecture.md).
+This view explains the product contract: Mettle runs one correction-recovery campaign, but it stops for trade routing, ambiguous notice interpretation, and final schedule or packet approval.
+
+### AWS architecture: one authenticated path to a bounded runtime
+
+![Mettle AWS architecture showing the authenticated request path, private resources, and security guardrails](assets/architecture/mettle-aws-architecture.png)
+
+This view explains the deployment boundary: the browser passes through CloudFront, WAF, Cognito, API Gateway, and a Lambda gateway before reaching the Strands workflow on Amazon Bedrock AgentCore. Model access, state, and evidence remain server-side.
+
+Both submission-ready PNGs are 1920×1080. The editable Pencil source is [`untitled.pen`](untitled.pen); deterministic HTML render sources live beside the PNGs, and the deeper design rationale lives in [`docs/architecture.md`](docs/architecture.md).
 
 ## Why this is genuinely agentic
 

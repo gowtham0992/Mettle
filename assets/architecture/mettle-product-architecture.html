@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700;750&family=IBM+Plex+Mono:wght@600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="mettle-diagrams.css" />
+    <title>Mettle product architecture</title>
+  </head>
+  <body>
+    <main class="sheet">
+      <div class="top-rule"></div>
+      <header class="header">
+        <div>
+          <p class="eyebrow">Product architecture / one bounded workflow</p>
+          <h1>One recovery campaign. Three moments to stop.</h1>
+          <p class="subtitle">Mettle turns a failed-inspection notice into a deadline-aware recovery campaign, handles the repetitive chase, and returns judgment to the contractor exactly where authority matters.</p>
+        </div>
+        <div class="brand"><span class="brand-mark"></span>METTLE</div>
+      </header>
+
+      <section>
+        <p class="section-label">Autonomous campaign loop</p>
+        <div class="product-flow">
+          <article class="card flow-card">
+            <span class="step">01 / EVENT</span>
+            <div>
+              <p class="meta">Contractor input</p>
+              <h2>Failed notice</h2>
+            </div>
+            <p>Municipal PDF or text arrives with citations and a reinspection clock.</p>
+          </article>
+          <div class="arrow">›</div>
+          <article class="card flow-card">
+            <span class="step">02 / STRUCTURE</span>
+            <div>
+              <p class="meta">Notice Intake Agent</p>
+              <h2>Correction docket</h2>
+            </div>
+            <p>Quotes each citation, derives evidence needs, and marks ambiguity.</p>
+          </article>
+          <div class="arrow">›</div>
+          <article class="card flow-card emphasis">
+            <span class="step">03 / ORCHESTRATE</span>
+            <div>
+              <p class="meta">Strands graph</p>
+              <h2>Recovery campaign</h2>
+            </div>
+            <p>Assigns work, advances citation state, watches the deadline, and retries safely.</p>
+          </article>
+          <div class="arrow">›</div>
+          <article class="card flow-card">
+            <span class="step">04 / VERIFY</span>
+            <div>
+              <p class="meta">Evidence Agent</p>
+              <h2>Evidence loop</h2>
+            </div>
+            <p>Checks photos against notice language and requests a precise replacement.</p>
+          </article>
+          <div class="arrow">›</div>
+          <article class="card flow-card output">
+            <span class="step">05 / RELEASE</span>
+            <div>
+              <p class="meta">Contractor approved</p>
+              <h2>Reinspection packet</h2>
+            </div>
+            <p>Citation-linked evidence, timestamps, status, and a drafted scheduling message.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="judgment-section">
+        <p class="section-label">Human judgment gates — the agent pauses here</p>
+        <div class="judgment-row">
+          <article class="card judgment-card">
+            <span class="judgment-number">1</span>
+            <h3>Route every correction</h3>
+            <p>The contractor confirms the proposed trade owner before outreach begins.</p>
+          </article>
+          <article class="card judgment-card">
+            <span class="judgment-number">2</span>
+            <h3>Interpret the notice</h3>
+            <p>Ambiguous code language is escalated; the agent never invents an interpretation.</p>
+          </article>
+          <article class="card judgment-card">
+            <span class="judgment-number">3</span>
+            <h3>Choose the date. Release the packet.</h3>
+            <p>Only the contractor commits the schedule or authorizes the final submission.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="authority" aria-label="Authority boundary">
+        <div class="authority-title"><strong>Authority boundary</strong><span>Autonomy is useful only when its limits are visible.</span></div>
+        <div class="authority-cell model"><div class="legend">● Model</div><p>Extracts, classifies, summarizes, and evaluates evidence—with source language attached.</p></div>
+        <div class="authority-cell code"><div class="legend">■ Code</div><p>Owns state transitions, deadlines, idempotency, file limits, and deterministic policy.</p></div>
+        <div class="authority-cell human"><div class="legend">◆ Human</div><p>Owns trade routing, code interpretation, date commitment, and final release.</p></div>
+      </section>
+
+      <div class="footer-note">Mettle / Professional Agents / Notice in → reinspection ready</div>
+    </main>
+  </body>
+</html>
