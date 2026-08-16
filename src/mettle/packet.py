@@ -6,6 +6,7 @@ from html import escape
 from io import BytesIO
 from pathlib import Path
 
+from PIL import Image as PillowImage
 from pydantic import BaseModel, ConfigDict, Field
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -152,7 +153,26 @@ class _PacketCanvas(Canvas):
 
 
 def _scaled_image(source: Path | BytesIO) -> Image:
-    image = Image(str(source) if isinstance(source, Path) else source)
+    # Lambda's synchronous response limit applies after Mangum base64-encodes
+    # the PDF. Re-encoding evidence for the packet keeps a detailed visual
+    # record while preventing a few lossless phone photos from overflowing the
+    # public response boundary.
+    compressed = BytesIO()
+    pillow_source: Path | BytesIO
+    if isinstance(source, Path):
+        pillow_source = source
+    else:
+        pillow_source = BytesIO(source.getvalue())
+    with PillowImage.open(pillow_source) as photo:
+        photo.convert("RGB").save(
+            compressed,
+            format="JPEG",
+            quality=82,
+            optimize=True,
+            progressive=True,
+        )
+    compressed.seek(0)
+    image = Image(compressed)
     max_width = 6.35 * inch
     max_height = 4.25 * inch
     scale = min(max_width / image.imageWidth, max_height / image.imageHeight)

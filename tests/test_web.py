@@ -434,6 +434,7 @@ def test_guided_demo_packet_requires_approval_then_downloads_pdf() -> None:
     assert downloaded.status_code == 200
     assert downloaded.headers["content-type"] == "application/pdf"
     assert len(PdfReader(BytesIO(downloaded.content)).pages) == 4
+    assert len(downloaded.content) < 4_000_000
 
 
 def test_api_rejects_oversized_decision_and_unknown_fields() -> None:

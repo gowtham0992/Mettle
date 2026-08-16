@@ -38,6 +38,22 @@ AWS profile files are local machine configuration. They are not part of this
 repository and must never be copied into `.env` files, issue descriptions, or
 commits.
 
+## Refresh the public web application
+
+The `mettle-web` profile assumes the exact-resource `MettleWebDeployer` role.
+It can update only the deployed `mettle-web` Lambda, synchronize only Mettle's
+static bucket, and invalidate only Mettle's CloudFront distribution. The direct
+release script verifies that assumed-role ARN and refuses root or any other
+identity before building or changing AWS resources:
+
+```bash
+./scripts/deploy_web_direct.sh mettle-web
+```
+
+This path intentionally avoids CloudFormation for ordinary code and static
+asset refreshes. Infrastructure changes still require a separately reviewed
+CloudFormation deployment.
+
 ## Remove access after the hackathon
 
 First list the bootstrap access-key ID:
@@ -62,6 +78,16 @@ aws iam delete-user-policy \
   --policy-name AssumeMettleHackathonDeveloper \
   --profile mettle
 
+aws iam delete-user-policy \
+  --user-name mettle-cli-bootstrap \
+  --policy-name AssumeMettleWebDeployer \
+  --profile mettle
+
+aws iam delete-role-policy \
+  --role-name MettleWebDeployer \
+  --policy-name DeployMettleWebExactResources \
+  --profile mettle
+
 aws iam delete-role-policy \
   --role-name MettleHackathonDeveloper \
   --policy-name InvokeMettleNovaMicro \
@@ -69,8 +95,9 @@ aws iam delete-role-policy \
 
 aws iam delete-user --user-name mettle-cli-bootstrap --profile mettle
 aws iam delete-role --role-name MettleHackathonDeveloper --profile mettle
+aws iam delete-role --role-name MettleWebDeployer --profile mettle
 ```
 
 Finally remove the `mettle-bootstrap` entries from the local AWS credentials
-and config files, and remove the `mettle-dev` role profile from the config
-file. Confirm removal with `aws configure list-profiles`.
+and config files, and remove the `mettle-dev` and `mettle-web` role profiles
+from the config file. Confirm removal with `aws configure list-profiles`.
