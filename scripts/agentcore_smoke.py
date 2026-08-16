@@ -173,8 +173,12 @@ def main() -> int:
         )
         assessment = current.get("workflow", {}).get("evidence", [{}])[-1]
         if not current.get("ok") or assessment.get("status") != "accepted":
+            safe_error = current.get("error", {})
             raise AgentCoreInvocationError(
-                f"vision evidence was not accepted ({assessment.get('status', 'missing')})"
+                "vision evidence was not accepted "
+                f"({assessment.get('status', 'missing')}; "
+                f"{safe_error.get('code', 'no_error_code')}: "
+                f"{safe_error.get('message', 'no safe error message')})"
             )
         print(
             json.dumps(

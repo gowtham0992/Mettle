@@ -4,7 +4,8 @@ import mettle.agents.vision as vision_module
 from mettle.agents.vision import (
     BedrockVisionError,
     BedrockVisionSettings,
-    _VisionResult,
+    MettleVisionModel,
+    VisibleEvidenceFindings,
     assess_visible_evidence_with_agent,
     assess_photo_with_bedrock,
     create_vision_model,
@@ -33,7 +34,7 @@ def _run_agent(findings, capture=None):
     def assessor(**kwargs):
         if capture is not None:
             capture.update(kwargs)
-        return _VisionResult.model_validate({"findings": findings})
+        return VisibleEvidenceFindings.model_validate({"findings": findings})
     return assessor
 
 
@@ -125,7 +126,7 @@ def test_vision_model_uses_non_streaming_converse_to_preserve_least_privilege(mo
         def __init__(self, **kwargs):
             captured.update(kwargs)
 
-    monkeypatch.setattr(vision_module, "BedrockModel", FakeModel)
+    monkeypatch.setattr(vision_module, "MettleVisionModel", FakeModel)
     create_vision_model(BedrockVisionSettings())
 
     assert captured["streaming"] is False
@@ -142,7 +143,7 @@ def test_evidence_agent_receives_multimodal_prompt_and_structured_contract(monke
         def structured_output(self, output_model, prompt):
             captured["output_model"] = output_model
             captured["prompt"] = prompt
-            return _VisionResult.model_validate({
+            return VisibleEvidenceFindings.model_validate({
                 "findings": [
                     _finding(CITATION.evidence_requirements[0], "shown", "Visible."),
                     _finding(CITATION.evidence_requirements[1], "shown", "Visible."),
@@ -158,6 +159,6 @@ def test_evidence_agent_receives_multimodal_prompt_and_structured_contract(monke
 
     assert captured["agent"]["name"] == "mettle-evidence"
     assert captured["agent"]["model"] == "bounded-model"
-    assert captured["output_model"] is _VisionResult
+    assert captured["output_model"] is VisibleEvidenceFindings
     assert captured["prompt"][0]["image"]["source"]["bytes"] == b"normalized-jpeg"
     assert result.findings[0].verdict == "shown"

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any, Literal
+from collections.abc import AsyncGenerator, Callable
+from typing import Any, Literal, TypeVar, cast
 
 import boto3
 from botocore.config import Config as BotocoreConfig
 from botocore.exceptions import BotoCoreError, ClientError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from strands import Agent
+from strands.event_loop import streaming
 from strands.models import BedrockModel
+from strands.tools import convert_pydantic_to_tool_spec
+from strands.types.tools import ToolChoice
 
 from mettle.domain import Citation
 from mettle.evidence import EvidenceAgentStep, EvidenceAssessment, EvidenceStatus
@@ -42,10 +45,52 @@ class _Finding(BaseModel):
     observation: str = Field(min_length=1, max_length=300)
 
 
-class _VisionResult(BaseModel):
+class VisibleEvidenceFindings(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     findings: list[_Finding]
+
+
+StructuredResult = TypeVar("StructuredResult", bound=BaseModel)
+
+
+class MettleVisionModel(BedrockModel):
+    """Bedrock model adapter that forces the one evidence-output contract."""
+
+    async def structured_output(
+        self,
+        output_model: type[StructuredResult],
+        prompt: list[dict[str, Any]],
+        system_prompt: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[dict[str, StructuredResult | Any], None]:
+        tool_spec = convert_pydantic_to_tool_spec(output_model)
+        response = self.stream(
+            messages=prompt,
+            tool_specs=[tool_spec],
+            system_prompt=system_prompt,
+            tool_choice=cast(ToolChoice, {"tool": {"name": tool_spec["name"]}}),
+            **kwargs,
+        )
+        async for event in streaming.process_stream(response):
+            yield event
+
+        stop_reason, messages, _, _ = event["stop"]
+        if stop_reason != "tool_use":
+            raise ValueError(
+                f'Model returned stop_reason: {stop_reason} instead of "tool_use".'
+            )
+        output_response = next(
+            (
+                block["toolUse"]["input"]
+                for block in messages["content"]
+                if block.get("toolUse", {}).get("name") == tool_spec["name"]
+            ),
+            None,
+        )
+        if output_response is None:
+            raise ValueError("Bedrock returned no matching evidence tool input.")
+        yield {"output": output_model(**output_response)}
 
 
 def create_vision_model(settings: BedrockVisionSettings) -> BedrockModel:
@@ -64,7 +109,7 @@ def create_vision_model(settings: BedrockVisionSettings) -> BedrockModel:
         }
     else:
         connection = {"region_name": settings.region}
-    return BedrockModel(
+    return MettleVisionModel(
         **connection,
         model_id=settings.model_id,
         boto_client_config=config,
@@ -87,7 +132,7 @@ def assess_visible_evidence_with_agent(
     model: Any,
     image: bytes,
     prompt: str,
-) -> _VisionResult:
+) -> VisibleEvidenceFindings:
     """Run a dedicated multimodal Strands agent with validated output."""
     agent = Agent(
         model=model,
@@ -97,7 +142,7 @@ def assess_visible_evidence_with_agent(
         callback_handler=None,
     )
     return agent.structured_output(
-        _VisionResult,
+        VisibleEvidenceFindings,
         [
             {"image": {"format": "jpeg", "source": {"bytes": image}}},
             {"text": prompt},
@@ -106,7 +151,7 @@ def assess_visible_evidence_with_agent(
 
 
 ModelFactory = Callable[[BedrockVisionSettings], Any]
-AgentAssessor = Callable[..., _VisionResult]
+AgentAssessor = Callable[..., VisibleEvidenceFindings]
 
 
 def assess_photo_with_bedrock(
