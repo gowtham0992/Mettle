@@ -58,6 +58,12 @@ def test_strands_workflow_coordinates_grounded_work_then_interrupts() -> None:
     assert len(snapshot.interrupts) == 1
     assert snapshot.interrupts[0].name == "correction-review"
     assert messenger.deliveries == ()
+    assert [step.node_id for step in snapshot.agent_run] == [
+        "intake",
+        "plan",
+        "review_gate",
+    ]
+    assert snapshot.agent_run[-1].status.value == "interrupted"
 
     completed = approve_corrections(session, snapshot)
 
@@ -65,6 +71,12 @@ def test_strands_workflow_coordinates_grounded_work_then_interrupts() -> None:
     assert [item.citation_id for item in messenger.deliveries] == ["1", "2", "3"]
     assert all("Notice:" in item.body for item in messenger.deliveries)
     assert all("Reinspection target:" in item.body for item in messenger.deliveries)
+    assert completed.agent_run[-1].node_id == "finish"
+    assert completed.agent_run[-1].status.value == "completed"
+    assert any(
+        step.node_id == "review_gate" and step.status.value == "interrupted"
+        for step in completed.agent_run
+    )
 
 
 def test_strands_workflow_resumes_without_duplicate_outreach() -> None:
@@ -174,6 +186,12 @@ def test_chase_graph_replans_open_citations_at_the_next_checkpoint() -> None:
     assert [item.citation_id for item in messenger.deliveries[-2:]] == ["2", "3"]
     assert all(item.scheduled_on == date(2026, 8, 14) for item in messenger.deliveries[-2:])
     assert "corrected wall location" in messenger.deliveries[-2].body
+    assert [step.node_id for step in snapshot.agent_run[-4:]] == [
+        "replan_open",
+        "follow_up",
+        "deadline_gate",
+        "finish_chase",
+    ]
 
 
 def test_chase_graph_interrupts_only_at_deadline_tradeoff() -> None:

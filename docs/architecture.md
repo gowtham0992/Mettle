@@ -19,7 +19,7 @@ Pydantic models represent notices, citations, recovery actions, and judgment req
 
 ### Agent adapters
 
-Strands agents translate unstructured input into the domain contracts. Their structured output is validated before it enters campaign state. The first adapter is the notice-intake agent; communication and evidence agents follow as separate nodes.
+Strands agents translate unstructured input into the domain contracts. Their structured output is validated before it enters campaign state. The notice-intake agent and multimodal evidence agent are separate specialists; communication remains an enforceable graph node behind a provider interface.
 
 The opt-in Bedrock intake adapter configures Nova Micro with explicit region,
 token, timeout, retry, and input limits. AWS errors are reduced to a service
@@ -34,7 +34,9 @@ The intake graph runs `intake -> plan -> correction review -> coordinate -> judg
 
 SMS, object storage, model providers, and packet rendering live behind small interfaces. The demo begins with recording fakes. Twilio, Amazon S3, Amazon Bedrock, and AgentCore can replace those fakes independently.
 
-The evidence lab keeps a trusted catalog of synthetic photo fixtures as a reliable fallback and also accepts real JPEG/PNG uploads. The server caps the raw body, decodes and bounds pixels, removes metadata, and re-encodes to JPEG before invoking Nova Lite. The vision contract returns one structured finding per notice requirement; Mettle derives accepted, rejected, or manual-review status and never asks the model to infer code compliance. Idempotency fingerprints include the normalized image bytes so retries cannot repeat model spend.
+The evidence lab keeps a trusted catalog of synthetic photo fixtures as a reliable fallback and also accepts real JPEG/PNG uploads. The server caps the raw body, decodes and bounds pixels, removes metadata, and re-encodes to JPEG before invoking a dedicated multimodal Strands Evidence Agent on Nova Lite. The agent returns one validated finding per notice requirement; deterministic policy derives accepted, rejected, or manual-review status and never asks the model to infer code compliance. Idempotency fingerprints include the normalized image bytes so retries cannot repeat model spend.
+
+Strands `BeforeNodeCallEvent` and `AfterNodeCallEvent` hooks record a safe execution trace containing only graph name, node, specialist, sequence, and status. Evidence assessments add the same high-level trace around requirement grounding, multimodal inspection, and policy application. The command center renders this as the Agent Run panel; prompts, notice contents, model reasoning, credentials, and private runtime identifiers are intentionally excluded.
 
 Packet generation begins only when the latest evidence for every citation is accepted. A separate final approval record blocks PDF download until the contractor approves the assembled packet. ReportLab renders the notice, evidence requirements, trusted fixture or normalized uploaded images, safety boundary, and communication record from validated server state; client-provided paths or filenames never reach the renderer.
 
@@ -123,9 +125,9 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 1. **Notice to campaign plan:** prove traceable extraction, deadline behavior, and judgment routing without a model.
 2. **Local Strands orchestration:** run deterministic contract nodes, recorded outreach, and a resumable human interrupt. **Complete.**
 3. **Deadline chase loop:** replan open citations, record scheduled follow-ups with replay safety, stop on accepted evidence, and interrupt at the T−2 tradeoff. **Complete locally and through the deployed AgentCore-compatible contract.**
-4. **Evidence assessment:** compare trusted fixtures or normalized real photos to notice-anchored requirements and produce a specific re-request or judgment interrupt. **Local and Bedrock Vision adapters complete.**
+4. **Evidence assessment:** compare trusted fixtures or normalized real photos to notice-anchored requirements and produce a specific re-request or judgment interrupt. **Local fixture adapter and dedicated Strands Evidence Agent on Bedrock complete.**
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
-6. **Demo interface and packet:** show the recovery timeline and generate a citation-to-evidence PDF. **Complete.**
+6. **Demo interface and packet:** show the recovery timeline, inspectable Agent Run, and citation-to-evidence PDF. **Complete.**
 7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,
    package it as CodeZip, and define least-privilege deployment and rollback.
    **Complete: runtime version 9 is deployed, immutable-artifact rollback was

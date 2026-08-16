@@ -18,6 +18,16 @@ class EvidenceStatus(StrEnum):
     MANUAL_REVIEW = "manual_review"
 
 
+class EvidenceAgentStep(BaseModel):
+    """A safe, high-level trace of the evidence agent's bounded work."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    step: str = Field(min_length=1, max_length=80)
+    status: str = Field(pattern=r"^(completed|interrupted)$")
+    detail: str = Field(min_length=1, max_length=240)
+
+
 class EvidenceAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -30,6 +40,7 @@ class EvidenceAssessment(BaseModel):
     matched_requirements: list[str] = Field(default_factory=list)
     missing_requirements: list[str] = Field(default_factory=list)
     explanation: str
+    agent_run: list[EvidenceAgentStep] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)

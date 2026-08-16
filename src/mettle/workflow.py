@@ -8,7 +8,12 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from strands.agent.agent_result import AgentResult
-from strands.hooks import BeforeNodeCallEvent, HookProvider, HookRegistry
+from strands.hooks import (
+    AfterNodeCallEvent,
+    BeforeNodeCallEvent,
+    HookProvider,
+    HookRegistry,
+)
 from strands.multiagent import GraphBuilder
 from strands.multiagent.base import MultiAgentBase, MultiAgentResult, NodeResult, Status
 from strands.telemetry.metrics import EventLoopMetrics
@@ -39,6 +44,24 @@ class WorkflowStatus(StrEnum):
     FAILED = "failed"
 
 
+class AgentRunStatus(StrEnum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    INTERRUPTED = "interrupted"
+
+
+class AgentRunStep(BaseModel):
+    """One observable execution step emitted by a real Strands graph."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    sequence: int = Field(ge=1)
+    graph: str = Field(min_length=1, max_length=40)
+    node_id: str = Field(min_length=1, max_length=80)
+    actor: str = Field(min_length=1, max_length=80)
+    status: AgentRunStatus
+
+
 class WorkflowInterrupt(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -57,6 +80,7 @@ class WorkflowSnapshot(BaseModel):
     interrupts: list[WorkflowInterrupt] = Field(default_factory=list)
     contractor_decision: str | None = None
     deadline_decision: str | None = None
+    agent_run: list[AgentRunStep] = Field(default_factory=list)
 
 
 class ResumeDecision(BaseModel):
@@ -283,6 +307,71 @@ class DeadlineJudgmentHook(HookProvider):
         event.invocation_state["deadline_decision"] = decision.decision
 
 
+_NODE_ACTORS = {
+    "intake": "Intake agent",
+    "plan": "Recovery planner",
+    "review_gate": "Contractor gate",
+    "coordinate": "Coordination agent",
+    "judgment_gate": "Contractor gate",
+    "coordinate_decision": "Coordination agent",
+    "finish": "Recovery orchestrator",
+    "replan_open": "Recovery planner",
+    "follow_up": "Coordination agent",
+    "deadline_gate": "Contractor gate",
+    "finish_chase": "Recovery orchestrator",
+}
+
+
+class AgentRunTraceHook(HookProvider):
+    """Record graph-node execution without exposing prompts or private payloads."""
+
+    def __init__(self, *, graph: str) -> None:
+        self.graph = graph
+
+    def register_hooks(self, registry: HookRegistry) -> None:
+        registry.add_callback(BeforeNodeCallEvent, self.before_node)
+        registry.add_callback(AfterNodeCallEvent, self.after_node)
+
+    def before_node(self, event: BeforeNodeCallEvent) -> None:
+        if event.invocation_state is None:
+            return
+        trace = event.invocation_state.setdefault("agent_run", [])
+        if not isinstance(trace, list):
+            raise WorkflowConfigurationError("agent run trace state is invalid")
+        for prior in reversed(trace):
+            if not isinstance(prior, dict):
+                continue
+            if prior.get("status") != AgentRunStatus.RUNNING.value:
+                break
+            prior["status"] = AgentRunStatus.INTERRUPTED.value
+            break
+        trace.append(
+            {
+                "sequence": len(trace) + 1,
+                "graph": self.graph,
+                "node_id": event.node_id,
+                "actor": _NODE_ACTORS.get(event.node_id, "Mettle agent"),
+                "status": AgentRunStatus.RUNNING.value,
+            }
+        )
+
+    def after_node(self, event: AfterNodeCallEvent) -> None:
+        if event.invocation_state is None:
+            return
+        trace = event.invocation_state.get("agent_run")
+        if not isinstance(trace, list):
+            return
+        for item in reversed(trace):
+            if (
+                isinstance(item, dict)
+                and item.get("graph") == self.graph
+                and item.get("node_id") == event.node_id
+                and item.get("status") == AgentRunStatus.RUNNING.value
+            ):
+                item["status"] = AgentRunStatus.COMPLETED.value
+                return
+
+
 class RecoveryWorkflowSession:
     """One stateful Strands recovery run with explicit start/resume boundaries."""
 
@@ -307,6 +396,7 @@ class RecoveryWorkflowSession:
             "roster": dict(roster),
             "messenger": messenger,
             "deliveries": [],
+            "agent_run": [],
         }
         self._started = False
         self._last_result: MultiAgentResult | None = None
@@ -436,7 +526,10 @@ class RecoveryWorkflowSession:
         builder.set_entry_point("replan_open")
         builder.set_max_node_executions(4)
         builder.set_execution_timeout(15)
-        builder.set_hook_providers([DeadlineJudgmentHook()])
+        builder.set_hook_providers([
+            AgentRunTraceHook(graph="deadline_chase"),
+            DeadlineJudgmentHook(),
+        ])
         return builder.build()
 
     def _build_graph(self) -> MultiAgentBase:
@@ -481,7 +574,11 @@ class RecoveryWorkflowSession:
         builder.set_entry_point("intake")
         builder.set_max_node_executions(7)
         builder.set_execution_timeout(15)
-        builder.set_hook_providers([CorrectionReviewHook(), ContractorJudgmentHook()])
+        builder.set_hook_providers([
+            AgentRunTraceHook(graph="recovery"),
+            CorrectionReviewHook(),
+            ContractorJudgmentHook(),
+        ])
         return builder.build()
 
     @staticmethod
@@ -746,6 +843,12 @@ class RecoveryWorkflowSession:
             Status.COMPLETED: WorkflowStatus.COMPLETED,
             Status.FAILED: WorkflowStatus.FAILED,
         }.get(self._last_result.status, WorkflowStatus.FAILED)
+        trace = [dict(item) for item in self._state.get("agent_run", [])]
+        if status is WorkflowStatus.INTERRUPTED:
+            for item in reversed(trace):
+                if item.get("status") == AgentRunStatus.RUNNING.value:
+                    item["status"] = AgentRunStatus.INTERRUPTED.value
+                    break
         return WorkflowSnapshot(
             status=status,
             notice=self._state.get("notice"),
@@ -761,4 +864,5 @@ class RecoveryWorkflowSession:
             ],
             contractor_decision=self._state.get("contractor_decision"),
             deadline_decision=self._state.get("deadline_decision"),
+            agent_run=[AgentRunStep.model_validate(item) for item in trace],
         )

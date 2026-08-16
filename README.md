@@ -25,7 +25,7 @@ Mettle starts with the event contractors already receive: a failed-inspection no
 1. **Understand the notice.** A Strands intake agent converts unstructured municipal language into a validated correction docket while preserving the source text.
 2. **Pause before outreach.** The contractor confirms the responsible trade, closure route, and proof request for every citation. Until then, Mettle records zero outreach.
 3. **Run the recovery.** A Strands graph assigns open corrections, records replay-safe follow-ups, and changes urgency at server-selected T−7, T−3, T−2, T−1, and deadline checkpoints.
-4. **Review visible proof.** Nova Lite checks only whether a submitted photo shows the notice-specific requirements. Insufficient photos receive a precise re-request; ambiguity returns to the contractor.
+4. **Review visible proof.** A dedicated multimodal Strands Evidence Agent uses Nova Lite to check only whether a submitted photo shows the notice-specific requirements. Insufficient photos receive a precise re-request; ambiguity returns to the contractor.
 5. **Close with consent.** Mettle maps each citation to its evidence and communication history, then blocks the final PDF until the contractor approves it.
 
 The result is not another dashboard to babysit. Mettle works between events and surfaces when professional judgment is actually required.
@@ -41,6 +41,8 @@ The compressed run demonstrates:
 - deadline-aware escalation for an unresolved trade;
 - meaningful human pauses rather than constant supervision; and
 - a contractor-approved, citation-to-evidence PDF packet.
+
+The **Agent run** panel makes the orchestration inspectable: judges can see specialist handoffs, graph-node execution, evidence-agent work, and exactly where Mettle paused for professional judgment. Sample playback is labeled `SAMPLE TRACE`; real workflow runs are labeled `LIVE · STRANDS` or `LIVE · AGENTCORE`.
 
 The browser playback is clearly labeled as a guided demonstration. The repository also includes the working Strands workflow, opt-in Bedrock execution, and deployed AgentCore boundary used by the live cloud path.
 
@@ -61,7 +63,8 @@ Mettle is event-driven work across time, not a prompt-response wrapper. It keeps
 | Notice understanding | A real `strands.Agent` using a bounded Nova Micro model and validated structured output | [`src/mettle/agents/intake.py`](src/mettle/agents/intake.py) |
 | Campaign orchestration | Two Strands `GraphBuilder` graphs: intake-to-coordination and deadline chase | [`src/mettle/workflow.py`](src/mettle/workflow.py) |
 | Human judgment | Strands hooks interrupt before outreach, at ambiguous requirements, and at the deadline tradeoff | [`src/mettle/workflow.py`](src/mettle/workflow.py) |
-| Visible-evidence assessment | Nova Lite multimodal assessment followed by deterministic accept, re-request, or manual-review policy | [`src/mettle/agents/vision.py`](src/mettle/agents/vision.py) |
+| Visible-evidence assessment | A dedicated multimodal `strands.Agent` on Nova Lite, followed by deterministic accept, re-request, or manual-review policy | [`src/mettle/agents/vision.py`](src/mettle/agents/vision.py) |
+| Inspectable autonomy | Safe Strands graph hooks and evidence-agent traces rendered as a visible Agent Run without exposing prompts or private payloads | [`src/mettle/workflow.py`](src/mettle/workflow.py), [`src/mettle/web/static/app.js`](src/mettle/web/static/app.js) |
 | Managed agent runtime | The same typed workflow operations run behind an Amazon Bedrock AgentCore entrypoint | [`agentcore_app.py`](agentcore_app.py) |
 | Secure public product | CloudFront, private S3, Cognito PKCE, API Gateway, Lambda, DynamoDB, WAF, and short-lived packet delivery | [`infra/web/template.yaml`](infra/web/template.yaml) |
 
@@ -102,7 +105,7 @@ uv run mettle serve \
   --aws-region us-east-1
 ```
 
-This exposes **Ground with Bedrock** and enables real-photo assessment. Model ID, region, token ceilings, retry limits, and timeouts remain server-side; the browser cannot override them. Nova Micro handles notice extraction, while Nova Lite receives normalized JPEG/PNG evidence and returns pixel-grounded findings—not a code-compliance opinion.
+This exposes **Ground with Bedrock** and enables real-photo assessment. Model ID, region, token ceilings, retry limits, and timeouts remain server-side; the browser cannot override them. A Strands intake agent on Nova Micro handles notice extraction, while a separate Strands Evidence Agent on Nova Lite receives normalized JPEG/PNG evidence and returns pixel-grounded structured findings—not a code-compliance opinion.
 
 ### Run through AgentCore
 
@@ -131,7 +134,7 @@ uv run pytest
 npx agentcore validate --json
 ```
 
-The test suite exercises notice parsing, campaign policy, Strands interruptions and resume, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
+The test suite exercises notice parsing, campaign policy, Strands node tracing, interruptions and resume, multimodal evidence-agent contracts, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
 
 ## Security and cost boundaries
 

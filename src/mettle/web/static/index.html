@@ -169,11 +169,17 @@
             <button class="button packet-action" id="packet-action" type="button" hidden>Prepare packet for approval</button>
           </section>
 
-          <section class="panel log-panel">
+          <section class="panel log-panel agent-run-panel">
             <div class="panel__header">
-              <div><span class="section-index">06</span><h2>Recovery log</h2></div>
+              <div><span class="section-index">06</span><h2>Agent run</h2></div>
+              <span class="agent-run__mode" id="agent-run-mode">SAMPLE TRACE</span>
             </div>
-            <p class="panel__kicker">WHAT METTLE DID, AND WHY</p>
+            <p class="panel__kicker">HANDOFFS, AUTONOMOUS WORK, AND HUMAN INTERRUPTS</p>
+            <div class="agent-run__summary">
+              <strong id="agent-run-summary">Mettle is coordinating the recovery across specialist agents.</strong>
+              <span>Every displayed step is bounded by notice language and recorded without exposing prompts or private payloads.</span>
+            </div>
+            <ol class="agent-nodes" id="agent-node-list" aria-label="Agent execution path"></ol>
             <ol id="event-list" class="event-list"></ol>
           </section>
 

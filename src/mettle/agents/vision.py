@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Literal, Protocol
+from typing import Any, Literal
 
 import boto3
 from botocore.config import Config as BotocoreConfig
 from botocore.exceptions import BotoCoreError, ClientError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from strands import Agent
+from strands.models import BedrockModel
 
 from mettle.domain import Citation
-from mettle.evidence import EvidenceAssessment, EvidenceStatus
+from mettle.evidence import EvidenceAgentStep, EvidenceAssessment, EvidenceStatus
 
 
 class BedrockVisionError(RuntimeError):
@@ -46,21 +48,64 @@ class _VisionResult(BaseModel):
     findings: list[_Finding]
 
 
-class ConverseClient(Protocol):
-    def converse(self, **kwargs: Any) -> dict[str, Any]: ...
-
-
-def _client(settings: BedrockVisionSettings) -> ConverseClient:
+def create_vision_model(settings: BedrockVisionSettings) -> BedrockModel:
     config = BotocoreConfig(
         connect_timeout=5,
         read_timeout=45,
         retries={"total_max_attempts": 2, "mode": "standard"},
     )
-    session = boto3.Session(
-        profile_name=settings.profile,
-        region_name=settings.region,
+    connection: dict[str, Any]
+    if settings.profile is not None:
+        connection = {
+            "boto_session": boto3.Session(
+                profile_name=settings.profile,
+                region_name=settings.region,
+            )
+        }
+    else:
+        connection = {"region_name": settings.region}
+    return BedrockModel(
+        **connection,
+        model_id=settings.model_id,
+        boto_client_config=config,
+        max_tokens=settings.max_output_tokens,
+        temperature=0.0,
     )
-    return session.client("bedrock-runtime", config=config)
+
+
+VISION_SYSTEM_PROMPT = """
+You are Mettle's visible-evidence specialist. Compare only observable pixels
+with requirements grounded in the failed-inspection notice. Never interpret a
+building code, infer hidden work, certify compliance, or estimate an unreadable
+measurement. Route ambiguity to the licensed contractor.
+""".strip()
+
+
+def assess_visible_evidence_with_agent(
+    *,
+    model: Any,
+    image: bytes,
+    prompt: str,
+) -> _VisionResult:
+    """Run a dedicated multimodal Strands agent with validated output."""
+    agent = Agent(
+        model=model,
+        name="mettle-evidence",
+        description="Notice-anchored visible-evidence assessment",
+        system_prompt=VISION_SYSTEM_PROMPT,
+        callback_handler=None,
+    )
+    return agent.structured_output(
+        _VisionResult,
+        [
+            {"image": {"format": "jpeg", "source": {"bytes": image}}},
+            {"text": prompt},
+        ],
+    )
+
+
+ModelFactory = Callable[[BedrockVisionSettings], Any]
+AgentAssessor = Callable[..., _VisionResult]
 
 
 def assess_photo_with_bedrock(
@@ -69,9 +114,10 @@ def assess_photo_with_bedrock(
     image: bytes,
     assessment_id: str,
     settings: BedrockVisionSettings | None = None,
-    client_factory: Callable[[BedrockVisionSettings], ConverseClient] = _client,
+    model_factory: ModelFactory = create_vision_model,
+    agent_assessor: AgentAssessor = assess_visible_evidence_with_agent,
 ) -> EvidenceAssessment:
-    """Check only visible notice evidence, never construction-code compliance."""
+    """Use a dedicated Strands agent, then enforce deterministic safety policy."""
     selected = settings or BedrockVisionSettings()
     requirements = list(citation.evidence_requirements)
     if not requirements:
@@ -85,8 +131,6 @@ def assess_photo_with_bedrock(
             explanation="Contractor review is required because the notice does not define visible evidence requirements.",
         )
 
-    tool_name = "record_visible_evidence"
-    schema = _VisionResult.model_json_schema()
     prompt = (
         "Inspect only the pixels in this job-site photo against each evidence requirement below. "
         "Do not decide code compliance, infer hidden work, estimate an unreadable measurement, or rely on outside code knowledge. "
@@ -95,40 +139,25 @@ def assess_photo_with_bedrock(
         + "\n- ".join(requirements)
     )
     try:
-        response = client_factory(selected).converse(
-            modelId=selected.model_id,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"image": {"format": "jpeg", "source": {"bytes": image}}},
-                    {"text": prompt},
-                ],
-            }],
-            inferenceConfig={"maxTokens": selected.max_output_tokens, "temperature": 0},
-            toolConfig={
-                "tools": [{"toolSpec": {
-                    "name": tool_name,
-                    "description": "Record pixel-grounded findings for every requested evidence item.",
-                    "inputSchema": {"json": schema},
-                }}],
-                "toolChoice": {"tool": {"name": tool_name}},
-            },
+        result = agent_assessor(
+            model=model_factory(selected),
+            image=image,
+            prompt=prompt,
         )
-        blocks = response["output"]["message"]["content"]
-        tool_inputs = [
-            block["toolUse"]["input"]
-            for block in blocks
-            if block.get("toolUse", {}).get("name") == tool_name
-        ]
-        if len(tool_inputs) != 1:
-            raise BedrockVisionError("Bedrock did not return one evidence assessment")
-        result = _VisionResult.model_validate(tool_inputs[0])
     except (ClientError, BotoCoreError) as exc:
-        raise BedrockVisionError("Bedrock could not assess the photo with the current AWS configuration") from exc
+        raise BedrockVisionError(
+            "The Strands evidence agent could not reach Bedrock with the current AWS configuration"
+        ) from exc
     except (KeyError, TypeError, ValidationError, BedrockVisionError) as exc:
         if isinstance(exc, BedrockVisionError):
             raise
-        raise BedrockVisionError("Bedrock returned an invalid evidence assessment") from exc
+        raise BedrockVisionError(
+            "The Strands evidence agent returned an invalid assessment"
+        ) from exc
+    except Exception as exc:
+        raise BedrockVisionError(
+            "The Strands evidence agent could not complete the assessment"
+        ) from exc
 
     by_requirement = {finding.requirement: finding for finding in result.findings}
     if len(result.findings) != len(requirements) or set(by_requirement) != set(requirements):
@@ -158,4 +187,25 @@ def assess_photo_with_bedrock(
         matched_requirements=matched,
         missing_requirements=missing,
         explanation=explanation,
+        agent_run=[
+            EvidenceAgentStep(
+                step="Ground requirements",
+                status="completed",
+                detail=f"Bound the run to {len(requirements)} requirement(s) quoted from citation {citation.citation_id}.",
+            ),
+            EvidenceAgentStep(
+                step="Inspect visible evidence",
+                status="completed",
+                detail=f"Strands Evidence Agent used {selected.model_id} to inspect the submitted image.",
+            ),
+            EvidenceAgentStep(
+                step="Apply safety policy",
+                status="interrupted" if status is EvidenceStatus.MANUAL_REVIEW else "completed",
+                detail=(
+                    "Ambiguity was routed to contractor judgment; no compliance decision was made."
+                    if status is EvidenceStatus.MANUAL_REVIEW
+                    else "Deterministic policy converted the grounded findings into an evidence-sufficiency result."
+                ),
+            ),
+        ],
     )

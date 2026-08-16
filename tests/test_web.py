@@ -376,6 +376,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Extract locally" in page.text
     assert "Approve & begin recovery" in page.text
     assert "Recovery clock" in page.text
+    assert "Agent run" in page.text
+    assert "HANDOFFS, AUTONOMOUS WORK, AND HUMAN INTERRUPTS" in page.text
     assert "Simulate scheduled check" in page.text
     assert page.headers["content-security-policy"].startswith("default-src 'self'")
     assert script.status_code == 200
@@ -383,6 +385,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert 'openRecoverySetup({ returnToWelcome: true });' in script.text
     assert 'elements.noticeDialog.addEventListener("cancel"' in script.text
     assert 'elements.noticeDialog.open && event.key === "Escape"' in script.text
+    assert "function renderAgentRun(data)" in script.text
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"
 

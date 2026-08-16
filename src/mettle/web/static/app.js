@@ -22,6 +22,9 @@ const elements = {
   asOf: document.querySelector("#as-of-date"),
   citations: document.querySelector("#citation-list"),
   events: document.querySelector("#event-list"),
+  agentRunMode: document.querySelector("#agent-run-mode"),
+  agentRunSummary: document.querySelector("#agent-run-summary"),
+  agentNodes: document.querySelector("#agent-node-list"),
   judgments: document.querySelector("#judgment-list"),
   judgmentCount: document.querySelector("#judgment-count"),
   recoveryClock: document.querySelector("#recovery-clock"),
@@ -362,6 +365,25 @@ function workflowCampaign(envelope, executionTarget = "local") {
   }
 
   const citationsReady = [...evidenceByCitation.values()].filter((item) => item.status === "accepted").length;
+  const graphRun = (snapshot.agent_run || []).map((step) => ({
+    sequence: step.sequence,
+    graph: step.graph,
+    node_id: step.node_id,
+    actor: step.actor,
+    status: step.status,
+    detail: `${step.graph.replaceAll("_", " ")} graph · ${step.node_id.replaceAll("_", " ")}`,
+  }));
+  let evidenceSequence = graphRun.length;
+  const evidenceRun = (envelope.evidence || []).flatMap((assessment) =>
+    (assessment.agent_run || []).map((step) => ({
+      sequence: ++evidenceSequence,
+      graph: "evidence",
+      node_id: step.step.toLowerCase().replaceAll(" ", "_"),
+      actor: "Evidence agent",
+      status: step.status,
+      detail: `C${assessment.citation_id} · ${step.detail}`,
+    })),
+  );
   return {
     source_mode: "workflow",
     execution_target: executionTarget,
@@ -380,6 +402,7 @@ function workflowCampaign(envelope, executionTarget = "local") {
     evidence: envelope.evidence || [],
     packet: envelope.packet,
     events,
+    agent_run: [...graphRun, ...evidenceRun],
     judgments,
     packet_status: envelope.packet?.status === "approved"
       ? "approved"
@@ -779,6 +802,42 @@ function renderEvent(event) {
   return item;
 }
 
+function sampleAgentRun(data) {
+  const actorStatus = new Map();
+  for (const event of [...data.events].reverse()) {
+    const actor = event.actor.replace(/^Mettle · /, "");
+    const interrupted = event.kind === "judgment_requested";
+    actorStatus.set(actor, {
+      actor,
+      status: interrupted ? "interrupted" : "completed",
+      detail: event.title,
+    });
+  }
+  return [...actorStatus.values()].map((item, index) => ({ ...item, sequence: index + 1 }));
+}
+
+function renderAgentRun(data) {
+  const isWorkflow = data.source_mode === "workflow";
+  const steps = isWorkflow ? (data.agent_run || []) : sampleAgentRun(data);
+  elements.agentRunMode.textContent = isWorkflow
+    ? data.execution_target === "agentcore" ? "LIVE · AGENTCORE" : "LIVE · STRANDS"
+    : "SAMPLE TRACE";
+  const interrupted = steps.filter((step) => step.status === "interrupted").length;
+  const completed = steps.filter((step) => step.status === "completed").length;
+  elements.agentRunSummary.textContent = interrupted
+    ? `${completed} agent steps completed · ${interrupted} paused for contractor judgment`
+    : `${completed} agent steps completed · no unnecessary contractor interrupt`;
+  elements.agentNodes.replaceChildren(...steps.map((step) => {
+    const item = node("li", `agent-node agent-node--${step.status}`);
+    item.append(node("span", "agent-node__sequence", String(step.sequence).padStart(2, "0")));
+    const body = node("div", "agent-node__body");
+    body.append(node("strong", "", step.actor));
+    body.append(node("span", "", step.detail));
+    item.append(body, node("span", "agent-node__status", step.status.toUpperCase()));
+    return item;
+  }));
+}
+
 function decisionPrompt(judgment) {
   if (judgment.kind === "final_packet_approval") {
     return ["Type your approval decision", "Approve packet"];
@@ -971,6 +1030,7 @@ function render(data) {
 
   elements.citations.replaceChildren(...data.citations.map(renderCitation));
   elements.events.replaceChildren(...data.events.map(renderEvent));
+  renderAgentRun(data);
 
   const pending = data.judgments.filter((item) => item.status === "pending");
   elements.judgmentCount.textContent = String(pending.length);
