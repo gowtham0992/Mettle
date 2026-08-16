@@ -139,7 +139,7 @@ uv run pytest
 npx agentcore validate --json
 ```
 
-The 107-test suite exercises notice parsing, campaign policy, Strands node tracing, interruptions and resume, multimodal evidence-agent contracts, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
+The 108-test suite exercises notice parsing, campaign policy, Strands node tracing, interruptions and resume, failed-review retry safety, multimodal evidence-agent contracts, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
 
 ## Security and cost boundaries
 

@@ -774,6 +774,37 @@ def test_workflow_api_explains_missing_trade_configuration() -> None:
     }
 
 
+def test_failed_correction_review_retry_remains_stable() -> None:
+    payload = workflow_payload()
+    payload["roster"] = payload["roster"][:1]
+    with client() as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=payload,
+            headers={"Idempotency-Key": "failed_review_workflow_123"},
+        ).json()
+        review = review_payload(created)
+        url = f"/api/workflows/{created['workflow_id']}/review"
+        first = browser.post(
+            url,
+            json=review,
+            headers={"Idempotency-Key": "failed_review_retry_123"},
+        )
+        retry = browser.post(
+            url,
+            json=review,
+            headers={"Idempotency-Key": "failed_review_retry_123"},
+        )
+
+    assert first.status_code == retry.status_code == 422
+    assert first.json() == retry.json() == {
+        "error": {
+            "code": "workflow_configuration_error",
+            "message": "missing recipient for trade(s): framing, mechanical",
+        }
+    }
+
+
 def test_evidence_api_rejects_then_accepts_notice_anchored_samples() -> None:
     with client() as browser:
         create_headers = {"Idempotency-Key": "evidence_workflow_123"}

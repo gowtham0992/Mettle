@@ -489,6 +489,20 @@ class RecoveryWorkflowSession:
         )
         if matching is None or matching.name != "correction-review":
             raise WorkflowStateError("interrupt is not the active correction review")
+        roster = self._state.get("roster")
+        if not isinstance(roster, dict):
+            raise WorkflowStateError("workflow roster is not available")
+        missing = sorted(
+            {citation.trade.value for citation in review.citations if citation.trade not in roster}
+        )
+        if missing:
+            # Reject predictable configuration errors before Strands consumes
+            # the interrupt. A failed graph continuation is not retryable on
+            # the same graph instance, so preserving this checkpoint keeps an
+            # idempotent retry deterministic and prevents partial outreach.
+            raise WorkflowConfigurationError(
+                f"missing recipient for trade(s): {', '.join(missing)}"
+            )
         self._last_result = self._active_graph(
             [
                 {
