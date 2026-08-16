@@ -49,11 +49,6 @@ The browser playback is clearly labeled as a guided demonstration. The repositor
 
 The unauthenticated Strands route keeps workflow state in one warm Lambda instance, so shared `?workflow=` links are demonstration conveniences rather than durable records. The authenticated AgentCore path owns session mapping in DynamoDB; production campaign persistence and scheduling remain future work.
 
-<p align="center">
-  <img src="assets/submission/03-agent-run.png" width="48%" alt="Mettle Agent Run showing intake, coordination, and evidence specialist handoffs">
-  <img src="assets/submission/05-approved-packet.png" width="48%" alt="Mettle approved reinspection packet and completed agent run">
-</p>
-
 ## Architecture
 
 ### Product architecture: autonomy with visible stopping points
