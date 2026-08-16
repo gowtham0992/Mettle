@@ -96,7 +96,7 @@ version was permanently removed.
   -> evidence -> packet preparation -> final approval -> PDF` in one runtime
   session.
 - Replaying the same start idempotency key does not repeat the Bedrock intake.
-- `npx agentcore validate --json` succeeds.
+- `npm ci && npx agentcore validate --json` succeeds from a clean clone.
 - `scripts/prune_agentcore_zip.sh` strips repository-only files after packaging
   and fails if the zip still contains `.env`, `.aws`, `.git`, design sources,
   docs, tests, scripts, AgentCore deployment state, or Node dependencies.

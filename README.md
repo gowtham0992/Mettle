@@ -117,6 +117,7 @@ This exposes **Ground with Bedrock** and enables real-photo assessment. Model ID
 The AgentCore app accepts a small, discriminated operation contract covering `start`, `review`, `resume`, evidence, deadline checks, packet assembly, and final approval.
 
 ```bash
+npm ci
 npx agentcore dev --runtime MettleRecovery --port 8081 --logs --skip-deploy
 ```
 
@@ -136,6 +137,7 @@ The gateway owns the AgentCore session identifier, reuses it for safe retries an
 
 ```bash
 uv run pytest
+npm ci
 npx agentcore validate --json
 ```
 
