@@ -7,6 +7,20 @@ const elements = {
   workspaceNav: document.querySelector("#workspace-nav"),
   workspaceTabs: [...document.querySelectorAll("[data-workspace-tab]")],
   workspacePanels: [...document.querySelectorAll("[data-workspace-panel]")],
+  judgeTour: document.querySelector("#judge-tour"),
+  tourStops: [...document.querySelectorAll("[data-tour-stop]")],
+  tourProgressLabel: document.querySelector("#tour-progress-label"),
+  tourEyebrow: document.querySelector("#tour-eyebrow"),
+  tourTitle: document.querySelector("#tour-title"),
+  tourCopy: document.querySelector("#tour-copy"),
+  tourVisual: document.querySelector("#tour-visual"),
+  tourControlTitle: document.querySelector("#tour-control-title"),
+  tourControlCopy: document.querySelector("#tour-control-copy"),
+  tourAction: document.querySelector("#tour-action"),
+  tourActionNote: document.querySelector("#tour-action-note"),
+  tourExit: document.querySelector("#tour-exit"),
+  tourMetrics: document.querySelector("#tour-metrics"),
+  demoDriver: document.querySelector(".demo-driver"),
   nextAction: document.querySelector("#next-action"),
   nextActionEyebrow: document.querySelector("#next-action-eyebrow"),
   nextActionTitle: document.querySelector("#next-action-title"),
@@ -76,6 +90,7 @@ const elements = {
   auth: document.querySelector("#auth-button"),
   home: document.querySelector("#mettle-home"),
   welcomeDialog: document.querySelector("#welcome-dialog"),
+  startTourEntry: document.querySelector("#start-tour-entry"),
   startRecoveryEntry: document.querySelector("#start-recovery-entry"),
   trySampleEntry: document.querySelector("#try-sample-entry"),
   resumeCurrentEntry: document.querySelector("#resume-current-entry"),
@@ -121,8 +136,11 @@ let setupReturnsToWelcome = false;
 let pendingCorrectionReview = null;
 let correctionReviewKey = null;
 let nextActionHandler = null;
+let tourActionHandler = null;
 const workspaceViews = new Set(["recovery", "evidence", "activity"]);
 let activeWorkspaceView = workspaceViewFromUrl();
+let judgeTourActive = new URLSearchParams(window.location.search).get("tour") === "1"
+  || sessionStorage.getItem("mettle_entry_selected") === "tour";
 
 function workspaceViewFromUrl() {
   const requested = new URLSearchParams(window.location.search).get("view");
@@ -158,6 +176,53 @@ function openWorkspacePanel(view, targetSelector, focusSelector = null) {
     target?.scrollIntoView({ behavior: "smooth", block: "start" });
     if (focusSelector) document.querySelector(focusSelector)?.focus();
   }, 0);
+}
+
+function setTourIsolation(active) {
+  for (const region of [elements.workspaceNav, elements.nextAction, elements.demoDriver, elements.awayBriefing, elements.dashboard]) {
+    if (active) {
+      region.hidden = true;
+      region.setAttribute("inert", "");
+      region.setAttribute("aria-hidden", "true");
+    } else {
+      region.removeAttribute("inert");
+      region.removeAttribute("aria-hidden");
+    }
+  }
+  if (!active && campaign) {
+    elements.workspaceNav.hidden = false;
+    elements.nextAction.hidden = false;
+    elements.demoDriver.hidden = false;
+    elements.dashboard.hidden = false;
+    renderBackgroundBrief(campaign);
+  }
+}
+
+function setJudgeTourActive(active, { updateUrl = false, focus = true } = {}) {
+  judgeTourActive = Boolean(active);
+  document.body.classList.toggle("tour-mode", judgeTourActive);
+  elements.judgeTour.hidden = !judgeTourActive;
+  setTourIsolation(judgeTourActive);
+  if (judgeTourActive) setWorkspaceView("recovery");
+  if (updateUrl) {
+    const url = new URL(window.location.href);
+    if (judgeTourActive) {
+      url.searchParams.set("tour", "1");
+      url.searchParams.delete("view");
+      url.searchParams.delete("workflow");
+      url.searchParams.delete("runtime");
+    } else {
+      url.searchParams.delete("tour");
+    }
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+  if (judgeTourActive && campaign) renderJudgeTour(campaign);
+  if (focus) {
+    window.setTimeout(() => {
+      if (judgeTourActive) elements.tourAction.focus();
+      else elements.workspaceTabs.find((tab) => tab.dataset.workspaceTab === activeWorkspaceView)?.focus();
+    }, 0);
+  }
 }
 
 function base64Url(bytes) {
@@ -919,7 +984,9 @@ function renderAgentRun(data) {
   const completed = steps.filter((step) => step.status === "completed").length;
   elements.agentRunSummary.textContent = interrupted
     ? `${completed} agent steps completed · ${interrupted} paused for contractor judgment`
-    : `${completed} agent steps completed · no unnecessary contractor interrupt`;
+    : Number(data.metrics?.contractor_decisions || 0) > 0
+      ? `${completed} execution lanes completed · ${data.metrics.contractor_decisions} professional decisions recorded`
+      : `${completed} agent steps completed · no unnecessary contractor interrupt`;
   elements.agentNodes.replaceChildren(...steps.map((step) => {
     const item = node("li", `agent-node agent-node--${step.status}`);
     item.append(node("span", "agent-node__sequence", String(step.sequence).padStart(2, "0")));
@@ -1022,6 +1089,250 @@ function renderMetrics(metrics) {
     row.append(node("dd", "", String(value)), node("dt", "", label));
     return row;
   }));
+}
+
+function pendingJudgment(data, judgmentId) {
+  return (data.judgments || []).find(
+    (judgment) => judgment.judgment_id === judgmentId && judgment.status === "pending",
+  );
+}
+
+function tourPhase(data) {
+  if (data.packet_status === "approved") {
+    return {
+      key: "complete", scene: 5, stopIndex: 4, complete: true,
+      eyebrow: "RECOVERY COMPLETE · CONTRACTOR APPROVED",
+      title: "Reinspection ready—with the authority trail intact.",
+      copy: "The notice, accepted proof, recovery history, and contractor approval now live in one reviewable packet.",
+      controlTitle: "The agent absorbed the coordination, not the accountability.",
+      controlCopy: "Inspect the Strands run to see every specialist handoff, autonomous action, and professional interrupt behind this result.",
+      actionLabel: "Inspect the Strands agent run",
+      actionNote: "FULL EXECUTION TRACE · NO PROMPTS OR PRIVATE PAYLOADS",
+      action: "inspect",
+    };
+  }
+  if (pendingJudgment(data, "final-approval")) {
+    return {
+      key: "approval", scene: 5, stopIndex: 3,
+      eyebrow: "FINAL GATE · PROFESSIONAL CONTROL",
+      title: "The packet is assembled. Mettle still cannot release it.",
+      copy: "Every citation has accepted proof, but contacting the inspector remains a contractor-controlled action.",
+      controlTitle: "Autonomy ends exactly where professional authority begins.",
+      controlCopy: "The packet agent prepared the artifact and then stopped. Your approval is recorded alongside the evidence it releases.",
+      actionLabel: "Approve the reinspection packet",
+      actionNote: "EXPLICIT APPROVAL · DOWNLOAD UNLOCKS AFTERWARD",
+      action: "approve-packet",
+    };
+  }
+  if (pendingJudgment(data, "deadline-choice")) {
+    return {
+      key: "deadline", scene: 3, stopIndex: 2,
+      eyebrow: "BACKGROUND RECOVERY · DEADLINE ADAPTED",
+      title: "Mettle rejected weak proof and changed the chase as the clock tightened.",
+      copy: "Accepted work left the campaign. The incomplete framing photo triggered a precise re-request; two days out, only unresolved trades were escalated.",
+      controlTitle: "The agent handled the routine pressure. The deadline tradeoff stays yours.",
+      controlCopy: "Mettle can escalate follow-up, but it will not decide whether a contractor should keep or move the reinspection date.",
+      actionLabel: "Keep the date and escalate",
+      actionNote: "CONTRACTOR DECISION · CRITICAL RECOVERY RESUMES",
+      action: "resolve-deadline",
+    };
+  }
+  if (pendingJudgment(data, "code-c3")) {
+    return {
+      key: "boundary", scene: 1, stopIndex: 0,
+      eyebrow: "NOTICE IN · RECOVERY OUT",
+      title: "One failed-inspection notice becomes an active recovery.",
+      copy: "Mettle derives the docket from the authority’s own language, sends the unambiguous requests, and stops where professional interpretation begins.",
+      controlTitle: "The agent did not invent a missing evidence requirement.",
+      controlCopy: "It prepared the recovery and contacted two trades, then reserved the ambiguous mechanical requirement for the contractor.",
+      actionLabel: "Approve the evidence boundary",
+      actionNote: "ONE HUMAN DECISION · THEN THE CAMPAIGN RESUMES",
+      action: "resolve-code",
+    };
+  }
+  if (Number(data.scenario_step || 0) >= 3) {
+    return {
+      key: "finish", scene: 4, stopIndex: 2,
+      eyebrow: "OPEN-ONLY REPLANNING · RECOVERY CONTINUES",
+      title: "Closed work stays closed. Mettle keeps chasing only what remains.",
+      copy: "The contractor’s deadline decision is recorded. The recovery graph can now accept replacement proof, close the final citations, and assemble the packet.",
+      controlTitle: "One click compresses the remaining multi-day campaign.",
+      controlCopy: "Watch the evidence and packet agents finish the bounded work. Mettle will stop again before anything can reach the inspector.",
+      actionLabel: "Finish the background recovery",
+      actionNote: "SYNTHETIC TIME COMPRESSION · SAME OPEN-ONLY POLICY",
+      action: "advance",
+    };
+  }
+  return {
+    key: "recovery", scene: 2, stopIndex: 1,
+    eyebrow: "BOUNDARY SET · CAMPAIGN RESUMED",
+    title: "Now Mettle can work while the contractor is somewhere else.",
+    copy: "The approved evidence rule is attached to citation 3. From here, specialist agents coordinate trades, assess visible proof, and adapt follow-up against the deadline.",
+    controlTitle: "The next click represents days of background coordination.",
+    controlCopy: "Mettle will accept sufficient proof, reject an incomplete submission with a specific re-request, and interrupt only when the deadline creates a real tradeoff.",
+    actionLabel: "Run the background campaign",
+    actionNote: "WATCH ACCEPTANCE · REJECTION · DEADLINE ESCALATION",
+    action: "advance",
+  };
+}
+
+function tourArtifact({ index, title, detail, status, tone = "" }) {
+  const card = node("article", `tour-artifact${tone ? ` tour-artifact--${tone}` : ""}`);
+  card.append(node("span", "tour-artifact__index", index));
+  const body = node("div", "tour-artifact__body");
+  body.append(node("strong", "", title), node("p", "", detail));
+  card.append(body, node("span", "tour-artifact__status", status));
+  return card;
+}
+
+function citationTourArtifact(citation) {
+  const labels = {
+    ready: ["ACCEPTED", "ready"],
+    evidence_rejected: ["RE-REQUESTED", "blocked"],
+    needs_judgment: ["NEEDS YOU", "blocked"],
+    awaiting_evidence: ["IN RECOVERY", ""],
+  };
+  const [status, tone] = labels[citation.stage] || [citation.stage.toUpperCase(), ""];
+  const detail = citation.evidence_note
+    || citation.evidence_requirements?.[0]
+    || citation.notice_text;
+  return tourArtifact({
+    index: `C${citation.citation_id}`,
+    title: `${citation.code_reference} · ${titleCase(citation.trade)}`,
+    detail,
+    status,
+    tone,
+  });
+}
+
+function renderTourVisual(data, phase) {
+  const artifacts = [];
+  if (phase.key === "boundary") {
+    artifacts.push(
+      tourArtifact({
+        index: "PDF",
+        title: "Municipal correction notice received",
+        detail: `“${data.citations[0].notice_text}” plus 2 additional numbered findings.`,
+        status: "SOURCE",
+        tone: "emphasis",
+      }),
+      node("div", "tour-transition", "Intake + coordination agents"),
+      tourArtifact({
+        index: "2×",
+        title: "Unambiguous trade requests sent",
+        detail: "Electrical and framing received notice-anchored proof requests without project setup.",
+        status: "ASSIGNED",
+        tone: "ready",
+      }),
+      citationTourArtifact(data.citations.find((citation) => citation.citation_id === "3")),
+    );
+  } else if (phase.key === "deadline") {
+    const accepted = data.citations.find((citation) => citation.stage === "ready");
+    const rejected = data.citations.find((citation) => citation.stage === "evidence_rejected");
+    if (accepted) artifacts.push(citationTourArtifact(accepted));
+    if (rejected) artifacts.push(citationTourArtifact(rejected));
+    artifacts.push(tourArtifact({
+      index: "T−2",
+      title: "Recovery cadence moved to critical",
+      detail: "Silent trades were escalated; the contractor received the deadline tradeoff instead of more routine noise.",
+      status: "NEEDS YOU",
+      tone: "blocked",
+    }));
+  } else if (phase.key === "approval" || phase.key === "complete") {
+    artifacts.push(
+      ...data.citations.map(citationTourArtifact),
+      node("div", "tour-transition", phase.key === "complete" ? "Contractor approval recorded" : "Packet agent assembled the trail"),
+      tourArtifact({
+        index: "PDF",
+        title: phase.key === "complete" ? "Reinspection evidence packet approved" : "Reinspection evidence packet prepared",
+        detail: "Notice language, accepted evidence, recovery history, and the human approval record in one artifact.",
+        status: phase.key === "complete" ? "READY" : "LOCKED",
+        tone: phase.key === "complete" ? "ready" : "blocked",
+      }),
+    );
+  } else {
+    artifacts.push(...data.citations.map(citationTourArtifact));
+  }
+  elements.tourVisual.replaceChildren(...artifacts);
+}
+
+async function resolveTourJudgment(judgmentId, decision, successMessage) {
+  setBusy(elements.tourAction, true);
+  try {
+    campaign = await request(`/api/judgments/${encodeURIComponent(judgmentId)}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ decision }),
+    });
+    render(campaign);
+    showToast(successMessage);
+  } catch (error) {
+    showError(error);
+  } finally {
+    setBusy(elements.tourAction, false);
+    if (campaign) renderJudgeTour(campaign);
+  }
+}
+
+function renderJudgeTour(data) {
+  if (!judgeTourActive || data.source_mode === "workflow") return;
+  const phase = tourPhase(data);
+  elements.judgeTour.hidden = false;
+  document.body.classList.add("tour-mode");
+  setTourIsolation(true);
+  elements.tourProgressLabel.textContent = phase.complete ? "RECOVERY COMPLETE" : `SCENE ${phase.scene} OF 5`;
+  elements.tourEyebrow.textContent = phase.eyebrow;
+  elements.tourTitle.textContent = phase.title;
+  elements.tourCopy.textContent = phase.copy;
+  elements.tourControlTitle.textContent = phase.controlTitle;
+  elements.tourControlCopy.textContent = phase.controlCopy;
+  elements.tourAction.textContent = phase.actionLabel;
+  elements.tourActionNote.textContent = phase.actionNote;
+  elements.tourAction.disabled = demoRunning;
+  elements.tourAction.setAttribute("aria-busy", String(demoRunning));
+  for (const [index, stop] of elements.tourStops.entries()) {
+    const state = phase.complete || index < phase.stopIndex
+      ? "complete"
+      : index === phase.stopIndex ? "active" : "upcoming";
+    stop.dataset.state = state;
+  }
+  renderTourVisual(data, phase);
+  const metricValues = [
+    ["Citations ready", `${data.metrics.citations_ready}/${data.metrics.citations_total}`],
+    ["Messages handled", data.metrics.messages_handled],
+    ["Agent actions", data.metrics.automated_actions],
+    ["Your decisions", data.metrics.contractor_decisions],
+  ];
+  elements.tourMetrics.replaceChildren(...metricValues.map(([label, value]) => {
+    const metric = node("div", "tour-metric");
+    metric.append(node("dd", "", String(value)), node("dt", "", label));
+    return metric;
+  }));
+  tourActionHandler = phase.action === "resolve-code"
+    ? () => resolveTourJudgment(
+      "code-c3",
+      "Wide photo showing the equipment and measured service clearance",
+      "Evidence boundary approved. Mettle resumed the recovery.",
+    )
+    : phase.action === "resolve-deadline"
+      ? () => resolveTourJudgment(
+        "deadline-choice",
+        "Keep the current reinspection target and continue critical recovery",
+        "Deadline decision recorded. Critical recovery resumed.",
+      )
+      : phase.action === "approve-packet"
+        ? () => resolveTourJudgment(
+          "final-approval",
+          "Approve packet for reinspection scheduling",
+          "Final approval recorded. The reinspection packet is ready.",
+        )
+        : phase.action === "inspect"
+          ? () => {
+            setJudgeTourActive(false, { updateUrl: true, focus: false });
+            sessionStorage.setItem("mettle_entry_selected", "sample");
+            setWorkspaceView("activity", { updateUrl: true, focusTab: true });
+            window.setTimeout(() => document.querySelector(".agent-run-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+          }
+          : runSampleUntilPause;
 }
 
 function buildBackgroundBrief(data) {
@@ -1251,6 +1562,7 @@ function render(data) {
 
   renderMetrics(data.metrics);
   renderPacket(data);
+  renderJudgeTour(data);
   const isWorkflow = data.source_mode === "workflow";
   const isAgentCore = isWorkflow && data.execution_target === "agentcore";
   elements.evidencePanel.hidden = !isWorkflow;
@@ -1315,12 +1627,15 @@ function render(data) {
 
 async function loadCampaign() {
   elements.error.hidden = true;
-  const workflowId = new URLSearchParams(window.location.search).get("workflow");
-  const workflowTarget = new URLSearchParams(window.location.search).get("runtime") === "agentcore"
+  const params = new URLSearchParams(window.location.search);
+  const workflowId = params.get("workflow");
+  const workflowTarget = params.get("runtime") === "agentcore"
     ? "agentcore"
     : "local";
   try {
     if (workflowId) {
+      sessionStorage.setItem("mettle_entry_selected", "workflow");
+      setJudgeTourActive(false, { focus: false });
       activeWorkflowId = workflowId;
       activeWorkflowTarget = workflowTarget;
       const workflowRoot = workflowTarget === "agentcore"
@@ -1333,8 +1648,11 @@ async function loadCampaign() {
     } else {
       activeWorkflowId = null;
       activeWorkflowTarget = "local";
-      render(await request("/api/campaign"));
-      if (!sessionStorage.getItem("mettle_entry_selected") && !elements.welcomeDialog.open) {
+      const entry = sessionStorage.getItem("mettle_entry_selected");
+      const directTour = params.get("tour") === "1" && entry !== "tour";
+      if (directTour) sessionStorage.setItem("mettle_entry_selected", "tour");
+      render(await request(directTour ? "/api/demo/reset" : "/api/campaign", directTour ? { method: "POST", body: "{}" } : {}));
+      if (!entry && !judgeTourActive && !elements.welcomeDialog.open) {
         elements.welcomeDialog.showModal();
       }
     }
@@ -1402,7 +1720,7 @@ elements.photoForm.addEventListener("submit", async (event) => {
   }
 });
 
-elements.advance.addEventListener("click", async () => {
+async function runSampleUntilPause() {
   if (demoRunning || activeWorkflowId || campaign?.scenario_complete) return;
   demoRunning = true;
   render(campaign);
@@ -1417,7 +1735,8 @@ elements.advance.addEventListener("click", async () => {
       render(updated);
       if (updated.scenario_step === previousStep) {
         showToast("Mettle paused the campaign for your judgment.");
-        document.querySelector(".judgment input")?.focus();
+        if (judgeTourActive) elements.tourAction.focus();
+        else document.querySelector(".judgment input")?.focus();
         break;
       }
       if (!updated.scenario_complete) {
@@ -1428,9 +1747,14 @@ elements.advance.addEventListener("click", async () => {
     showError(error);
   } finally {
     demoRunning = false;
-    if (campaign) render(campaign);
+    if (campaign) {
+      render(campaign);
+      if (judgeTourActive) elements.tourAction.focus();
+    }
   }
-});
+}
+
+elements.advance.addEventListener("click", runSampleUntilPause);
 
 elements.reset.addEventListener("click", async () => {
   setBusy(elements.reset, true);
@@ -1454,27 +1778,62 @@ for (const tab of elements.workspaceTabs) {
   tab.addEventListener("click", () => setWorkspaceView(tab.dataset.workspaceTab, { updateUrl: true }));
 }
 
-window.addEventListener("popstate", () => setWorkspaceView(workspaceViewFromUrl()));
+window.addEventListener("popstate", () => {
+  const tourFromUrl = new URLSearchParams(window.location.search).get("tour") === "1";
+  setJudgeTourActive(tourFromUrl, { focus: false });
+  if (!tourFromUrl) setWorkspaceView(workspaceViewFromUrl());
+});
 
 elements.nextActionButton.addEventListener("click", () => nextActionHandler?.());
+elements.tourAction.addEventListener("click", () => tourActionHandler?.());
+elements.tourExit.addEventListener("click", () => {
+  sessionStorage.setItem("mettle_entry_selected", "sample");
+  setJudgeTourActive(false, { updateUrl: true });
+});
 
 elements.home.addEventListener("click", (event) => {
   event.preventDefault();
   setupReturnsToWelcome = false;
   if (elements.noticeDialog.open) elements.noticeDialog.close();
-  elements.resumeCurrentEntry.hidden = !activeWorkflowId;
+  elements.resumeCurrentEntry.hidden = !(activeWorkflowId || judgeTourActive);
+  elements.resumeCurrentEntry.querySelector("strong").textContent = judgeTourActive ? "Return to guided tour" : "Return to current recovery";
+  elements.resumeCurrentEntry.querySelector("span:last-child").textContent = judgeTourActive
+    ? "Close this chooser without leaving the staged evaluator path."
+    : "Close this chooser without changing the recovery already in progress.";
   if (!elements.welcomeDialog.open) elements.welcomeDialog.showModal();
 });
 
 elements.startRecoveryEntry.addEventListener("click", () => {
+  setJudgeTourActive(false, { updateUrl: true, focus: false });
   elements.welcomeDialog.close();
   openRecoverySetup({ returnToWelcome: true });
+});
+
+elements.startTourEntry.addEventListener("click", async () => {
+  sessionStorage.setItem("mettle_entry_selected", "tour");
+  setBusy(elements.startTourEntry, true);
+  elements.welcomeDialog.close();
+  window.history.replaceState({}, "", window.location.pathname);
+  setWorkspaceView("recovery");
+  activeWorkflowId = null;
+  activeWorkflowTarget = "local";
+  try {
+    campaign = await request("/api/demo/reset", { method: "POST", body: "{}" });
+    setJudgeTourActive(true, { updateUrl: true, focus: false });
+    render(campaign);
+  } catch (error) {
+    showError(error);
+  } finally {
+    setBusy(elements.startTourEntry, false);
+  }
+  elements.tourAction.focus();
 });
 
 elements.trySampleEntry.addEventListener("click", async () => {
   sessionStorage.setItem("mettle_entry_selected", "sample");
   setBusy(elements.trySampleEntry, true);
   elements.welcomeDialog.close();
+  setJudgeTourActive(false, { focus: false });
   window.history.replaceState({}, "", window.location.pathname);
   setWorkspaceView("recovery");
   activeWorkflowId = null;
@@ -1491,7 +1850,8 @@ elements.trySampleEntry.addEventListener("click", async () => {
 
 elements.resumeCurrentEntry.addEventListener("click", () => {
   elements.welcomeDialog.close();
-  elements.nextActionButton.focus();
+  if (judgeTourActive) elements.tourAction.focus();
+  else elements.nextActionButton.focus();
 });
 
 elements.setupNext.addEventListener("click", () => {

@@ -372,7 +372,11 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Recovery command center" in page.text
     assert "Start with the failed-inspection report" in page.text
     assert "Start a recovery" in page.text
-    assert "Try the sample campaign" in page.text
+    assert "Take the 90-second tour" in page.text
+    assert "Explore the sample freely" in page.text
+    assert 'id="judge-tour"' in page.text
+    assert "Same product, staged for evaluation" in page.text
+    assert "Failed-inspection recovery stages" in page.text
     assert "Extract on AgentCore" in page.text
     assert "Extract locally" in page.text
     assert "Approve & begin recovery" in page.text
@@ -400,9 +404,16 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function openWorkspacePanel(view" in script.text
     assert "function buildBackgroundBrief(data)" in script.text
     assert "function renderBackgroundBrief(data)" in script.text
+    assert "function setJudgeTourActive(active" in script.text
+    assert "function tourPhase(data)" in script.text
+    assert "function renderJudgeTour(data)" in script.text
+    assert "async function runSampleUntilPause()" in script.text
+    assert 'sessionStorage.setItem("mettle_entry_selected", "tour")' in script.text
     assert styles.status_code == 200
     assert ".workspace-panel--view-hidden" in styles.text
     assert ".dashboard--focused" in styles.text
+    assert ".recovery-line" in styles.text
+    assert ".tour-mode .dashboard" in styles.text
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"
 

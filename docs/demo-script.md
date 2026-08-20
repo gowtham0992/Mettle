@@ -28,7 +28,7 @@ Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, not
 
 ## 1:42–3:12 — Show the complete product journey
 
-**On screen:** Return home and select **Try the sample campaign**. Keep the `SAMPLE CAMPAIGN · SYNTHETIC DATA` label visible. Run the compressed recovery.
+**On screen:** Return home and select **Take the 90-second tour**. Keep the `GUIDED EVALUATOR PATH · SYNTHETIC DATA` label visible. Follow the recovery line through the staged campaign.
 
 **Narration:**
 
@@ -38,7 +38,7 @@ Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, not
 
 **Narration:**
 
-> The evidence specialist accepts the panel photo because the required label and breaker position are visible. This framing photo is not enough: the location and full clearance are missing, so Mettle asks for a wider shot instead of pretending the correction passed. In the live cloud path, a dedicated multimodal Strands agent on Nova Lite performs this visible-proof assessment. It never claims code compliance.
+> The evidence specialist accepts the panel set because the full work area and measured clearance are visible. The framing photo is not enough: its wider wall location is missing, so Mettle asks for that specific view instead of pretending the correction passed. In the live cloud path, a dedicated multimodal Strands agent on Nova Lite performs this visible-proof assessment. It never claims code compliance.
 
 **On screen:** Advance to the T−2 deadline gate. Choose **Keep the date** and continue.
 
@@ -48,11 +48,11 @@ Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, not
 
 ## 3:12–3:55 — Human authority and final artifact
 
-**On screen:** Resolve the ambiguous mechanical evidence requirement. Approve the packet, download it, and scroll the citation-to-evidence table.
+**On screen:** Finish the background recovery, approve the packet at the final gate, select **Inspect the Strands agent run**, then open **Evidence & packet** to download it.
 
 **Narration:**
 
-> Ambiguous notice language is another hard boundary: the contractor defines what visible proof is needed. After every citation has accepted evidence, Mettle assembles this traceable packet—but download stays blocked until final contractor approval. The result maps each notice citation to its trade, evidence, timeline, and consent record.
+> The ambiguous mechanical requirement was the tour’s first hard boundary: the contractor defined the visible proof before recovery began. After every citation has accepted evidence, Mettle assembles this traceable packet—but download stays blocked until final contractor approval. The result maps each notice citation to its trade, evidence, timeline, and consent record.
 
 ## 3:55–4:28 — Architecture and deployed autonomy proof
 

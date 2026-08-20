@@ -33,7 +33,7 @@ The result is not another dashboard to babysit. Mettle works between events and 
 
 ## See it work
 
-Open the **[live guided demo](https://d1ytth8asjpes8.cloudfront.net)** and select **Run compressed recovery**. The public journey uses synthetic contractor, property, notice, and evidence data so judges can experience the complete product without credentials or cloud spend.
+Open the **[live guided demo](https://d1ytth8asjpes8.cloudfront.net)** and select **Take the 90-second tour**. The public journey stages the real sample endpoints into five focused scenes, using synthetic contractor, property, notice, and evidence data so judges can experience the complete product without credentials or cloud spend. Every result remains inspectable afterward in the full workspace.
 
 The compressed run demonstrates:
 
@@ -105,7 +105,7 @@ uv run mettle ingest examples/notices/failed-rough-in.txt --as-of 2026-08-10
 uv run mettle serve
 ```
 
-Open [http://127.0.0.1:4310](http://127.0.0.1:4310), then select **Run compressed recovery** or **Load notice**. The server binds only to the local machine. The included communication adapter records proposed messages but sends nothing externally.
+Open [http://127.0.0.1:4310](http://127.0.0.1:4310), then select **Take the 90-second tour**, **Explore the sample freely**, or **Start a recovery**. The server binds only to the local machine. The included communication adapter records proposed messages but sends nothing externally.
 
 The default path is deterministic, reproducible, and free. It uses the same domain contracts, Strands graphs, interrupts, retry rules, packet gate, and UI as the cloud path without invoking a model.
 

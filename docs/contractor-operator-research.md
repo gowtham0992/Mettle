@@ -53,7 +53,7 @@ The competitive wedge is narrow. PermitFlow covers permitting, AHJ coordination,
 
 ### Build now
 
-- Two honest entry points: **Start a recovery** and **Try the sample campaign**.
+- Three honest entry points: **Take the 90-second tour** for evaluators, **Start a recovery** for contractors, and **Explore the sample freely** for product inspection.
 - A setup path that asks for the failed-inspection text/report, the working date, and editable trade contacts.
 - A review step that makes clear that Mettle drafts and records outreach; it does not contact an inspector or certify compliance.
 - One dominant **Next action** after setup. Priority order: contractor judgment, collect/assess evidence, run the next scheduled check, prepare packet, approve packet, download packet.

@@ -55,6 +55,47 @@
         <div class="skeleton skeleton--wide"></div><div class="skeleton"></div>
       </div>
 
+      <section class="judge-tour" id="judge-tour" aria-labelledby="tour-title" hidden>
+        <header class="judge-tour__header">
+          <div>
+            <p class="mono-label">GUIDED EVALUATOR PATH · SYNTHETIC DATA</p>
+            <strong id="tour-progress-label">SCENE 1 OF 5</strong>
+          </div>
+          <button class="tour-exit" id="tour-exit" type="button">Explore the full product <span aria-hidden="true">↗</span></button>
+        </header>
+
+        <ol class="recovery-line" aria-label="Failed-inspection recovery stages">
+          <li data-tour-stop="notice"><span>01</span><strong>Notice</strong><small>Grounded</small></li>
+          <li data-tour-stop="assigned"><span>02</span><strong>Assigned</strong><small>Coordinated</small></li>
+          <li data-tour-stop="proof"><span>03</span><strong>Proof</strong><small>Verified</small></li>
+          <li data-tour-stop="approved"><span>04</span><strong>Approved</strong><small>Human gate</small></li>
+          <li data-tour-stop="reinspection"><span>05</span><strong>Reinspection</strong><small>Ready</small></li>
+        </ol>
+
+        <div class="tour-stage">
+          <div class="tour-stage__copy">
+            <p class="mono-label" id="tour-eyebrow">NOTICE IN · RECOVERY OUT</p>
+            <h1 id="tour-title">One failed-inspection notice becomes an active recovery.</h1>
+            <p id="tour-copy">Mettle derives the work from the authority’s own language and stops where professional interpretation begins.</p>
+          </div>
+
+          <div class="tour-stage__visual" id="tour-visual" aria-live="polite"></div>
+
+          <aside class="tour-stage__control" aria-labelledby="tour-control-title">
+            <p class="mono-label">WHAT TO NOTICE</p>
+            <strong id="tour-control-title">The agent did not invent a missing requirement.</strong>
+            <p id="tour-control-copy">It prepared the recovery, contacted the unambiguous trades, and reserved one consequential decision for the contractor.</p>
+            <button class="button button--orange tour-action" id="tour-action" type="button">Approve the evidence boundary</button>
+            <span id="tour-action-note">ONE HUMAN DECISION · THEN THE CAMPAIGN RESUMES</span>
+          </aside>
+        </div>
+
+        <footer class="tour-outcome">
+          <p><span aria-hidden="true">◆</span><strong>Same product, staged for evaluation.</strong> Every scene uses the sample campaign’s real endpoints and remains inspectable in the full workspace.</p>
+          <dl id="tour-metrics" aria-label="Recovery outcome so far"></dl>
+        </footer>
+      </section>
+
       <nav class="workspace-nav" id="workspace-nav" aria-label="Recovery workspace" hidden>
         <button class="workspace-tab" type="button" data-workspace-tab="recovery" aria-current="page">
           <span>01</span><strong>Recovery</strong><small>What needs attention now</small>
@@ -237,15 +278,20 @@
         <p>Mettle reads the failed-inspection report, organizes the responsible trades and proof, follows the deadline, and interrupts you only for decisions.</p>
       </div>
       <div class="welcome-dialog__choices">
-        <button class="entry-choice entry-choice--primary" id="start-recovery-entry" type="button">
+        <button class="entry-choice entry-choice--primary" id="start-tour-entry" type="button">
           <span class="entry-choice__index">01</span>
+          <strong>Take the 90-second tour</strong>
+          <span>Follow one failed inspection from notice to contractor-approved packet.</span>
+        </button>
+        <button class="entry-choice" id="start-recovery-entry" type="button">
+          <span class="entry-choice__index">02</span>
           <strong>Start a recovery</strong>
           <span>Paste a redacted inspection report and guide the setup.</span>
         </button>
         <button class="entry-choice" id="try-sample-entry" type="button">
-          <span class="entry-choice__index">02</span>
-          <strong>Try the sample campaign</strong>
-          <span>Use synthetic data and see the full recovery loop.</span>
+          <span class="entry-choice__index">03</span>
+          <strong>Explore the sample freely</strong>
+          <span>Open the complete recovery workspace with synthetic data.</span>
         </button>
         <button class="entry-choice entry-choice--resume" id="resume-current-entry" type="button" hidden>
           <span class="entry-choice__index">↩</span>
