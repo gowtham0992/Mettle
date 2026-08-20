@@ -39,7 +39,10 @@ class FakeGateway:
         return self.envelope, self.executed
 
 
-def test_scheduler_handler_validates_event_and_returns_only_safe_reference(monkeypatch) -> None:
+def test_scheduler_handler_validates_event_and_returns_only_safe_reference(
+    monkeypatch,
+    caplog,
+) -> None:
     envelope, _ = WorkflowRegistry().create(
         payload(), idempotency_key="scheduler_handler_source"
     )
@@ -60,12 +63,15 @@ def test_scheduler_handler_validates_event_and_returns_only_safe_reference(monke
         "logical_check_on": "2026-08-14",
     }
 
-    result = scheduler_runtime.handle_scheduled_check(event, None)
+    with caplog.at_level("INFO"):
+        result = scheduler_runtime.handle_scheduled_check(event, None)
 
     assert result["ok"] is True
     assert result["executed"] is True
     assert result["automation_status"] == "scheduled"
     assert envelope.workflow_id not in str(result)
+    assert envelope.workflow_id not in caplog.text
+    assert result["workflow_reference"] in caplog.text
     assert len(gateway.events) == 1
 
 

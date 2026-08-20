@@ -42,7 +42,8 @@ commits.
 
 The `mettle-web` profile assumes the exact-resource `MettleWebDeployer` role.
 It can update only the deployed `mettle-web` Lambda, synchronize only Mettle's
-static bucket, and invalidate only Mettle's CloudFront distribution. The direct
+static bucket, read deployment artifacts only beneath the private `web/`
+prefix, and invalidate only Mettle's CloudFront distribution. The direct
 release script verifies that assumed-role ARN and refuses root or any other
 identity before building or changing AWS resources:
 

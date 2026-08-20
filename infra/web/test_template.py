@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import yaml
@@ -21,6 +22,21 @@ TEMPLATE = yaml.load(
     Loader=CloudFormationLoader,
 )
 RESOURCES = TEMPLATE["Resources"]
+
+
+def test_scoped_web_deployer_can_rollback_only_from_web_artifacts() -> None:
+    policy = json.loads(
+        Path("infra/web/iam/deployer-policy.json").read_text(encoding="utf-8")
+    )
+    artifact_statement = next(
+        statement
+        for statement in policy["Statement"]
+        if statement["Sid"] == "ReadOnlyImmutableWebArtifacts"
+    )
+
+    assert artifact_statement["Action"] == "s3:GetObject"
+    assert artifact_statement["Resource"].endswith("/web/*")
+    assert "/runtime/" not in artifact_statement["Resource"]
 
 
 def test_live_agentcore_routes_require_jwt_but_demo_routes_remain_public() -> None:
@@ -52,6 +68,16 @@ def test_lambda_role_is_least_privilege_and_cannot_manage_infrastructure() -> No
     assert {action for action in actions if action.startswith("iam:")} == {"iam:PassRole"}
     assert not any("CreateAgentRuntime" in action for action in actions)
     assert "*" not in actions
+
+    invoke_statement = next(
+        statement
+        for statement in statements
+        if statement["Sid"] == "InvokeOnlyMettleRuntime"
+    )
+    assert invoke_statement["Resource"] == [
+        {"Ref": "AgentCoreRuntimeArn"},
+        {"Sub": "${AgentCoreRuntimeArn}/runtime-endpoint/DEFAULT"},
+    ]
 
 
 def test_scheduler_is_one_time_bounded_and_has_a_dead_letter_path() -> None:
@@ -94,6 +120,15 @@ def test_scheduler_worker_has_no_public_route_or_sms_permission() -> None:
     }
     assert "sns:Publish" not in actions
     assert not any(action.startswith("sms-voice:") for action in actions)
+    invoke_statement = next(
+        statement
+        for statement in statements
+        if statement["Sid"] == "InvokeOnlyMettleRuntime"
+    )
+    assert invoke_statement["Resource"] == [
+        {"Ref": "AgentCoreRuntimeArn"},
+        {"Sub": "${AgentCoreRuntimeArn}/runtime-endpoint/DEFAULT"},
+    ]
 
 
 def test_storage_is_private_encrypted_and_ephemeral_packets_expire() -> None:

@@ -86,7 +86,7 @@ Self-registration is disabled, the browser uses authorization code with PKCE,
 and no browser receives AWS credentials.
 
 The Lambda never uses deployment credentials. Its execution role can invoke
-only the exact Mettle AgentCore runtime ARN, read and conditionally update one
+only the exact Mettle AgentCore runtime ARN and its `DEFAULT` endpoint, read and conditionally update one
 DynamoDB table, and write contractor-approved packets beneath one private S3
 bucket. It cannot create or update runtimes, list either bucket, scan the table,
 or call IAM. DynamoDB keys contain only a hash of the verified Cognito subject;
@@ -153,7 +153,8 @@ Putting all behavior inside agent prompts would produce an impressive but untest
    paid routes, and a public deterministic judge journey.**
 9. **Autonomous wake-up:** create one-time EventBridge schedules, invoke a
    private worker, reject stale events, and surface failures through a DLQ.
-   **Complete in the checked-in serverless stack; deployment verification is pending.**
+   **Deployed and verified end to end: a live synthetic workflow advanced from
+   schedule version 1 to version 2, then the follow-on smoke schedule was cancelled.**
 10. **One-way messaging:** keep recording as the safe default and allow Amazon
     SNS delivery only to a hashed, pre-approved personal demo destination.
     **Complete in code; AWS messaging enrollment and live-send verification are pending.**

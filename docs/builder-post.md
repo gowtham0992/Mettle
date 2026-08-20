@@ -154,7 +154,7 @@ Those are product boundaries, not footnotes. A small contractor does not need an
 
 - **Live guided demo:** [d1ytth8asjpes8.cloudfront.net](https://d1ytth8asjpes8.cloudfront.net)—synthetic data, no AWS account required
 - **Source and setup:** [github.com/gowtham0992/Mettle](https://github.com/gowtham0992/Mettle)—MIT licensed, public, and verified from an anonymous clone
-- **Verification:** 118 tests run without AWS credentials or model spend; `npx agentcore validate --json` succeeds from a clean install
+- **Verification:** 119 tests run without AWS credentials or model spend; `npx agentcore validate --json` succeeds from a clean install
 - **Hackathon track:** Professional Agents
 
 **Notice in. Reinspection ready. Mettle handles the chase. The contractor decides.**

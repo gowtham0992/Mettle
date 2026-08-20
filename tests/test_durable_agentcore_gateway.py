@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 from collections import deque
 from datetime import UTC, datetime
 from hashlib import sha256
@@ -11,6 +12,7 @@ import pytest
 from botocore.exceptions import ClientError
 
 from mettle.automation import AutomationStatus, CampaignAutomation, ScheduledCheckEvent
+from mettle.agentcore_gateway import AgentCoreGatewayError
 from mettle.durable_agentcore_gateway import DurableAgentCoreWorkflowGateway
 from mettle.request_identity import (
     AuthenticationRequired,
@@ -125,6 +127,17 @@ class QueueClient:
         }
 
 
+class DeniedClient:
+    def invoke_agent_runtime(self, **_kwargs):
+        raise ClientError(
+            {
+                "Error": {"Code": "AccessDeniedException", "Message": "sensitive"},
+                "ResponseMetadata": {"RequestId": "safe-request-id"},
+            },
+            "InvokeAgentRuntime",
+        )
+
+
 class UnusedBucket:
     pass
 
@@ -194,6 +207,21 @@ class FakeCampaignScheduler:
 def test_live_gateway_fails_closed_without_verified_subject() -> None:
     with pytest.raises(AuthenticationRequired):
         gateway(MemoryTable(), QueueClient([])).get("workflow")
+
+
+def test_agentcore_failure_logs_only_safe_provider_metadata(caplog) -> None:
+    durable = gateway(MemoryTable(), DeniedClient())
+
+    with caplog.at_level(logging.WARNING), pytest.raises(AgentCoreGatewayError):
+        durable._invoke(
+            session_id="mettle-session-12345678901234567890",
+            payload={"notice_text": "must-not-appear"},
+        )
+
+    assert "AccessDeniedException" in caplog.text
+    assert "safe-request-id" in caplog.text
+    assert "sensitive" not in caplog.text
+    assert "must-not-appear" not in caplog.text
 
 
 def test_workflow_survives_gateway_recreation_and_is_owner_scoped() -> None:

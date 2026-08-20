@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import logging
 import time
 from hashlib import sha256
 from typing import Any
@@ -44,6 +45,7 @@ from mettle.workflow_registry import (
 SESSION_TTL_SECONDS = 8 * 60 * 60
 LOCK_SECONDS = 45
 MAX_PACKET_BYTES = 25_000_000
+LOGGER = logging.getLogger(__name__)
 
 
 def _is_conditional_failure(exc: ClientError) -> bool:
@@ -524,6 +526,19 @@ class DurableAgentCoreWorkflowGateway:
                 payload=payload,
             )
         except Exception as exc:
+            error_code = "unknown"
+            request_id = "unknown"
+            if isinstance(exc, ClientError):
+                error = exc.response.get("Error", {})
+                metadata = exc.response.get("ResponseMetadata", {})
+                error_code = str(error.get("Code", "unknown"))
+                request_id = str(metadata.get("RequestId", "unknown"))
+            LOGGER.warning(
+                "agentcore_invoke_failed error_type=%s code=%s request_id=%s",
+                type(exc).__name__,
+                error_code,
+                request_id,
+            )
             raise AgentCoreGatewayError(
                 "AgentCore could not be reached with the current server configuration"
             ) from exc

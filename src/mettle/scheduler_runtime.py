@@ -13,6 +13,7 @@ from mettle.durable_agentcore_gateway import DurableAgentCoreWorkflowGateway
 
 
 LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.INFO)
 
 
 def configured_gateway() -> DurableAgentCoreWorkflowGateway:
