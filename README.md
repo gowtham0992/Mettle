@@ -25,7 +25,7 @@ Mettle starts with the event contractors already receive: a failed-inspection no
 
 1. **Understand the notice.** A Strands intake agent converts unstructured municipal language into a validated correction docket while preserving the source text.
 2. **Pause before outreach.** The contractor confirms the responsible trade, closure route, and proof request for every citation. Until then, Mettle records zero outreach.
-3. **Run the recovery.** A Strands graph assigns open corrections, records replay-safe follow-ups, and changes urgency at server-selected T−7, T−3, T−2, T−1, and deadline checkpoints.
+3. **Run the recovery.** A Strands graph assigns open corrections, records replay-safe follow-ups, and changes urgency at server-selected T−7, T−3, T−2, T−1, and deadline checkpoints. EventBridge Scheduler wakes the authenticated workflow for the next bounded check; the contractor does not have to keep the dashboard open.
 4. **Review visible proof.** A dedicated multimodal Strands Evidence Agent uses Nova Lite to check only whether a submitted photo shows the notice-specific requirements. Insufficient photos receive a precise re-request; ambiguity returns to the contractor.
 5. **Close with consent.** Mettle maps each citation to its evidence and communication history, then blocks the final PDF until the contractor approves it.
 
@@ -47,7 +47,7 @@ The **Agent run** panel makes the orchestration inspectable: judges can see spec
 
 The browser playback is clearly labeled as a guided demonstration. The repository also includes the working Strands workflow, opt-in Bedrock execution, and deployed AgentCore boundary used by the live cloud path.
 
-The unauthenticated Strands route keeps workflow state in one warm Lambda instance, so shared `?workflow=` links are demonstration conveniences rather than durable records. The authenticated AgentCore path owns session mapping in DynamoDB; production campaign persistence and scheduling remain future work.
+The unauthenticated Strands route keeps workflow state in one warm Lambda instance, so shared `?workflow=` links are demonstration conveniences rather than durable records. The authenticated AgentCore path owns session mapping in DynamoDB and the repository defines one-time EventBridge schedules with stale-event rejection, retries, and a dead-letter queue. The 90-second judge run is deliberately accelerated and remains bounded by AgentCore's eight-hour session lifetime; multi-day production campaign persistence is future work.
 
 ## Architecture
 
@@ -77,6 +77,8 @@ Mettle is event-driven work across time, not a prompt-response wrapper. It keeps
 | Visible-evidence assessment | A dedicated multimodal `strands.Agent` on Nova Lite, followed by deterministic accept, re-request, or manual-review policy | [`src/mettle/agents/vision.py`](src/mettle/agents/vision.py) |
 | Inspectable autonomy | Safe Strands graph hooks and evidence-agent traces rendered as a visible Agent Run without exposing prompts or private payloads | [`src/mettle/workflow.py`](src/mettle/workflow.py), [`src/mettle/web/static/app.js`](src/mettle/web/static/app.js) |
 | Managed agent runtime | The same typed workflow operations run behind an Amazon Bedrock AgentCore entrypoint | [`agentcore_app.py`](agentcore_app.py) |
+| Work across time | One-time EventBridge schedules wake the next deadline checkpoint; schedule versions and idempotency keys make stale or replayed events safe | [`src/mettle/automation.py`](src/mettle/automation.py), [`src/mettle/scheduler_runtime.py`](src/mettle/scheduler_runtime.py) |
+| One-way trade updates | Communication records by default; opt-in Amazon SNS delivery is restricted to one pre-approved, hashed demo destination and never accepts inbound messages | [`src/mettle/communication.py`](src/mettle/communication.py) |
 | Secure public product | CloudFront, private S3, Cognito PKCE, API Gateway, Lambda, DynamoDB, WAF, and short-lived packet delivery | [`infra/web/template.yaml`](infra/web/template.yaml) |
 
 This division is deliberate. Language models are useful where inputs are unstructured or visual; deterministic policy is safer where a deadline, retry, permission, or compliance claim must be exact.
@@ -147,7 +149,7 @@ npm ci
 npx agentcore validate --json
 ```
 
-The 108-test suite exercises notice parsing, campaign policy, Strands node tracing, interruptions and resume, failed-review retry safety, multimodal evidence-agent contracts, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
+The 118-test suite exercises notice parsing, campaign policy, Strands node tracing, interruptions and resume, failed-review retry safety, multimodal evidence-agent contracts, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, schedule creation and stale-event rejection, one-way delivery guardrails, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
 
 ## Security and cost boundaries
 
@@ -155,9 +157,11 @@ The 108-test suite exercises notice parsing, campaign policy, Strands node traci
 - **No credentials in the client:** all AWS profiles, regions, model IDs, runtime identifiers, and session IDs remain server-side.
 - **Least privilege:** checked-in IAM policies restrict model access to Nova Micro and Nova Lite and runtime invocation to Mettle's resource.
 - **Replay safety:** workflow creation, follow-ups, evidence submission, and resume operations use idempotency controls.
+- **Bounded scheduling:** each checkpoint is a one-time EventBridge schedule with a versioned payload, two retries, a dead-letter queue, and automatic deletion; stale events cannot advance the workflow.
+- **No open messaging channel:** SMS is outbound-only and disabled by default. Enabling Amazon SNS requires a server-side SHA-256 allowlist for one demo phone; all other recipients remain recorded simulations.
 - **Safe uploads:** image bodies are capped, decoded, stripped of metadata, dimension-bounded, and re-encoded before model use.
 - **Short-lived artifacts:** approved PDFs are integrity-checked, encrypted in private S3, and delivered through a 60-second presigned URL; stored packets expire after one day.
-- **Explicit limitations:** AgentCore session state is not presented as durable memory, and the demo is not presented as a production scheduler.
+- **Explicit limitations:** AgentCore session state is not presented as durable memory. The accelerated scheduler demonstrates autonomous wake-ups inside one live session, not durable multi-day production operation.
 
 For the full permission model and teardown procedure, see [`docs/aws-access.md`](docs/aws-access.md).
 
@@ -167,6 +171,7 @@ For the full permission model and teardown procedure, see [`docs/aws-access.md`]
 src/mettle/agents/       Strands intake and Bedrock model adapters
 src/mettle/workflow.py   Strands graphs, hooks, interrupts, and resume
 src/mettle/campaign.py   Deterministic deadline and recovery policy
+src/mettle/automation.py One-time EventBridge scheduling and stale-event policy
 src/mettle/evidence.py   Evidence contracts and decision boundary
 src/mettle/packet.py     Approval-gated PDF generation
 src/mettle/web/          Contractor command center and local API
@@ -180,9 +185,9 @@ docs/                    Architecture, scope, research, and operations
 
 ## Scope
 
-Mettle begins after an inspection fails. It is not a permitting suite, a construction management platform, or an authority on building code. The current hackathon slice handles one project, one representative notice shape, three trades, recorded rather than delivered communications, and a compressed deadline clock.
+Mettle begins after an inspection fails. It is not a permitting suite, a construction management platform, or an authority on building code. The current hackathon slice handles one project, one representative notice shape, three trades, outbound-only communication, and a compressed deadline clock. Communication records safely by default; an Amazon SNS adapter can deliver only to one pre-approved personal demo number after account enrollment and explicit server-side opt-in.
 
-Those constraints preserve the single workflow that matters: **notice in, recovery out**. Production expansion would add jurisdiction-specific notice adapters, a real scheduler, an approved messaging provider, and durable campaign persistence without changing the authority boundary.
+Those constraints preserve the single workflow that matters: **notice in, recovery out**. Production expansion would add jurisdiction-specific notice adapters, consent and opt-out operations for messaging, and durable campaign persistence without changing the authority boundary.
 
 Read [`docs/product-scope.md`](docs/product-scope.md) and [`docs/contractor-operator-research.md`](docs/contractor-operator-research.md) for the product decisions and domain evidence behind that scope.
 

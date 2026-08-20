@@ -126,7 +126,7 @@ For AgentCore deployment, I used direct **CodeZip** rather than accepting the CL
 
 Cost control is part of the design. The synthetic public journey makes zero Bedrock calls. Credit-metered routes sit behind Cognito, and the browser cannot choose model IDs or regions. Internet photo bodies are capped at 3.5 MB at the deployed edge, decoded, pixel-bounded, stripped of metadata, and re-encoded before the vision agent sees them. The adapter uses non-streaming Converse, avoiding a broader streaming permission for this operation.
 
-One limitation matters: AgentCore runtime sessions are ephemeral. Mettle configures a 15-minute idle timeout and an eight-hour maximum lifetime. DynamoDB durably maps an authenticated user to the active session, but the hackathon slice does not integrate AgentCore Memory or a production scheduler. I would rather state that boundary than imply durability that is not present.
+One limitation matters: AgentCore runtime sessions are ephemeral. Mettle configures a 15-minute idle timeout and an eight-hour maximum lifetime. DynamoDB durably maps an authenticated user to the active session, and EventBridge Scheduler can wake the next checkpoint during the accelerated judge run, but this is not durable multi-day campaign memory. I would rather state that boundary than imply persistence that is not present.
 
 > **Demo boundary:** `SAMPLE TRACE` is deterministic playback over synthetic data. `LIVE · STRANDS` runs the real graph with deterministic local notice extraction. The authenticated AgentCore path runs the graph with Nova-backed intake and evidence assessment. The interface and repository label these paths separately.
 
@@ -146,7 +146,7 @@ These failures pushed the implementation in the same direction: models work on b
 
 ## What I deliberately left out
 
-Mettle supports one representative residential notice shape and a small set of trade categories. Messaging is recorded rather than delivered; I will not add an SMS provider until contractor and subcontractor consent and opt-out requirements are settled. The public sample compresses days into ninety seconds. There is no durable AgentCore Memory integration or production scheduler. Mettle never contacts an inspector and never claims code compliance autonomously.
+Mettle supports one representative residential notice shape and a small set of trade categories. Messaging is one-way and recorded by default. An opt-in Amazon SNS adapter can send only to one hashed, pre-approved personal demo number; it is not an inbound trade channel and is not a substitute for contractor consent or opt-out operations. The public sample compresses days into ninety seconds. EventBridge Scheduler advances that accelerated run, but there is no durable AgentCore Memory integration for a real multi-day campaign. Mettle never contacts an inspector and never claims code compliance autonomously.
 
 Those are product boundaries, not footnotes. A small contractor does not need another chatbot that can discuss an inspection. They need the repetitive recovery work handled, the consequential decisions surfaced, and a trustworthy record at the end.
 
@@ -154,7 +154,7 @@ Those are product boundaries, not footnotes. A small contractor does not need an
 
 - **Live guided demo:** [d1ytth8asjpes8.cloudfront.net](https://d1ytth8asjpes8.cloudfront.net)—synthetic data, no AWS account required
 - **Source and setup:** [github.com/gowtham0992/Mettle](https://github.com/gowtham0992/Mettle)—MIT licensed, public, and verified from an anonymous clone
-- **Verification:** 108 tests run without AWS credentials or model spend; `npx agentcore validate --json` succeeds from a clean install
+- **Verification:** 118 tests run without AWS credentials or model spend; `npx agentcore validate --json` succeeds from a clean install
 - **Hackathon track:** Professional Agents
 
 **Notice in. Reinspection ready. Mettle handles the chase. The contractor decides.**

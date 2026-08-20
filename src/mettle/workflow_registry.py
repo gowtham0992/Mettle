@@ -10,7 +10,8 @@ from threading import Lock
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from mettle.communication import Recipient, RecordingMessenger
+from mettle.automation import CampaignAutomation
+from mettle.communication import Messenger, Recipient, RecordingMessenger
 from mettle.domain import InspectionNotice, Trade
 from mettle.evidence import EvidenceAssessment, EvidenceSampleNotFound, assess_sample
 from mettle.packet import PacketRecord, PacketStatus, render_packet_pdf
@@ -26,6 +27,7 @@ from mettle.workflow import (
 
 NoticeExtractor = Callable[[str], InspectionNotice]
 PhotoAssessor = Callable[..., EvidenceAssessment]
+MessengerFactory = Callable[[], Messenger]
 
 
 class WorkflowNotFound(RuntimeError):
@@ -146,6 +148,7 @@ class WorkflowEnvelope(BaseModel):
     snapshot: WorkflowSnapshot
     evidence: list[EvidenceAssessment] = Field(default_factory=list)
     packet: PacketRecord | None = None
+    automation: CampaignAutomation | None = None
 
 
 class _WorkflowEntry:
@@ -184,12 +187,14 @@ class WorkflowRegistry:
         capacity: int = 50,
         bedrock_intake: NoticeExtractor | None = None,
         photo_assessor: PhotoAssessor | None = None,
+        messenger_factory: MessengerFactory | None = None,
     ) -> None:
         if capacity < 1:
             raise ValueError("capacity must be positive")
         self._capacity = capacity
         self._bedrock_intake = bedrock_intake
         self._photo_assessor = photo_assessor
+        self._messenger_factory = messenger_factory or RecordingMessenger
         self._lock = Lock()
         self._entries: dict[str, _WorkflowEntry] = {}
         self._create_replays: dict[str, tuple[str, str, WorkflowEnvelope]] = {}
@@ -261,7 +266,7 @@ class WorkflowRegistry:
                 notice_text=payload.notice_text,
                 as_of=payload.as_of,
                 roster=roster,
-                messenger=RecordingMessenger(),
+                messenger=self._messenger_factory(),
                 **({"notice_extractor": notice_extractor} if notice_extractor else {}),
             )
             snapshot = session.start()

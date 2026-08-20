@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Secure public web edge for Mettle with Cognito, Lambda, DynamoDB, S3, CloudFront, and WAF.
+Description: Secure public Mettle workflow with Cognito, AgentCore, EventBridge Scheduler, Lambda, DynamoDB, S3, CloudFront, and WAF.
 
 Parameters:
   AgentCoreRuntimeArn:
@@ -30,6 +30,26 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: expires_at
         Enabled: true
+      Tags:
+        - Key: Project
+          Value: Mettle
+
+  RecoveryScheduleGroup:
+    Type: AWS::Scheduler::ScheduleGroup
+    Properties:
+      Name: mettle-recovery
+      Tags:
+        - Key: Project
+          Value: Mettle
+
+  SchedulerDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      QueueName: mettle-scheduler-dlq
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
       Tags:
         - Key: Project
           Value: Mettle
@@ -195,6 +215,20 @@ Resources:
                 Effect: Allow
                 Action: bedrock-agentcore:InvokeAgentRuntime
                 Resource: !Ref AgentCoreRuntimeArn
+              - Sid: ManageOnlyMettleRecoverySchedules
+                Effect: Allow
+                Action:
+                  - scheduler:CreateSchedule
+                  - scheduler:UpdateSchedule
+                  - scheduler:DeleteSchedule
+                Resource: !Sub 'arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${RecoveryScheduleGroup}/*'
+              - Sid: PassOnlyMettleSchedulerRole
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/MettleSchedulerInvoke'
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: scheduler.amazonaws.com
               - Sid: TraceRequests
                 Effect: Allow
                 Action:
@@ -231,8 +265,142 @@ Resources:
           METTLE_MAX_UPLOAD_BYTES: '3500000'
           METTLE_COGNITO_CLIENT_ID: !Ref UserPoolClient
           METTLE_COGNITO_DOMAIN: !Sub 'https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'
+          METTLE_SCHEDULER_ENABLED: '1'
+          METTLE_SCHEDULER_TARGET_ARN: !GetAtt SchedulerFunction.Arn
+          METTLE_SCHEDULER_ROLE_ARN: !GetAtt SchedulerInvokeRole.Arn
+          METTLE_SCHEDULER_GROUP: !Ref RecoveryScheduleGroup
+          METTLE_SCHEDULER_DLQ_ARN: !GetAtt SchedulerDeadLetterQueue.Arn
+          METTLE_SCHEDULER_TIMEZONE: America/Denver
+          METTLE_SCHEDULER_DEMO_DELAY_SECONDS: '90'
       Tags:
         Project: Mettle
+
+  SchedulerFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/mettle-scheduler
+      RetentionInDays: 14
+
+  SchedulerFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: MettleSchedulerLambda
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: MettleSchedulerExactAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: WriteOwnLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub '${SchedulerFunctionLogGroup.Arn}:*'
+              - Sid: MutateScheduledWorkflowState
+                Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt WorkflowTable.Arn
+              - Sid: InvokeOnlyMettleRuntime
+                Effect: Allow
+                Action: bedrock-agentcore:InvokeAgentRuntime
+                Resource: !Ref AgentCoreRuntimeArn
+              - Sid: ManageOnlyMettleRecoverySchedules
+                Effect: Allow
+                Action:
+                  - scheduler:CreateSchedule
+                  - scheduler:UpdateSchedule
+                  - scheduler:DeleteSchedule
+                Resource: !Sub 'arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/${RecoveryScheduleGroup}/*'
+              - Sid: PassOnlyMettleSchedulerRole
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/MettleSchedulerInvoke'
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: scheduler.amazonaws.com
+              - Sid: TraceRequests
+                Effect: Allow
+                Action:
+                  - xray:PutTraceSegments
+                  - xray:PutTelemetryRecords
+                Resource: '*'
+      Tags:
+        - Key: Project
+          Value: Mettle
+
+  SchedulerFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: SchedulerFunctionLogGroup
+    Properties:
+      FunctionName: mettle-scheduler
+      CodeUri: ../../build/web-lambda
+      Handler: scheduler_handler.handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Role: !GetAtt SchedulerFunctionRole.Arn
+      MemorySize: 512
+      Timeout: 60
+      Tracing: Active
+      Environment:
+        Variables:
+          METTLE_AGENTCORE_RUNTIME_ARN: !Ref AgentCoreRuntimeArn
+          METTLE_AWS_REGION: !Ref AWS::Region
+          METTLE_DYNAMODB_TABLE: !Ref WorkflowTable
+          METTLE_PACKET_BUCKET: !Ref PacketBucket
+          METTLE_SCHEDULER_TARGET_ARN: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:mettle-scheduler'
+          METTLE_SCHEDULER_ROLE_ARN: !GetAtt SchedulerInvokeRole.Arn
+          METTLE_SCHEDULER_GROUP: !Ref RecoveryScheduleGroup
+          METTLE_SCHEDULER_DLQ_ARN: !GetAtt SchedulerDeadLetterQueue.Arn
+          METTLE_SCHEDULER_TIMEZONE: America/Denver
+          METTLE_SCHEDULER_DEMO_DELAY_SECONDS: '90'
+      Tags:
+        Project: Mettle
+
+  SchedulerInvokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: MettleSchedulerInvoke
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule-group/${RecoveryScheduleGroup}'
+      Policies:
+        - PolicyName: InvokeOnlyMettleSchedulerWorker
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: InvokeWorker
+                Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:mettle-scheduler'
+              - Sid: SendFailedInvocationToDlq
+                Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt SchedulerDeadLetterQueue.Arn
+      Tags:
+        - Key: Project
+          Value: Mettle
 
   HttpApi:
     Type: AWS::ApiGatewayV2::Api
@@ -585,6 +753,38 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
 
+  SchedulerLambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Mettle autonomous scheduler worker returned an error.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref SchedulerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  SchedulerDlqAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Mettle has an autonomous checkpoint in the dead-letter queue.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt SchedulerDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
   ApiServerErrorAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -618,3 +818,7 @@ Outputs:
     Value: !Sub 'https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'
   ApiEndpoint:
     Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+  RecoveryScheduleGroupName:
+    Value: !Ref RecoveryScheduleGroup
+  SchedulerDeadLetterQueueUrl:
+    Value: !Ref SchedulerDeadLetterQueue

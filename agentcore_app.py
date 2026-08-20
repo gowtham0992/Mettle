@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from functools import partial
 from pathlib import Path
 
 
@@ -14,6 +15,7 @@ from bedrock_agentcore import BedrockAgentCoreApp, RequestContext
 from mettle.agentcore_runtime import MettleAgentCoreRuntime
 from mettle.agents.bedrock import BedrockIntakeSettings, extract_notice_with_bedrock
 from mettle.agents.vision import BedrockVisionSettings, assess_photo_with_bedrock
+from mettle.communication import RecordingMessenger, SnsMessenger
 from mettle.workflow_registry import WorkflowRegistry
 
 
@@ -35,10 +37,33 @@ def photo_assessor(**kwargs):
     return assess_photo_with_bedrock(**kwargs, settings=vision_settings)
 
 
+def configured_messenger_factory():
+    if os.getenv("METTLE_SMS_ENABLED") != "1":
+        return RecordingMessenger
+    allowed_destination_sha256 = os.getenv(
+        "METTLE_SMS_ALLOWED_DESTINATION_SHA256", ""
+    )
+    if not allowed_destination_sha256:
+        raise RuntimeError(
+            "METTLE_SMS_ALLOWED_DESTINATION_SHA256 is required when SMS is enabled"
+        )
+    import boto3
+
+    client = boto3.Session(
+        region_name=os.getenv("AWS_REGION", "us-east-1")
+    ).client("sns")
+    return partial(
+        SnsMessenger,
+        client=client,
+        allowed_destination_sha256=allowed_destination_sha256,
+    )
+
+
 runtime = MettleAgentCoreRuntime(
     workflows=WorkflowRegistry(
         bedrock_intake=bedrock_intake,
         photo_assessor=photo_assessor,
+        messenger_factory=configured_messenger_factory(),
     )
 )
 app = BedrockAgentCoreApp()

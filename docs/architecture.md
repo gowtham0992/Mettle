@@ -32,7 +32,7 @@ The intake graph runs `intake -> plan -> correction review -> coordinate -> judg
 
 ### External ports
 
-SMS, object storage, model providers, and packet rendering live behind small interfaces. The demo begins with recording fakes. Twilio, Amazon S3, Amazon Bedrock, and AgentCore can replace those fakes independently.
+Outbound messaging, object storage, model providers, scheduling, and packet rendering live behind small interfaces. The demo begins with recording fakes. Amazon SNS, Amazon S3, Amazon Bedrock, AgentCore, and EventBridge Scheduler can replace those fakes independently. Messaging is intentionally one-way: Mettle sends a bounded request but does not ingest SMS replies or pretend a carrier thread is workflow state.
 
 The evidence lab keeps a trusted catalog of synthetic photo fixtures as a reliable fallback and also accepts real JPEG/PNG uploads. The server caps the raw body, decodes and bounds pixels, removes metadata, and re-encodes to JPEG before invoking a dedicated multimodal Strands Evidence Agent on Nova Lite. The model adapter deliberately uses non-streaming Converse so the runtime does not need a broader streaming permission for this bounded assessment. The agent returns one validated finding per notice requirement; deterministic policy derives accepted, rejected, or manual-review status and never asks the model to infer code compliance. Idempotency fingerprints include the normalized image bytes so retries cannot repeat model spend.
 
@@ -42,7 +42,7 @@ Packet generation begins only when the latest evidence for every citation is acc
 
 ### Local application boundary
 
-FastAPI exposes bounded workflow creation, retrieval, correction-review, resume, evidence, packet, and next-check endpoints to the command center. A thread-safe in-memory registry owns each stateful Strands session, caps the number of runs, and protects every mutation with idempotency keys. It is a development boundary, not durable production storage; a production scheduler can invoke the same next-check operation later.
+FastAPI exposes bounded workflow creation, retrieval, correction-review, resume, evidence, packet, and next-check endpoints to the command center. A thread-safe in-memory registry owns each stateful Strands session, caps the number of runs, and protects every mutation with idempotency keys. It is a development boundary, not durable production storage.
 
 ### AgentCore runtime boundary
 
@@ -94,6 +94,18 @@ each workflow and idempotency attempt is therefore caller-scoped without
 persisting an email address or access token. Records expire with the AgentCore
 session after eight hours.
 
+After a successful authenticated mutation, deterministic campaign policy
+selects the next logical checkpoint. The gateway creates a versioned, one-time
+EventBridge schedule targeting a private Lambda worker. Its payload contains no
+phone number, notice text, property address, or AgentCore session identifier.
+It carries only an owner hash, workflow identifier, logical date, schedule
+name, and version. The worker reloads the caller-scoped mapping from DynamoDB
+and rejects stale versions before invoking the same AgentCore session.
+Schedules delete after completion, retry twice, and send exhausted events to
+an encrypted dead-letter queue. The 90-second demo cadence proves autonomous
+wake-up inside the eight-hour runtime-session boundary; durable multi-day
+campaigns require a future persistence layer.
+
 Generated PDFs are integrity-checked, stored encrypted for at most one day,
 and returned through a 60-second presigned download. Internet photo bodies are
 capped at 3.5 MB before the existing decode, pixel-bound, metadata-strip, and
@@ -115,8 +127,8 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 ## Failure behavior
 
 - Invalid structured output is rejected and leaves the campaign unchanged.
-- Duplicate inbound messages are ignored by an idempotency key.
-- SMS failure records an event and schedules a retry; it never marks a citation complete.
+- Duplicate outbound delivery attempts are ignored by an idempotency key.
+- Amazon SNS failure fails closed and never records a message as sent or marks a citation complete; a successful provider receipt is cached for replay-safe retries within the session.
 - Unclear evidence creates a re-request or judgment item; it never certifies completion.
 - A missed deadline moves the campaign to critical review instead of silently rescheduling.
 
@@ -139,11 +151,17 @@ Putting all behavior inside agent prompts would produce an impressive but untest
    private packet storage, Cognito authentication, and a CloudFront/Lambda edge.
    **Deployed behind CloudFront with private origins, WAF, Cognito-protected
    paid routes, and a public deterministic judge journey.**
-9. **Live integrations:** add AgentCore Memory where it creates demonstrable
-   value and an SMS adapter only after partner validation.
+9. **Autonomous wake-up:** create one-time EventBridge schedules, invoke a
+   private worker, reject stale events, and surface failures through a DLQ.
+   **Complete in the checked-in serverless stack; deployment verification is pending.**
+10. **One-way messaging:** keep recording as the safe default and allow Amazon
+    SNS delivery only to a hashed, pre-approved personal demo destination.
+    **Complete in code; AWS messaging enrollment and live-send verification are pending.**
 
 ## Decisions we can reverse later
 
-The SMS provider remains intentionally undecided. The public demo uses
-DynamoDB, private S3, CloudFront, API Gateway, Lambda, Cognito, and WAF; the
-local FastAPI path remains independent for offline rehearsals.
+The public demo uses DynamoDB, private S3, CloudFront, API Gateway, Lambda,
+Cognito, and WAF; the local FastAPI path remains independent for offline
+rehearsals. Amazon SNS is the only delivery adapter. It is disabled unless the
+runtime receives a SHA-256 allowlist for one demo destination, and every other
+phone number falls back to a recorded delivery without contacting a carrier.

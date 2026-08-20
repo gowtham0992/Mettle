@@ -27,6 +27,7 @@ docker run --rm --platform linux/amd64 \
   -lc 'python -m pip install --no-cache-dir --target build/web-lambda -r build/web-requirements.txt && python -m pip install --no-cache-dir --no-deps --target build/web-lambda .'
 
 cp "${repo_dir}/lambda_handler.py" "${build_dir}/lambda_handler.py"
+cp "${repo_dir}/scheduler_handler.py" "${build_dir}/scheduler_handler.py"
 
 find "${build_dir}" -type d -name '__pycache__' -prune -exec rm -rf '{}' +
 find "${build_dir}" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete

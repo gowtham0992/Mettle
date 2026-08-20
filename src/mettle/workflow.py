@@ -833,7 +833,8 @@ class RecoveryWorkflowSession:
                         f'Notice: "{citation.notice_text}" '
                         f'Contractor direction: "{decision}" '
                         f"Reinspection target: {notice.reinspection_due_on.isoformat()}. "
-                        "Reply with the requested photos; Mettle does not certify compliance."
+                        "Send the requested photos to your contractor through the agreed "
+                        "project channel; Mettle does not certify compliance."
                     ),
                     idempotency_key=f"delivery:{delivery_token}:decision",
                     scheduled_on=plan.as_of,

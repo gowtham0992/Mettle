@@ -232,6 +232,21 @@ function formatTime(value) {
     .format(new Date(value));
 }
 
+function formatTimestamp(value) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(new Date(value));
+}
+
+function maskedPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length >= 4 ? `••• ••• ${digits.slice(-4)}` : "private number";
+}
+
 function daysBetween(from, to) {
   return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
 }
@@ -248,6 +263,7 @@ function workflowCampaign(envelope, executionTarget = "local") {
   const snapshot = envelope.snapshot;
   const notice = snapshot.notice;
   const plan = snapshot.plan;
+  const automation = envelope.automation || null;
   if (!notice || !plan) throw new Error("The workflow did not produce a notice and recovery plan.");
 
   const deliveries = new Map(snapshot.deliveries.map((item) => [item.citation_id, item]));
@@ -268,12 +284,13 @@ function workflowCampaign(envelope, executionTarget = "local") {
       : assessment?.status === "rejected" ? "evidence_rejected" : null;
     return {
       ...citation,
-      assignee: delivery ? `${delivery.recipient.name} · ${delivery.recipient.phone}` : null,
+      assignee: delivery ? `${delivery.recipient.name} · ${maskedPhone(delivery.recipient.phone)}` : null,
       evidence_note: assessment?.explanation || (needsJudgment
         ? "Mettle needs an evidence-spec decision before outreach"
         : delivery?.message_id.endsWith("-decision")
-          ? "Contractor-directed request recorded locally"
-          : delivery ? "Initial request recorded locally" : "No outreach until contractor review"),
+          ? "Contractor-directed request recorded"
+          : delivery?.status === "sent" ? "One-way SMS accepted by Amazon SNS"
+            : delivery ? "Request recorded without carrier delivery" : "No outreach until contractor review"),
       stage: assessedStage || (needsJudgment ? "needs_judgment" : "awaiting_evidence"),
     };
   });
@@ -292,19 +309,39 @@ function workflowCampaign(envelope, executionTarget = "local") {
     ...snapshot.deliveries.map((delivery, index) => {
       const followUp = delivery.message_id.endsWith("-followup");
       const contractorDirected = delivery.message_id.endsWith("-decision");
+      const sent = delivery.status === "sent";
       return {
         happened_at: `${delivery.scheduled_on}T08:${String(16 + index).padStart(2, "0")}:00Z`,
-        kind: followUp ? "deadline_escalation" : "message_recorded",
+        kind: followUp ? "deadline_escalation" : sent ? "message_sent" : "message_recorded",
         actor: followUp ? "Mettle · chase graph" : "Mettle · coordinator",
         title: followUp
           ? `Autonomously followed up C${delivery.citation_id} with ${delivery.recipient.name}`
-          : `${contractorDirected ? "Recorded contractor-directed" : "Recorded"} C${delivery.citation_id} request for ${delivery.recipient.name}`,
-        detail: followUp
-          ? `${plan.priority.toUpperCase()} cadence at ${daysBetween(delivery.scheduled_on, notice.reinspection_due_on)} day(s) to reinspection; no live SMS was sent.`
-          : "Local delivery adapter used; no live SMS was sent.",
+          : `${sent ? "Sent" : "Recorded"} ${contractorDirected ? "contractor-directed " : ""}C${delivery.citation_id} request for ${delivery.recipient.name}`,
+        detail: sent
+          ? "Amazon SNS accepted this transactional, one-way SMS. Replies are intentionally outside the demo scope."
+          : followUp
+            ? `${plan.priority.toUpperCase()} cadence at ${daysBetween(delivery.scheduled_on, notice.reinspection_due_on)} day(s) to reinspection; carrier delivery was not enabled for this destination.`
+            : "The safe recording adapter preserved the action without contacting this destination.",
       };
     }),
   ];
+  if (automation) {
+    events.push({
+      happened_at: automation.next_check_at || timestamp(8, 22),
+      kind: `automation_${automation.status}`,
+      actor: "Mettle · EventBridge Scheduler",
+      title: automation.status === "scheduled"
+        ? `Armed autonomous T−${daysBetween(automation.logical_check_on, notice.reinspection_due_on)} checkpoint`
+        : automation.status === "awaiting_decision"
+          ? "Automation paused at a contractor judgment gate"
+          : "Autonomous campaign stood down",
+      detail: automation.status === "scheduled"
+        ? `${automation.accelerated_demo_clock ? "Accelerated demo clock" : "Production campaign clock"} · next execution ${formatTimestamp(automation.next_check_at)}.`
+        : automation.status === "awaiting_decision"
+          ? "No background outreach will continue until the contractor resolves the judgment."
+          : "No future EventBridge checkpoint remains for this campaign.",
+    });
+  }
   if (pendingInterrupt) {
     events.push({
       happened_at: timestamp(8, 19), kind: "judgment_requested", actor: "Mettle · judgment gate",
@@ -389,6 +426,9 @@ function workflowCampaign(envelope, executionTarget = "local") {
     execution_target: executionTarget,
     intake_provider: envelope.intake_provider || "local",
     workflow_status: snapshot.status,
+    automation_status: automation?.status || null,
+    next_check_at: automation?.next_check_at || null,
+    accelerated_demo_clock: automation?.accelerated_demo_clock === true,
     correction_review_required: correctionReviewRequired,
     correction_review_interrupt: correctionReviewRequired ? pendingInterrupt.interrupt_id : null,
     review_citations: correctionReviewRequired ? pendingInterrupt.reason.citations : [],
@@ -986,12 +1026,16 @@ function renderRecoveryClock(data) {
   const next = checkpoints.find((checkpoint) => checkpoint.date > data.as_of);
   const closed = open === 0;
   const expired = !next;
+  const autonomous = data.execution_target === "agentcore" && data.automation_status === "scheduled";
   if (closed) {
     elements.clockTitle.textContent = "All citations closed · campaign standing down";
     elements.clockCopy.textContent = "Accepted evidence removed every citation from the chase plan. Mettle will send no further follow-ups.";
   } else if (waiting) {
     elements.clockTitle.textContent = `${open} open citation${open === 1 ? "" : "s"} · waiting for your decision`;
     elements.clockCopy.textContent = "The campaign is paused at a Strands judgment gate. Resolve it above before the next scheduled check.";
+  } else if (autonomous) {
+    elements.clockTitle.textContent = `EventBridge armed · ${formatTimestamp(data.next_check_at)}`;
+    elements.clockCopy.textContent = `${open} open citation${open === 1 ? "" : "s"}. ${data.accelerated_demo_clock ? "ACCELERATED DEMO CLOCK · " : ""}Mettle will wake without this page, replan only open work, and run the Strands chase graph.`;
   } else if (expired) {
     elements.clockTitle.textContent = `${open} open citation${open === 1 ? "" : "s"} · deadline reached`;
     elements.clockCopy.textContent = "No later campaign checkpoint exists. Mettle will not invent outreach beyond the configured reinspection deadline.";
@@ -1001,8 +1045,8 @@ function renderRecoveryClock(data) {
     elements.clockTitle.textContent = `Next: ${next.label} · ${formatDate(next.date)}`;
     elements.clockCopy.textContent = `${open} open citation${open === 1 ? "" : "s"}. Mettle will replan only those citations, then run ${behavior}.`;
   }
-  elements.clockAction.disabled = closed || waiting || expired || data.packet_status !== "blocked";
-  elements.clockAction.textContent = waiting ? "Resolve decision to continue" : closed ? "Campaign stood down" : expired ? "Deadline reached" : "Simulate scheduled check";
+  elements.clockAction.disabled = autonomous || closed || waiting || expired || data.packet_status !== "blocked";
+  elements.clockAction.textContent = autonomous ? "EventBridge armed" : waiting ? "Resolve decision to continue" : closed ? "Campaign stood down" : expired ? "Deadline reached" : "Simulate scheduled check";
 }
 
 function render(data) {
@@ -1094,7 +1138,7 @@ function render(data) {
     ? "The approved artifact is ready. Download the same packet the contractor reviewed."
     : "Assembles as evidence is accepted. Nothing reaches the inspector until you approve it.";
   elements.demoStep.textContent = isWorkflow
-    ? `${isAgentCore ? "AGENTCORE + " : ""}${data.intake_provider === "bedrock" ? "BEDROCK + " : ""}STRANDS · ${data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH COMPLETE"}`
+    ? `${isAgentCore ? "AGENTCORE + " : ""}${data.intake_provider === "bedrock" ? "BEDROCK + " : ""}STRANDS · ${data.automation_status === "scheduled" ? "AUTONOMOUS CHECK ARMED" : data.workflow_status === "interrupted" ? "WAITING FOR YOU" : "GRAPH COMPLETE"}`
     : `${data.scenario_step} · ${stepLabels[data.scenario_step] || "RECOVERY RUN"}`;
   elements.advance.disabled = isWorkflow || data.scenario_complete || demoRunning;
   elements.advance.hidden = isWorkflow;
@@ -1391,7 +1435,10 @@ elements.approveCorrections.addEventListener("click", async () => {
     correctionReviewKey = null;
     setupReturnsToWelcome = false;
     elements.noticeDialog.close();
-    showToast(`Review approved. Mettle recorded ${envelope.snapshot.deliveries.length} notice-anchored request${envelope.snapshot.deliveries.length === 1 ? "" : "s"}.`);
+    const sent = envelope.snapshot.deliveries.filter((delivery) => delivery.status === "sent").length;
+    showToast(sent
+      ? `Review approved. Amazon SNS accepted ${sent} one-way message${sent === 1 ? "" : "s"}; EventBridge is armed.`
+      : `Review approved. Mettle recorded ${envelope.snapshot.deliveries.length} safe outreach action${envelope.snapshot.deliveries.length === 1 ? "" : "s"}; EventBridge is armed.`);
   } catch (error) {
     elements.workflowError.textContent = error.message;
     elements.workflowError.hidden = false;
@@ -1526,3 +1573,17 @@ initializeAuth().then(async () => {
   await loadCapabilities();
   await loadCampaign();
 });
+
+window.setInterval(async () => {
+  if (
+    document.visibilityState !== "visible"
+    || !activeWorkflowId
+    || activeWorkflowTarget !== "agentcore"
+    || campaign?.automation_status !== "scheduled"
+  ) return;
+  try {
+    await loadCampaign();
+  } catch (_error) {
+    // The normal error banner and manual retry remain the user-facing recovery.
+  }
+}, 10_000);

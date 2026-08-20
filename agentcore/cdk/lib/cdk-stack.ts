@@ -130,6 +130,35 @@ export class AgentCoreStack extends Stack {
           ],
         })
       );
+
+      // Live SMS is an explicit demo-only opt-in. The runtime receives only a
+      // digest of the single allowed destination; every other phone remains on
+      // the recording adapter and can never reach SNS.
+      const smsDestinationHash = process.env.METTLE_SMS_ALLOWED_DESTINATION_SHA256;
+      if (smsDestinationHash) {
+        if (!/^[a-f0-9]{64}$/.test(smsDestinationHash)) {
+          throw new Error('METTLE_SMS_ALLOWED_DESTINATION_SHA256 must be a lowercase SHA-256 digest');
+        }
+        environment.runtime.addEnvironmentVariable('METTLE_SMS_ENABLED', '1');
+        environment.runtime.addEnvironmentVariable(
+          'METTLE_SMS_ALLOWED_DESTINATION_SHA256',
+          smsDestinationHash,
+        );
+        environment.runtime.role.addToPrincipalPolicy(
+          new iam.PolicyStatement({
+            actions: ['sns:Publish'],
+            // Direct-to-phone SNS publishes do not expose a narrower resource
+            // ARN. The application-level digest allowlist is therefore the
+            // load-bearing destination boundary.
+            resources: ['*'],
+            conditions: {
+              StringEquals: {
+                'aws:RequestedRegion': 'us-east-1',
+              },
+            },
+          })
+        );
+      }
     }
 
     // Create AgentCoreMcp if there are gateways configured

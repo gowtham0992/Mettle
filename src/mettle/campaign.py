@@ -116,5 +116,6 @@ def _message_for(
     return (
         f"{opening} for citation {citation_id}. Notice: \"{notice_text}\" "
         f"Closure route: {closure_route.replace('_', ' ')}. "
-        f"Reply with: {evidence}. Reinspection target: {due_on.isoformat()}."
+        f"Requested evidence: {evidence}. Send it to your contractor through the "
+        f"agreed project channel. Reinspection target: {due_on.isoformat()}."
     )

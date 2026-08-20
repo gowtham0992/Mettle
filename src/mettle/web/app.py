@@ -25,6 +25,7 @@ from mettle.agentcore_gateway import (
     AgentCoreGatewayError,
     AgentCoreWorkflowGateway,
 )
+from mettle.automation import EventBridgeCampaignScheduler
 from mettle.durable_agentcore_gateway import DurableAgentCoreWorkflowGateway
 from mettle.demo import DemoCampaign, DemoConflict, DemoNotFound, DemoStore
 from mettle.workflow import WorkflowConfigurationError
@@ -138,11 +139,36 @@ def configured_agentcore_gateway() -> AgentCoreWorkflowGateway | DurableAgentCor
     table_name = os.getenv("METTLE_DYNAMODB_TABLE")
     packet_bucket_name = os.getenv("METTLE_PACKET_BUCKET")
     if table_name and packet_bucket_name:
+        campaign_scheduler = None
+        if os.getenv("METTLE_SCHEDULER_ENABLED") == "1":
+            target_arn = os.getenv("METTLE_SCHEDULER_TARGET_ARN", "")
+            execution_role_arn = os.getenv("METTLE_SCHEDULER_ROLE_ARN", "")
+            schedule_group = os.getenv("METTLE_SCHEDULER_GROUP", "")
+            dlq_arn = os.getenv("METTLE_SCHEDULER_DLQ_ARN", "")
+            if not all(
+                (target_arn, execution_role_arn, schedule_group, dlq_arn)
+            ):
+                raise ValueError(
+                    "scheduler target, role, group, and DLQ are required when automation is enabled"
+                )
+            delay = os.getenv("METTLE_SCHEDULER_DEMO_DELAY_SECONDS")
+            campaign_scheduler = EventBridgeCampaignScheduler(
+                client=session.client("scheduler"),
+                target_arn=target_arn,
+                execution_role_arn=execution_role_arn,
+                schedule_group=schedule_group,
+                dlq_arn=dlq_arn,
+                timezone_name=os.getenv(
+                    "METTLE_SCHEDULER_TIMEZONE", "America/Denver"
+                ),
+                demo_delay_seconds=int(delay) if delay else None,
+            )
         return DurableAgentCoreWorkflowGateway(
             client=session.client("bedrock-agentcore"),
             runtime_arn=runtime_arn,
             table=session.resource("dynamodb").Table(table_name),
             packet_bucket=session.resource("s3").Bucket(packet_bucket_name),
+            campaign_scheduler=campaign_scheduler,
         )
     return AgentCoreWorkflowGateway(client=session.client("bedrock-agentcore"), runtime_arn=runtime_arn)
 

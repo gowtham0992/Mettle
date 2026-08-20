@@ -13,8 +13,15 @@ from pydantic import BaseModel, ValidationError
 from mettle.agentcore_client import AgentCoreDataClient, invoke_json
 from mettle.agentcore_gateway import AgentCoreGatewayError, _fingerprint
 from mettle.agents.bedrock import BedrockIntakeError
+from mettle.automation import (
+    AutomationStatus,
+    CampaignAutomation,
+    CampaignScheduler,
+    ScheduledCheckEvent,
+)
+from mettle.campaign import next_campaign_check
 from mettle.request_identity import require_principal
-from mettle.workflow import WorkflowConfigurationError
+from mettle.workflow import WorkflowConfigurationError, WorkflowStatus
 from mettle.workflow_registry import (
     AgentCorePhotoEvidenceRequest,
     ApprovePacketRequest,
@@ -58,6 +65,7 @@ class DurableAgentCoreWorkflowGateway:
         runtime_arn: str,
         table: Any,
         packet_bucket: Any,
+        campaign_scheduler: CampaignScheduler | None = None,
         clock: Any = time.time,
     ) -> None:
         if not runtime_arn.startswith("arn:aws:bedrock-agentcore:"):
@@ -66,6 +74,7 @@ class DurableAgentCoreWorkflowGateway:
         self._runtime_arn = runtime_arn
         self._table = table
         self._packet_bucket = packet_bucket
+        self._campaign_scheduler = campaign_scheduler
         self._clock = clock
 
     def _owner(self) -> str:
@@ -167,6 +176,31 @@ class DurableAgentCoreWorkflowGateway:
         owner = self._owner()
         return self._envelope(self._workflow(owner, workflow_id).get("envelope"))
 
+    def run_scheduled_check(
+        self,
+        event: ScheduledCheckEvent,
+    ) -> tuple[WorkflowEnvelope, bool]:
+        """Run a trusted EventBridge checkpoint without a browser principal."""
+        workflow = self._workflow(event.owner_hash, event.workflow_id)
+        current = self._envelope(workflow.get("envelope"))
+        automation = current.automation
+        if (
+            automation is None
+            or automation.status is not AutomationStatus.SCHEDULED
+            or automation.schedule_version != event.schedule_version
+            or automation.schedule_name != event.schedule_name
+            or automation.logical_check_on != event.logical_check_on
+        ):
+            return current, False
+        envelope = self._mutate_owned(
+            event.owner_hash,
+            event.workflow_id,
+            "run_next_check",
+            RunNextCheckRequest(),
+            event.idempotency_key,
+        )
+        return envelope, True
+
     def resume(self, workflow_id: str, payload: ResumeWorkflowRequest, *, idempotency_key: str) -> WorkflowEnvelope:
         return self._mutate(workflow_id, "resume", payload, idempotency_key)
 
@@ -207,6 +241,22 @@ class DurableAgentCoreWorkflowGateway:
         idempotency_key: str,
     ) -> WorkflowEnvelope:
         owner = self._owner()
+        return self._mutate_owned(
+            owner,
+            workflow_id,
+            operation,
+            payload,
+            idempotency_key,
+        )
+
+    def _mutate_owned(
+        self,
+        owner: str,
+        workflow_id: str,
+        operation: str,
+        payload: BaseModel,
+        idempotency_key: str,
+    ) -> WorkflowEnvelope:
         workflow = self._workflow(owner, workflow_id)
         fingerprint = _fingerprint(payload)
         attempt_key = self._attempt_key(
@@ -259,6 +309,10 @@ class DurableAgentCoreWorkflowGateway:
             raise
 
         try:
+            # The workflow may have advanced between the initial read and lock
+            # acquisition. Re-read under our lock so schedule versions and the
+            # AgentCore session always come from the latest committed envelope.
+            workflow = self._get(workflow_key)
             result = self._invoke(
                 session_id=workflow["session_id"],
                 payload={
@@ -273,6 +327,13 @@ class DurableAgentCoreWorkflowGateway:
                 raise AgentCoreGatewayError(
                     "AgentCore returned a different workflow identifier"
                 )
+            previous_envelope = self._envelope(workflow.get("envelope"))
+            envelope = self._reconcile_automation(
+                owner=owner,
+                operation=operation,
+                envelope=envelope,
+                previous=previous_envelope.automation,
+            )
             self._table.update_item(
                 Key={"pk": workflow_key},
                 UpdateExpression=(
@@ -303,6 +364,81 @@ class DurableAgentCoreWorkflowGateway:
         except Exception:
             self._release_lock(workflow_key, lock_token)
             raise
+
+    def _reconcile_automation(
+        self,
+        *,
+        owner: str,
+        operation: str,
+        envelope: WorkflowEnvelope,
+        previous: CampaignAutomation | None,
+    ) -> WorkflowEnvelope:
+        scheduler = self._campaign_scheduler
+        if scheduler is None:
+            return envelope.model_copy(update={"automation": previous}, deep=True)
+
+        if operation not in {
+            "review",
+            "resume",
+            "run_next_check",
+            "prepare_packet",
+            "approve_packet",
+        }:
+            return envelope.model_copy(update={"automation": previous}, deep=True)
+
+        snapshot = envelope.snapshot
+        plan = snapshot.plan
+        notice = snapshot.notice
+        if envelope.packet is not None or operation in {"prepare_packet", "approve_packet"}:
+            scheduler.cancel(previous)
+            return envelope.model_copy(
+                update={
+                    "automation": CampaignAutomation(
+                        status=AutomationStatus.COMPLETE,
+                        schedule_version=previous.schedule_version if previous else 0,
+                    )
+                },
+                deep=True,
+            )
+        if snapshot.status is WorkflowStatus.INTERRUPTED:
+            scheduler.cancel(previous)
+            return envelope.model_copy(
+                update={
+                    "automation": CampaignAutomation(
+                        status=AutomationStatus.AWAITING_DECISION,
+                        schedule_version=previous.schedule_version if previous else 0,
+                    )
+                },
+                deep=True,
+            )
+        if plan is None or notice is None:
+            return envelope.model_copy(update={"automation": previous}, deep=True)
+        try:
+            logical_check_on = next_campaign_check(
+                plan.as_of,
+                notice.reinspection_due_on,
+            )
+        except ValueError:
+            scheduler.cancel(previous)
+            return envelope.model_copy(
+                update={
+                    "automation": CampaignAutomation(
+                        status=AutomationStatus.COMPLETE,
+                        schedule_version=previous.schedule_version if previous else 0,
+                    )
+                },
+                deep=True,
+            )
+
+        version = (previous.schedule_version if previous else 0) + 1
+        automation = scheduler.schedule(
+            owner_hash=owner,
+            workflow_id=envelope.workflow_id,
+            logical_check_on=logical_check_on,
+            schedule_version=version,
+            previous=previous,
+        )
+        return envelope.model_copy(update={"automation": automation}, deep=True)
 
     def packet_download_url(self, workflow_id: str) -> str:
         owner = self._owner()

@@ -45,11 +45,55 @@ def test_lambda_role_is_least_privilege_and_cannot_manage_infrastructure() -> No
     }
 
     assert "bedrock-agentcore:InvokeAgentRuntime" in actions
+    assert "scheduler:CreateSchedule" in actions
+    assert "iam:PassRole" in actions
     assert "dynamodb:Scan" not in actions
     assert "s3:ListBucket" not in actions
-    assert not any(action.startswith("iam:") for action in actions)
+    assert {action for action in actions if action.startswith("iam:")} == {"iam:PassRole"}
     assert not any("CreateAgentRuntime" in action for action in actions)
     assert "*" not in actions
+
+
+def test_scheduler_is_one_time_bounded_and_has_a_dead_letter_path() -> None:
+    worker = RESOURCES["SchedulerFunction"]["Properties"]
+    invoke_role = RESOURCES["SchedulerInvokeRole"]["Properties"]
+    queue = RESOURCES["SchedulerDeadLetterQueue"]["Properties"]
+    web_env = RESOURCES["WebFunction"]["Properties"]["Environment"]["Variables"]
+
+    assert "ReservedConcurrentExecutions" not in worker
+    assert worker["Handler"] == "scheduler_handler.handler"
+    assert web_env["METTLE_SCHEDULER_ENABLED"] == "1"
+    assert web_env["METTLE_SCHEDULER_DEMO_DELAY_SECONDS"] == "90"
+    assert queue["SqsManagedSseEnabled"] is True
+    assert queue["MessageRetentionPeriod"] == 1209600
+    trust = invoke_role["AssumeRolePolicyDocument"]["Statement"][0]
+    assert trust["Principal"]["Service"] == "scheduler.amazonaws.com"
+    assert trust["Condition"]["StringEquals"]["aws:SourceAccount"] == {"Ref": "AWS::AccountId"}
+
+
+def test_scheduler_worker_has_no_public_route_or_sms_permission() -> None:
+    route_targets = [
+        properties["Target"]
+        for name, resource in RESOURCES.items()
+        if resource.get("Type") == "AWS::ApiGatewayV2::Route"
+        for properties in [resource["Properties"]]
+    ]
+    assert all("Scheduler" not in str(target) for target in route_targets)
+
+    statements = RESOURCES["SchedulerFunctionRole"]["Properties"]["Policies"][0][
+        "PolicyDocument"
+    ]["Statement"]
+    actions = {
+        action
+        for statement in statements
+        for action in (
+            statement["Action"]
+            if isinstance(statement["Action"], list)
+            else [statement["Action"]]
+        )
+    }
+    assert "sns:Publish" not in actions
+    assert not any(action.startswith("sms-voice:") for action in actions)
 
 
 def test_storage_is_private_encrypted_and_ephemeral_packets_expire() -> None:
