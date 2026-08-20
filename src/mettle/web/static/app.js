@@ -9,6 +9,12 @@ const elements = {
   nextActionCopy: document.querySelector("#next-action-copy"),
   nextActionButton: document.querySelector("#next-action-button"),
   nextActionMeta: document.querySelector("#next-action-meta"),
+  awayBriefing: document.querySelector("#away-briefing"),
+  awayBriefingMode: document.querySelector("#away-briefing-mode"),
+  awayBriefingTitle: document.querySelector("#away-briefing-title"),
+  awayBriefingCopy: document.querySelector("#away-briefing-copy"),
+  awayBriefingList: document.querySelector("#away-briefing-list"),
+  awayBriefingActions: document.querySelector("#away-briefing-actions"),
   error: document.querySelector("#error-banner"),
   errorMessage: document.querySelector("#error-message"),
   noticeId: document.querySelector("#notice-id"),
@@ -750,9 +756,9 @@ function configureNextAction(data) {
       elements.nextActionButton.textContent = "Review decision";
       nextActionHandler = () => document.querySelector(".judgment input")?.focus();
     } else {
-      elements.nextActionTitle.textContent = "Watch Mettle run the recovery";
-      elements.nextActionCopy.textContent = "The sample compresses days of evidence chasing, escalation, and packet assembly into one guided run.";
-      elements.nextActionButton.textContent = "Run sample recovery";
+      elements.nextActionTitle.textContent = "Compress the background recovery";
+      elements.nextActionCopy.textContent = "Advance the disclosed synthetic clock and watch Mettle handle days of evidence chasing, replanning, and escalation.";
+      elements.nextActionButton.textContent = "Compress time";
       nextActionHandler = () => elements.advance.click();
     }
     return;
@@ -789,9 +795,9 @@ function configureNextAction(data) {
     elements.nextActionButton.textContent = "Download PDF";
     nextActionHandler = () => elements.packetAction.click();
   } else {
-    elements.nextActionTitle.textContent = "Run the next scheduled check";
-    elements.nextActionCopy.textContent = "Mettle will replan only open citations and adjust follow-up intensity against the deadline.";
-    elements.nextActionButton.textContent = "Run scheduled check";
+    elements.nextActionTitle.textContent = "Preview the next autonomous checkpoint";
+    elements.nextActionCopy.textContent = "Compress the waiting period; Mettle will replan only open citations and adjust follow-up intensity against the deadline.";
+    elements.nextActionButton.textContent = "Compress to checkpoint";
     nextActionHandler = () => elements.clockAction.click();
   }
 }
@@ -971,6 +977,112 @@ function renderMetrics(metrics) {
   }));
 }
 
+function buildBackgroundBrief(data) {
+  const isWorkflow = data.source_mode === "workflow";
+  const isAgentCore = isWorkflow && data.execution_target === "agentcore";
+  const sampleHasAdvanced = !isWorkflow && Number(data.scenario_step || 0) > 0;
+  const events = data.events || [];
+  const completedKinds = new Set([
+    "deadline_escalation",
+    "evidence_accepted",
+    "evidence_rejected",
+    "evidence_manual_review",
+    "packet_prepared",
+  ]);
+  const completedBackgroundWork = events.some((event) => completedKinds.has(event.kind));
+  const armed = isAgentCore && data.automation_status === "scheduled" && !completedBackgroundWork;
+  if (!sampleHasAdvanced && !(isAgentCore && (completedBackgroundWork || armed))) return null;
+
+  const items = [];
+  const citations = data.citations || [];
+  const ready = citations.filter((citation) => citation.stage === "ready");
+  const rejected = citations.filter((citation) => citation.stage === "evidence_rejected");
+  const allReady = ready.length > 0 && ready.length === citations.length;
+
+  if (allReady) {
+    items.push({
+      label: `${ready.length}/${citations.length} closed`,
+      copy: "Every accepted citation was removed from the chase; no trade will receive another follow-up.",
+    });
+  } else {
+    for (const citation of ready.slice(0, 2)) {
+      items.push({
+        label: `C${citation.citation_id} out of chase`,
+        copy: `${titleCase(citation.trade)} evidence was accepted. Mettle removed this correction from every later follow-up.`,
+      });
+    }
+  }
+
+  for (const citation of rejected.slice(0, 1)) {
+    const rejectionEvent = events.find(
+      (event) => event.kind === "evidence_rejected" && String(event.citation_id) === String(citation.citation_id),
+    );
+    items.push({
+      label: `C${citation.citation_id} re-requested`,
+      copy: rejectionEvent?.detail || citation.evidence_note || "The submitted proof was incomplete, so Mettle requested the missing visible context.",
+    });
+  }
+
+  const deadlineEvent = events.find((event) => event.kind === "deadline_escalation");
+  if (deadlineEvent) {
+    items.push({ label: "Deadline adapted", copy: deadlineEvent.detail });
+  }
+
+  const pendingJudgment = (data.judgments || []).find((judgment) => judgment.status === "pending");
+  if (pendingJudgment && items.length < 4) {
+    items.push({
+      label: "Needs you",
+      copy: `Mettle stopped instead of guessing: ${pendingJudgment.question}`,
+    });
+  }
+
+  if (data.packet_status === "awaiting_approval" && items.length < 4) {
+    items.push({
+      label: "Packet ready",
+      copy: "Mettle assembled the citation-to-evidence record and stopped before contractor release.",
+    });
+  }
+
+  if (armed && !items.length) {
+    items.push({
+      label: "EventBridge armed",
+      copy: `The next recovery checkpoint is scheduled${data.next_check_at ? ` for ${formatTimestamp(data.next_check_at)}` : ""}; this page can close.`,
+    });
+  }
+
+  return {
+    armed,
+    mode: armed ? "EventBridge armed" : sampleHasAdvanced ? "Synthetic time compression" : "Background recovery brief",
+    title: armed ? "Mettle is ready to work while you are away" : sampleHasAdvanced ? "Mettle worked while the contractor was away" : "Mettle worked while you were away",
+    copy: sampleHasAdvanced
+      ? "This disclosed sample compresses the background campaign. The authenticated run uses EventBridge Scheduler to wake the same open-only recovery policy."
+      : armed
+        ? "The authenticated campaign has a one-time checkpoint and will wake without this page remaining open."
+        : "These results come from the current AgentCore campaign; only unresolved work remains in the chase.",
+    items: items.slice(0, 4),
+    actions: Number(data.metrics?.automated_actions || 0),
+  };
+}
+
+function renderBackgroundBrief(data) {
+  const brief = buildBackgroundBrief(data);
+  elements.awayBriefing.hidden = !brief;
+  if (!brief) {
+    elements.awayBriefingList.replaceChildren();
+    return;
+  }
+  elements.awayBriefing.classList.toggle("away-briefing--armed", brief.armed);
+  elements.awayBriefingMode.textContent = brief.mode;
+  elements.awayBriefingTitle.textContent = brief.title;
+  elements.awayBriefingCopy.textContent = brief.copy;
+  elements.awayBriefingActions.textContent = String(brief.actions);
+  elements.awayBriefingList.replaceChildren(...brief.items.map((item) => {
+    const row = node("li", "away-briefing__item");
+    row.append(node("strong", "", item.label), node("p", "", item.copy));
+    return row;
+  }));
+}
+
 function renderPacket(data) {
   const rows = data.citations.map((citation) => {
     const row = node("div", "packet-row");
@@ -1046,7 +1158,7 @@ function renderRecoveryClock(data) {
     elements.clockCopy.textContent = `${open} open citation${open === 1 ? "" : "s"}. Mettle will replan only those citations, then run ${behavior}.`;
   }
   elements.clockAction.disabled = autonomous || closed || waiting || expired || data.packet_status !== "blocked";
-  elements.clockAction.textContent = autonomous ? "EventBridge armed" : waiting ? "Resolve decision to continue" : closed ? "Campaign stood down" : expired ? "Deadline reached" : "Simulate scheduled check";
+  elements.clockAction.textContent = autonomous ? "EventBridge armed" : waiting ? "Resolve decision to continue" : closed ? "Campaign stood down" : expired ? "Deadline reached" : "Compress to next checkpoint";
 }
 
 function render(data) {
@@ -1061,6 +1173,7 @@ function render(data) {
   elements.progressLabel.textContent = `${data.metrics.citations_ready} / ${data.metrics.citations_total} CITATIONS READY`;
   elements.progressBar.style.width = `${(data.metrics.citations_ready / data.metrics.citations_total) * 100}%`;
   configureNextAction(data);
+  renderBackgroundBrief(data);
 
   const [conditionLabel, conditionTone] = conditionFor(data);
   elements.conditionLabel.textContent = conditionLabel;
@@ -1145,8 +1258,8 @@ function render(data) {
   elements.reset.disabled = demoRunning;
   elements.loadNotice.disabled = demoRunning;
   const advanceLabels = elements.advance.querySelectorAll("span");
-  advanceLabels[0].textContent = isWorkflow ? "Real workflow active" : data.scenario_complete ? "Scenario complete" : demoRunning ? "Recovery running" : "Run compressed recovery";
-  advanceLabels[1].textContent = isWorkflow ? "LIVE" : data.scenario_complete ? "DONE ✓" : demoRunning ? "WORKING…" : "AUTO ▶";
+  advanceLabels[0].textContent = isWorkflow ? "Real workflow active" : data.scenario_complete ? "Scenario complete" : demoRunning ? "Background recovery running" : "Compress background recovery";
+  advanceLabels[1].textContent = isWorkflow ? "LIVE" : data.scenario_complete ? "DONE ✓" : demoRunning ? "WORKING…" : "TIME ▶";
   elements.loadNotice.querySelector("span").textContent = isWorkflow ? "NEW" : "LOAD";
   elements.reset.querySelector("span").textContent = isWorkflow ? "SAMPLE" : "RESET";
 }

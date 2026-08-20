@@ -2,7 +2,7 @@
 
 Target length: **4:35**. Hard limit: **5:00**.
 
-Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, notifications, AWS account identifiers, and every developer console. Use a fresh private window for the public demo. Keep the architecture PNG and one generated packet open in separate tabs before recording.
+Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, notifications, AWS account identifiers, and every developer console. Use a fresh private window for the public demo. Keep the architecture PNG, one generated packet, and two sanitized AWS proof stills open in separate tabs before recording. Never wait for a live scheduler on camera; show the verified execution record and label the timeline compression.
 
 ## 0:00–0:28 — The person, problem, and stakes
 
@@ -54,13 +54,13 @@ Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, not
 
 > Ambiguous notice language is another hard boundary: the contractor defines what visible proof is needed. After every citation has accepted evidence, Mettle assembles this traceable packet—but download stays blocked until final contractor approval. The result maps each notice citation to its trade, evidence, timeline, and consent record.
 
-## 3:55–4:28 — Architecture and technical credibility
+## 3:55–4:28 — Architecture and deployed autonomy proof
 
-**On screen:** Show `assets/architecture/mettle-product-architecture.png` first. Trace the campaign loop and its three human judgment gates. Then switch to `assets/architecture/mettle-aws-architecture.png` and trace the authenticated request path into AgentCore.
+**On screen:** Show `assets/architecture/mettle-product-architecture.png` first and trace the campaign loop and its three human judgment gates. Switch briefly to `assets/architecture/mettle-aws-architecture.png`, then show two sanitized proof stills: the AgentCore runtime in `READY`, followed by the EventBridge/CloudWatch acceptance record showing schedule version 1 firing the private worker and schedule version 2 being armed. Crop all account identifiers and keep only hashed workflow references visible.
 
 **Narration:**
 
-> Mettle separates authority three ways. Amazon Nova models handle notice language and visible evidence. Deterministic Python controls state, deadlines, retries, and permissions. The licensed contractor decides interpretation, schedule tradeoffs, and release. In AWS, the public browser reaches one authenticated Lambda gateway before the same typed operations run on Amazon Bedrock AgentCore Runtime; credentials, model access, state, and private evidence stay server-side.
+> Mettle separates authority three ways. Amazon Nova models handle notice language and visible evidence. Deterministic Python controls state, deadlines, retries, and permissions. The licensed contractor decides interpretation, schedule tradeoffs, and release. The same typed workflow runs on Bedrock AgentCore Runtime. In our deployed acceptance run, EventBridge woke the private worker, advanced the campaign, and armed its next checkpoint with an empty dead-letter queue—without a browser staying open.
 
 ## 4:28–4:35 — Close
 
@@ -78,4 +78,6 @@ Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, not
 - [ ] Keep the sample disclosure visible when describing compressed evidence and time.
 - [ ] Show one native interrupt, one evidence re-request, the deadline gate, and final approval.
 - [ ] Show the architecture diagram long enough to read `Strands` and `AgentCore Runtime`.
+- [ ] Show sanitized `READY` and scheduler-execution proof; hide the account ID, ARNs, usernames, emails, session identifiers, and raw notice content.
+- [ ] Describe the scheduler proof as a recorded deployed acceptance run, not as a live event occurring during the video.
 - [ ] Upload publicly or unlisted to YouTube or Vimeo and test the URL while signed out.

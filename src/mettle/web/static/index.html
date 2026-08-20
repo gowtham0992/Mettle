@@ -68,6 +68,19 @@
         </div>
       </section>
 
+      <section class="away-briefing" id="away-briefing" aria-labelledby="away-briefing-title" hidden>
+        <div class="away-briefing__intro">
+          <p class="mono-label" id="away-briefing-mode">Background recovery brief</p>
+          <h2 id="away-briefing-title">Mettle worked while you were away</h2>
+          <p id="away-briefing-copy">Only state-grounded work from this recovery appears here.</p>
+        </div>
+        <ol class="away-briefing__list" id="away-briefing-list"></ol>
+        <div class="away-briefing__metric" aria-label="Autonomous actions absorbed">
+          <strong id="away-briefing-actions">0</strong>
+          <span>autonomous actions absorbed</span>
+        </div>
+      </section>
+
       <div id="dashboard" class="dashboard" hidden>
         <section class="main-column" aria-labelledby="docket-title">
           <div class="section-heading">
@@ -103,8 +116,8 @@
               <strong id="clock-title">Waiting for a recovery run</strong>
               <p id="clock-copy">Mettle will choose the next scheduled checkpoint from the reinspection deadline.</p>
             </div>
-            <button class="button clock-action" id="clock-action" type="button">Simulate scheduled check</button>
-            <p class="clock-note">PROTOTYPE CONTROL · A PRODUCTION RUN ADVANCES FROM THE SCHEDULER</p>
+            <button class="button clock-action" id="clock-action" type="button">Compress to next checkpoint</button>
+            <p class="clock-note">DEMO TIME CONTROL · EVENTBRIDGE ADVANCES THE AUTHENTICATED RUN</p>
           </section>
 
           <section class="panel evidence-panel" id="evidence-panel" hidden>
@@ -193,7 +206,7 @@
       <span id="demo-step">0 · OPENING CAMPAIGN</span>
       <button class="demo-button" id="load-notice-button" type="button" aria-label="Load notice">＋ <span>LOAD</span></button>
       <button class="demo-button" id="reset-button" type="button" title="Reset demo (R)">↺ <span>RESET</span></button>
-      <button class="demo-button demo-button--next" id="advance-button" type="button"><span>Run compressed recovery</span><span aria-hidden="true">AUTO ▶</span></button>
+      <button class="demo-button demo-button--next" id="advance-button" type="button"><span>Compress background recovery</span><span aria-hidden="true">TIME ▶</span></button>
     </div>
 
     <dialog class="welcome-dialog" id="welcome-dialog" aria-labelledby="welcome-title">
