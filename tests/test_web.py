@@ -365,6 +365,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     with client() as browser:
         page = browser.get("/")
         script = browser.get("/static/app.js")
+        styles = browser.get("/static/styles.css")
         campaign = browser.get("/api/campaign")
 
     assert page.status_code == 200
@@ -377,6 +378,12 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Approve & begin recovery" in page.text
     assert "Recovery clock" in page.text
     assert "Agent run" in page.text
+    assert "Recovery workspace" in page.text
+    assert "Evidence &amp; packet" in page.text
+    assert "Agent activity" in page.text
+    assert 'data-workspace-view="recovery"' in page.text
+    assert 'data-workspace-panel="activity"' in page.text
+    assert "Sample controls" in page.text
     assert "Background recovery brief" in page.text
     assert 'id="away-briefing"' in page.text
     assert "HANDOFFS, AUTONOMOUS WORK, AND HUMAN INTERRUPTS" in page.text
@@ -389,8 +396,13 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert 'elements.noticeDialog.addEventListener("cancel"' in script.text
     assert 'elements.noticeDialog.open && event.key === "Escape"' in script.text
     assert "function renderAgentRun(data)" in script.text
+    assert "function setWorkspaceView(view" in script.text
+    assert "function openWorkspacePanel(view" in script.text
     assert "function buildBackgroundBrief(data)" in script.text
     assert "function renderBackgroundBrief(data)" in script.text
+    assert styles.status_code == 200
+    assert ".workspace-panel--view-hidden" in styles.text
+    assert ".dashboard--focused" in styles.text
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"
 

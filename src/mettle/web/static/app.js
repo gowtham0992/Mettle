@@ -1,8 +1,12 @@
 const elements = {
+  main: document.querySelector("#main"),
   band: document.querySelector(".command-band"),
   campaignStrip: document.querySelector(".campaign-strip"),
   loading: document.querySelector("#loading-state"),
   dashboard: document.querySelector("#dashboard"),
+  workspaceNav: document.querySelector("#workspace-nav"),
+  workspaceTabs: [...document.querySelectorAll("[data-workspace-tab]")],
+  workspacePanels: [...document.querySelectorAll("[data-workspace-panel]")],
   nextAction: document.querySelector("#next-action"),
   nextActionEyebrow: document.querySelector("#next-action-eyebrow"),
   nextActionTitle: document.querySelector("#next-action-title"),
@@ -117,6 +121,44 @@ let setupReturnsToWelcome = false;
 let pendingCorrectionReview = null;
 let correctionReviewKey = null;
 let nextActionHandler = null;
+const workspaceViews = new Set(["recovery", "evidence", "activity"]);
+let activeWorkspaceView = workspaceViewFromUrl();
+
+function workspaceViewFromUrl() {
+  const requested = new URLSearchParams(window.location.search).get("view");
+  return ["recovery", "evidence", "activity"].includes(requested) ? requested : "recovery";
+}
+
+function setWorkspaceView(view, { updateUrl = false, focusTab = false } = {}) {
+  const nextView = workspaceViews.has(view) ? view : "recovery";
+  activeWorkspaceView = nextView;
+  elements.main.dataset.workspaceView = nextView;
+  elements.dashboard.classList.toggle("dashboard--focused", nextView !== "recovery");
+  for (const panel of elements.workspacePanels) {
+    panel.classList.toggle("workspace-panel--view-hidden", panel.dataset.workspacePanel !== nextView);
+  }
+  for (const tab of elements.workspaceTabs) {
+    const active = tab.dataset.workspaceTab === nextView;
+    if (active) tab.setAttribute("aria-current", "page");
+    else tab.removeAttribute("aria-current");
+    if (active && focusTab) tab.focus();
+  }
+  if (updateUrl) {
+    const url = new URL(window.location.href);
+    if (nextView === "recovery") url.searchParams.delete("view");
+    else url.searchParams.set("view", nextView);
+    window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+}
+
+function openWorkspacePanel(view, targetSelector, focusSelector = null) {
+  setWorkspaceView(view, { updateUrl: true });
+  window.setTimeout(() => {
+    const target = document.querySelector(targetSelector);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (focusSelector) document.querySelector(focusSelector)?.focus();
+  }, 0);
+}
 
 function base64Url(bytes) {
   return btoa(String.fromCharCode(...new Uint8Array(bytes)))
@@ -754,7 +796,7 @@ function configureNextAction(data) {
       elements.nextActionTitle.textContent = "Make the one decision Mettle cannot";
       elements.nextActionCopy.textContent = pending[0].question;
       elements.nextActionButton.textContent = "Review decision";
-      nextActionHandler = () => document.querySelector(".judgment input")?.focus();
+      nextActionHandler = () => openWorkspacePanel("recovery", ".judgment-panel", ".judgment input");
     } else {
       elements.nextActionTitle.textContent = "Compress the background recovery";
       elements.nextActionCopy.textContent = "Advance the disclosed synthetic clock and watch Mettle handle days of evidence chasing, replanning, and escalation.";
@@ -768,10 +810,7 @@ function configureNextAction(data) {
     elements.nextActionTitle.textContent = pending[0].kind === "final_packet_approval" ? "Approve the final packet" : "Resolve the blocked decision";
     elements.nextActionCopy.textContent = pending[0].question;
     elements.nextActionButton.textContent = "Review decision";
-    nextActionHandler = () => {
-      document.querySelector(".judgment-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      window.setTimeout(() => document.querySelector(".judgment input")?.focus(), 300);
-    };
+    nextActionHandler = () => openWorkspacePanel("recovery", ".judgment-panel", ".judgment input");
   } else if (openCitation) {
     elements.nextActionTitle.textContent = `Collect proof for C${openCitation.citation_id}`;
     elements.nextActionCopy.textContent = openCitation.stage === "evidence_rejected"
@@ -780,25 +819,33 @@ function configureNextAction(data) {
     elements.nextActionButton.textContent = activePhotoEnabled() ? "Add evidence" : "Open evidence options";
     nextActionHandler = () => {
       elements.photoCitation.value = openCitation.citation_id;
-      elements.evidencePanel.scrollIntoView({ behavior: "smooth", block: "start" });
       if (!activePhotoEnabled()) elements.demoEvidence.open = true;
-      window.setTimeout(() => elements.photoFile.focus(), 300);
+      openWorkspacePanel("evidence", "#evidence-panel", "#photo-file");
     };
   } else if (data.packet_status === "blocked") {
     elements.nextActionTitle.textContent = "Assemble the review packet";
     elements.nextActionCopy.textContent = "Every citation has accepted evidence. Prepare the packet before giving final approval.";
     elements.nextActionButton.textContent = "Prepare packet";
-    nextActionHandler = () => elements.packetAction.click();
+    nextActionHandler = () => {
+      setWorkspaceView("evidence", { updateUrl: true });
+      elements.packetAction.click();
+    };
   } else if (data.packet_status === "approved") {
     elements.nextActionTitle.textContent = "Download the approved packet";
     elements.nextActionCopy.textContent = "The notice, evidence, recovery history, and your approval are ready in one artifact.";
     elements.nextActionButton.textContent = "Download PDF";
-    nextActionHandler = () => elements.packetAction.click();
+    nextActionHandler = () => {
+      setWorkspaceView("evidence", { updateUrl: true });
+      elements.packetAction.click();
+    };
   } else {
     elements.nextActionTitle.textContent = "Preview the next autonomous checkpoint";
     elements.nextActionCopy.textContent = "Compress the waiting period; Mettle will replan only open citations and adjust follow-up intensity against the deadline.";
     elements.nextActionButton.textContent = "Compress to checkpoint";
-    nextActionHandler = () => elements.clockAction.click();
+    nextActionHandler = () => {
+      setWorkspaceView("recovery", { updateUrl: true });
+      elements.clockAction.click();
+    };
   }
 }
 
@@ -1166,6 +1213,8 @@ function render(data) {
   elements.loading.hidden = true;
   elements.error.hidden = true;
   elements.dashboard.hidden = false;
+  elements.workspaceNav.hidden = false;
+  setWorkspaceView(activeWorkspaceView);
   elements.noticeId.textContent = data.notice_id;
   elements.property.textContent = data.property_label;
   elements.days.textContent = String(Math.max(data.days_remaining, 0));
@@ -1260,8 +1309,8 @@ function render(data) {
   const advanceLabels = elements.advance.querySelectorAll("span");
   advanceLabels[0].textContent = isWorkflow ? "Real workflow active" : data.scenario_complete ? "Scenario complete" : demoRunning ? "Background recovery running" : "Compress background recovery";
   advanceLabels[1].textContent = isWorkflow ? "LIVE" : data.scenario_complete ? "DONE ✓" : demoRunning ? "WORKING…" : "TIME ▶";
-  elements.loadNotice.querySelector("span").textContent = isWorkflow ? "NEW" : "LOAD";
-  elements.reset.querySelector("span").textContent = isWorkflow ? "SAMPLE" : "RESET";
+  elements.loadNotice.querySelector("span").textContent = "NEW RECOVERY";
+  elements.reset.querySelector("span").textContent = isWorkflow ? "OPEN SAMPLE" : "RESET SAMPLE";
 }
 
 async function loadCampaign() {
@@ -1389,8 +1438,9 @@ elements.reset.addEventListener("click", async () => {
     if (activeWorkflowId) {
       activeWorkflowId = null;
       activeWorkflowTarget = "local";
-      window.history.replaceState({}, "", window.location.pathname);
     }
+    window.history.replaceState({}, "", window.location.pathname);
+    setWorkspaceView("recovery");
     render(await request("/api/demo/reset", { method: "POST", body: "{}" }));
     showToast("Recovery run reset to the opening campaign.");
   } catch (error) {
@@ -1399,6 +1449,12 @@ elements.reset.addEventListener("click", async () => {
     setBusy(elements.reset, false);
   }
 });
+
+for (const tab of elements.workspaceTabs) {
+  tab.addEventListener("click", () => setWorkspaceView(tab.dataset.workspaceTab, { updateUrl: true }));
+}
+
+window.addEventListener("popstate", () => setWorkspaceView(workspaceViewFromUrl()));
 
 elements.nextActionButton.addEventListener("click", () => nextActionHandler?.());
 
@@ -1417,16 +1473,18 @@ elements.startRecoveryEntry.addEventListener("click", () => {
 
 elements.trySampleEntry.addEventListener("click", async () => {
   sessionStorage.setItem("mettle_entry_selected", "sample");
+  setBusy(elements.trySampleEntry, true);
   elements.welcomeDialog.close();
-  if (activeWorkflowId) {
-    activeWorkflowId = null;
-    activeWorkflowTarget = "local";
-    window.history.replaceState({}, "", window.location.pathname);
-    try {
-      render(await request("/api/campaign"));
-    } catch (error) {
-      showError(error);
-    }
+  window.history.replaceState({}, "", window.location.pathname);
+  setWorkspaceView("recovery");
+  activeWorkflowId = null;
+  activeWorkflowTarget = "local";
+  try {
+    render(await request("/api/demo/reset", { method: "POST", body: "{}" }));
+  } catch (error) {
+    showError(error);
+  } finally {
+    setBusy(elements.trySampleEntry, false);
   }
   elements.nextActionButton.focus();
 });
@@ -1500,6 +1558,7 @@ elements.noticeForm.addEventListener("submit", async (event) => {
     activeWorkflowTarget = executionTarget;
     const targetQuery = executionTarget === "agentcore" ? "&runtime=agentcore" : "";
     window.history.replaceState({}, "", `${window.location.pathname}?workflow=${encodeURIComponent(activeWorkflowId)}${targetQuery}`);
+    setWorkspaceView("recovery");
     const workflowView = workflowCampaign(envelope, executionTarget);
     render(workflowView);
     sessionStorage.setItem("mettle_entry_selected", "recovery");
