@@ -5,101 +5,104 @@
     <meta name="viewport" content="width=1920, initial-scale=1" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700;750&family=IBM+Plex+Mono:wght@600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Funnel+Sans:wght@600;700&family=Geist+Mono:wght@600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="mettle-diagrams.css" />
     <title>Mettle product architecture</title>
   </head>
   <body>
-    <main class="sheet">
+    <main class="sheet product-sheet">
       <div class="top-rule"></div>
-      <header class="header">
+      <header class="diagram-header">
         <div>
-          <p class="eyebrow">Product architecture / one bounded workflow</p>
-          <h1>One recovery campaign. Three moments to stop.</h1>
-          <p class="subtitle">Mettle turns a failed-inspection notice into a deadline-aware recovery campaign, handles the repetitive chase, and returns judgment to the contractor exactly where authority matters.</p>
+          <p class="eyebrow">Product system / one recovery, three authority gates</p>
+          <h1>The agent works the clock.<br />The contractor owns the calls.</h1>
+          <p class="subtitle">A failed-inspection notice becomes a bounded recovery campaign. Mettle handles the chase between events—and stops before outreach, at the deadline tradeoff, and before release.</p>
         </div>
         <div class="brand"><span class="brand-mark"></span>METTLE</div>
       </header>
 
-      <section>
-        <p class="section-label">Autonomous campaign loop</p>
-        <div class="product-flow">
-          <article class="card flow-card">
-            <span class="step">01 / EVENT</span>
-            <div>
-              <p class="meta">Contractor input</p>
-              <h2>Failed notice</h2>
-            </div>
-            <p>Municipal PDF or text arrives with citations and a reinspection clock.</p>
+      <section class="campaign-section" aria-label="Recovery campaign spine">
+        <p class="section-label">Campaign spine / state advances only through validated events</p>
+        <div class="campaign-spine">
+          <article class="notice-node">
+            <span class="step">00 / EVENT</span>
+            <span class="large-icon" aria-hidden="true">▤</span>
+            <h2>Failed notice lands</h2>
+            <p>Municipal language + a reinspection clock. No project setup.</p>
           </article>
-          <div class="arrow">›</div>
-          <article class="card flow-card">
-            <span class="step">02 / STRUCTURE</span>
-            <div>
-              <p class="meta">Notice Intake Agent</p>
-              <h2>Correction docket</h2>
-            </div>
-            <p>Quotes each citation, derives evidence needs, and marks ambiguity.</p>
+          <div class="flow-arrow">›</div>
+          <article class="stop-node">
+            <span class="stop-label">◆ STOP 01</span>
+            <span class="owner">CONTRACTOR</span>
+            <h2>Confirm route + proof boundary</h2>
+            <p>Every citation, trade owner, closure route, and visible-proof request is reviewed. Zero outreach before this gate.</p>
           </article>
-          <div class="arrow">›</div>
-          <article class="card flow-card emphasis">
-            <span class="step">03 / ORCHESTRATE</span>
-            <div>
-              <p class="meta">Strands graph</p>
-              <h2>Recovery campaign</h2>
+          <div class="flow-arrow">›</div>
+          <article class="engine-node">
+            <span class="step orange">STRANDS GRAPH / AUTONOMY ZONE</span>
+            <h2>Recovery runs between events</h2>
+            <p>Open-only replanning • replay-safe outreach • evidence assessment • deadline-aware cadence</p>
+            <div class="timeline" aria-label="Deadline checkpoints">
+              <div><i></i><b>T−7</b><span>ASSIGN</span></div>
+              <div><i></i><b>T−3</b><span>CHASE</span></div>
+              <div class="critical"><i></i><b>T−2</b><span>ESCALATE</span></div>
+              <div><i></i><b>T−1</b><span>OPEN ONLY</span></div>
+              <div><i></i><b>✓</b><span>CLOSE</span></div>
             </div>
-            <p>Assigns work, advances citation state, watches the deadline, and retries safely.</p>
+            <div class="evidence-loop"><strong>↻</strong> PHOTO → VISIBLE / NOT SHOWN / UNCERTAIN → ACCEPT OR RE-REQUEST</div>
           </article>
-          <div class="arrow">›</div>
-          <article class="card flow-card">
-            <span class="step">04 / VERIFY</span>
-            <div>
-              <p class="meta">Evidence Agent</p>
-              <h2>Evidence loop</h2>
-            </div>
-            <p>Checks photos against notice language and requests a precise replacement.</p>
+          <div class="flow-arrow">›</div>
+          <article class="stop-node">
+            <span class="stop-label">◆ STOP 02</span>
+            <span class="owner">T−2 / CONTRACTOR</span>
+            <h2>Keep or move the date</h2>
+            <p>Mettle escalates open trades. The contractor owns the schedule commitment.</p>
           </article>
-          <div class="arrow">›</div>
-          <article class="card flow-card output">
-            <span class="step">05 / RELEASE</span>
-            <div>
-              <p class="meta">Contractor approved</p>
-              <h2>Reinspection packet</h2>
+          <div class="flow-arrow">›</div>
+          <article class="output-node">
+            <div class="packet-half">
+              <span class="step green">PACKET AGENT</span>
+              <span class="packet-icon">▣</span>
+              <h2>Assemble the evidence trail</h2>
+              <p>Citation ↔ proof ↔ timestamp ↔ recovery history</p>
             </div>
-            <p>Citation-linked evidence, timestamps, status, and a drafted scheduling message.</p>
+            <div class="release-half">
+              <span class="stop-label">◆ STOP 03</span>
+              <span class="owner green">CONTRACTOR</span>
+              <h2>Approve final release</h2>
+              <p>The system drafts. Only the contractor unlocks the PDF.</p>
+              <strong class="ready">REINSPECTION READY</strong>
+            </div>
           </article>
         </div>
       </section>
 
-      <section class="judgment-section">
-        <p class="section-label">Human judgment gates — the agent pauses here</p>
-        <div class="judgment-row">
-          <article class="card judgment-card">
-            <span class="judgment-number">1</span>
-            <h3>Route every correction</h3>
-            <p>The contractor confirms the proposed trade owner before outreach begins.</p>
-          </article>
-          <article class="card judgment-card">
-            <span class="judgment-number">2</span>
-            <h3>Interpret the notice</h3>
-            <p>Ambiguous code language is escalated; the agent never invents an interpretation.</p>
-          </article>
-          <article class="card judgment-card">
-            <span class="judgment-number">3</span>
-            <h3>Choose the date. Release the packet.</h3>
-            <p>Only the contractor commits the schedule or authorizes the final submission.</p>
-          </article>
+      <section class="decision-section" aria-label="Decision rights">
+        <p class="section-label">Decision rights / the boundary is the product</p>
+        <div class="decision-strip">
+          <div class="decision-lead">
+            <span>AUTHORITY MAP</span>
+            <strong>Autonomy is useful only when its limits are visible.</strong>
+          </div>
+          <div class="decision-cell model">
+            <span>● MODEL / DESCRIBE</span>
+            <h3>Unstructured → structured</h3>
+            <p>Quotes notice language and describes visible evidence. Never certifies compliance.</p>
+          </div>
+          <div class="decision-cell code">
+            <span>■ CODE / ENFORCE</span>
+            <h3>State moves by policy</h3>
+            <p>Deadlines, idempotency, open-only replanning, file limits, and packet locks stay deterministic.</p>
+          </div>
+          <div class="decision-cell human">
+            <span>◆ HUMAN / AUTHORIZE</span>
+            <h3>Professional calls stay human</h3>
+            <p>Owns routing, interpretation, schedule commitment, and final inspector-facing release.</p>
+          </div>
         </div>
       </section>
 
-      <section class="authority" aria-label="Authority boundary">
-        <div class="authority-title"><strong>Authority boundary</strong><span>Autonomy is useful only when its limits are visible.</span></div>
-        <div class="authority-cell model"><div class="legend">● Model</div><p>Extracts, classifies, summarizes, and evaluates evidence—with source language attached.</p></div>
-        <div class="authority-cell code"><div class="legend">■ Code</div><p>Owns state transitions, deadlines, idempotency, file limits, and deterministic policy.</p></div>
-        <div class="authority-cell human"><div class="legend">◆ Human</div><p>Owns trade routing, code interpretation, date commitment, and final release.</p></div>
-      </section>
-
-      <div class="footer-note">Mettle / Professional Agents / Notice in → reinspection ready</div>
+      <div class="footer-note">Notice in → recovery out / Professional Agents</div>
     </main>
   </body>
 </html>

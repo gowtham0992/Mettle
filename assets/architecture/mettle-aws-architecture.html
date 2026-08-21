@@ -5,97 +5,90 @@
     <meta name="viewport" content="width=1920, initial-scale=1" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700;750&family=IBM+Plex+Mono:wght@600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Funnel+Sans:wght@600;700&family=Geist+Mono:wght@600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="mettle-diagrams.css" />
     <title>Mettle AWS architecture</title>
   </head>
-  <body class="aws">
-    <main class="sheet">
+  <body>
+    <main class="sheet aws-sheet">
       <div class="top-rule"></div>
-      <header class="header">
+      <header class="diagram-header">
         <div>
-          <p class="eyebrow">AWS internals / trust and request path</p>
-          <h1>The browser reaches one bounded agent runtime.</h1>
-          <p class="subtitle">The public surface is authenticated and throttled. AWS credentials, model invocation, workflow state, and private evidence stay behind the server boundary.</p>
+          <p class="eyebrow">AWS internals / trust, request, and wake-up paths</p>
+          <h1>The browser gets a product.<br />The agent gets a bounded runtime.</h1>
+          <p class="subtitle">Credentials, model choice, runtime identity, evidence, and campaign state remain server-side. Solid orange is a user request; amber is a scheduled wake-up; green is private state and artifacts.</p>
         </div>
         <div class="brand"><span class="brand-mark"></span>METTLE</div>
       </header>
 
-      <section>
-        <p class="section-label">Authenticated request path</p>
+      <section class="request-section" aria-label="Authenticated request path">
+        <p class="section-label">01 / authenticated request → 02 / bounded agent run</p>
         <div class="request-path">
-          <article class="card service-card">
-            <p class="meta">User surface</p>
-            <h2>Contractor browser</h2>
-            <p>Notice upload, judgment inbox, campaign timeline, and evidence review.</p>
+          <article class="browser-node">
+            <span class="step orange">USER SURFACE</span>
+            <span class="large-icon">▱</span>
+            <h2>Contractor command center</h2>
+            <p>Uploads notice text, resolves judgment cards, submits evidence, and approves the final packet.</p>
+            <strong class="outline-badge">NO AWS CREDENTIALS</strong>
           </article>
-          <div class="arrow">›</div>
-          <article class="card service-card">
-            <p class="meta">Public edge</p>
+          <div class="request-rail" aria-hidden="true"></div>
+          <article class="request-node edge-node">
+            <span class="step orange">01 / EDGE</span>
             <h2>CloudFront + WAF</h2>
-            <p>TLS, static delivery, managed protections, and request throttling.</p>
+            <p>TLS, private static origin, managed protections, and request throttling.</p>
+            <code>/static → PRIVATE S3<br />/api/* → API GATEWAY</code>
           </article>
-          <div class="arrow">›</div>
-          <article class="card service-card">
-            <p class="meta">Identity + API</p>
-            <h2>Cognito + API Gateway</h2>
-            <p>Authorization Code + PKCE, JWT validation, and typed routes.</p>
+          <article class="request-node identity-node">
+            <span class="step orange">02 / IDENTITY + API</span>
+            <h2>Cognito PKCE + API Gateway</h2>
+            <p>JWT validation and typed protected routes. Paid paths throttle at 1 rps, burst 2.</p>
           </article>
-          <div class="arrow">›</div>
-          <article class="card service-card">
-            <p class="meta">Server boundary</p>
+          <article class="request-node gateway-node">
+            <span class="step orange">03 / SERVER BOUNDARY</span>
             <h2>Lambda gateway</h2>
-            <p>Normalizes input, enforces limits, and invokes AWS with least privilege.</p>
+            <p>Validates bounded operations, normalizes uploads, owns the AgentCore session ID, and invokes one exact endpoint.</p>
+            <strong class="amber-badge">EXACT-RESOURCE IAM</strong>
           </article>
-          <div class="arrow">›</div>
-          <article class="card service-card runtime">
-            <p class="meta">Amazon Bedrock AgentCore</p>
-            <h2>Strands runtime</h2>
-            <p>Runs the intake → campaign → evidence graph with bounded tools and explicit state.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="resource-section">
-        <p class="section-label">Private state, artifacts, models, and operations</p>
-        <div class="resource-plane">
-          <article class="card resource-card secure">
-            <p class="meta">Static origin</p>
-            <h3>Private S3</h3>
-            <p>Web assets are available only through CloudFront origin access control.</p>
-          </article>
-          <article class="card resource-card">
-            <p class="meta">Campaign state</p>
-            <h3>DynamoDB</h3>
-            <p>Citation state, judgments, message events, and idempotency records.</p>
-          </article>
-          <article class="card resource-card secure">
-            <p class="meta">Evidence + packets</p>
-            <h3>Private S3</h3>
-            <p>Normalized photos and generated packets remain non-public at rest.</p>
-          </article>
-          <article class="card resource-card">
-            <p class="meta">Model plane</p>
-            <h3>Amazon Nova</h3>
-            <p>Bedrock models support notice extraction and multimodal evidence assessment.</p>
-          </article>
-          <article class="card resource-card">
-            <p class="meta">Operations</p>
-            <h3>CloudWatch + X-Ray</h3>
-            <p>Structured events, correlation IDs, runtime traces, errors, and alarms.</p>
+          <article class="runtime-node">
+            <span class="step orange">04 / AMAZON BEDROCK AGENTCORE</span>
+            <h2>One session. Typed operations.</h2>
+            <p>The entrypoint accepts start, review, resume, evidence, checkpoint, packet, approval, and render—not arbitrary prompts.</p>
+            <div class="runtime-lanes">
+              <div><b>INTAKE</b><span>NOVA MICRO</span></div>
+              <div class="active"><b>RECOVERY</b><span>GRAPH + HOOKS</span></div>
+              <div><b>EVIDENCE</b><span>NOVA LITE</span></div>
+              <div><b>PACKET</b><span>POLICY</span></div>
+            </div>
+            <div class="runtime-interrupt">◆ NATIVE INTERRUPTS → SAME GRAPH RESUMES AFTER CONTRACTOR DECISION</div>
+            <div class="claim-boundary">⬡ DESCRIBE VISIBLE EVIDENCE ≠ CERTIFY CODE COMPLIANCE</div>
           </article>
         </div>
       </section>
 
-      <section class="guardrails" aria-label="Security guardrails">
-        <div class="guardrail-title">Security<br />guardrails</div>
-        <div class="guardrail"><span class="guardrail-label">No public model spend</span><p>The browser cannot invoke Bedrock or AgentCore directly.</p></div>
-        <div class="guardrail"><span class="guardrail-label">Exact-resource IAM</span><p>Runtime and deployer roles target named resources and actions.</p></div>
-        <div class="guardrail"><span class="guardrail-label">3.5 MB photo limit</span><p>Images are decoded, normalized, and validated before model use.</p></div>
-        <div class="guardrail"><span class="guardrail-label">Human release gate</span><p>The system drafts; it never submits the final packet automatically.</p></div>
+      <section class="operations-section">
+        <p class="section-label">05 / work across time / the browser may be closed</p>
+        <div class="operations-grid">
+          <div class="wake-loop">
+            <h3>One-time schedule → stale-event check → same AgentCore session</h3>
+            <div class="wake-steps">
+              <article><span>◷ EVENTBRIDGE</span><p>Create one exact <code>at(…)</code> checkpoint</p></article>
+              <article><span>ϟ WORKER LAMBDA</span><p>Private target wakes without a browser</p></article>
+              <article><span>▦ DYNAMODB GATE</span><p>Load hashed session map; reject stale version</p></article>
+              <article><span>↻ AGENTCORE / DEFAULT</span><p>Idempotent invoke of the same bounded run</p></article>
+            </div>
+          </div>
+          <div class="resource-plane">
+            <h3>Private resource plane</h3>
+            <div class="resource-cells">
+              <article><span class="green">EVIDENCE + PACKETS</span><b>S3</b><p>SSE-S3 • 1-day expiry • 60s URL</p></article>
+              <article><span>OBSERVE</span><b>CloudWatch</b><p>Sanitized traces • errors • alarms</p></article>
+              <article><span>OUTBOUND</span><b>SNS</b><p>Opt-in • one hashed demo destination</p></article>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <div class="footer-note">Mettle / AWS deployment boundary / no browser credentials</div>
+      <div class="footer-note">No browser keys / private origins / human release gate</div>
     </main>
   </body>
 </html>

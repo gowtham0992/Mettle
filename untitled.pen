@@ -3,16 +3,2324 @@
   "children": [
     {
       "type": "frame",
-      "id": "bi8Au",
-      "x": 0,
+      "id": "NJ8rR",
+      "x": 960,
       "y": 0,
-      "name": "Frame",
+      "name": "Mettle Product Architecture — Recovery Spine",
       "clip": true,
-      "width": 800,
-      "height": 600,
-      "fill": "#FFFFFF",
-      "layout": "none"
+      "width": 1920,
+      "height": 1080,
+      "fill": "$mettle-paper",
+      "layout": "none",
+      "children": [
+        {
+          "type": "rectangle",
+          "id": "COFzo",
+          "x": 0,
+          "y": 0,
+          "name": "Orange Registration Bar",
+          "fill": "$mettle-orange",
+          "width": 1920,
+          "height": 16
+        },
+        {
+          "type": "text",
+          "id": "fQkJm",
+          "x": 96,
+          "y": 54,
+          "name": "Product Diagram Eyebrow",
+          "fill": "$mettle-orange",
+          "content": "PRODUCT SYSTEM  /  ONE RECOVERY, THREE AUTHORITY GATES",
+          "fontFamily": "Geist Mono",
+          "fontSize": 18,
+          "fontWeight": "700",
+          "letterSpacing": 1.8
+        },
+        {
+          "type": "text",
+          "id": "ivVJE",
+          "x": 96,
+          "y": 90,
+          "name": "Product Diagram Title",
+          "fill": "$mettle-ink",
+          "textGrowth": "fixed-width",
+          "width": 1260,
+          "content": "THE AGENT WORKS THE CLOCK.\nTHE CONTRACTOR OWNS THE CALLS.",
+          "lineHeight": 1.02,
+          "fontFamily": "Funnel Sans",
+          "fontSize": 64,
+          "fontWeight": "700",
+          "letterSpacing": -2.4
+        },
+        {
+          "type": "text",
+          "id": "y50Xhi",
+          "x": 100,
+          "y": 235,
+          "name": "Product Diagram Subtitle",
+          "fill": "$mettle-muted",
+          "textGrowth": "fixed-width",
+          "width": 1170,
+          "content": "A failed-inspection notice becomes a bounded recovery campaign. Mettle handles the chase between events—and stops before outreach, at the deadline tradeoff, and before release.",
+          "lineHeight": 1.45,
+          "fontFamily": "Inter",
+          "fontSize": 21
+        },
+        {
+          "type": "frame",
+          "id": "cffRi",
+          "x": 1600,
+          "y": 62,
+          "name": "Mettle Wordmark",
+          "width": 224,
+          "height": 52,
+          "gap": 14,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "polygon",
+              "polygonCount": 4,
+              "id": "eRRgI",
+              "name": "Mettle Diamond",
+              "rotation": 45,
+              "fill": "$mettle-orange",
+              "width": 25,
+              "height": 25
+            },
+            {
+              "type": "text",
+              "id": "IPbY3",
+              "name": "Mettle Name",
+              "fill": "$mettle-ink",
+              "content": "METTLE",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 28,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "f9EKU",
+          "x": 96,
+          "y": 324,
+          "name": "Campaign Spine Label",
+          "fill": "$mettle-muted",
+          "content": "CAMPAIGN SPINE  /  STATE ADVANCES ONLY THROUGH VALIDATED EVENTS",
+          "fontFamily": "Geist Mono",
+          "fontSize": 15,
+          "fontWeight": "700",
+          "letterSpacing": 1.2
+        },
+        {
+          "type": "rectangle",
+          "id": "KrGsP",
+          "x": 96,
+          "y": 503,
+          "name": "Campaign Spine Line",
+          "fill": "$mettle-ink",
+          "width": 1728,
+          "height": 3
+        },
+        {
+          "type": "frame",
+          "id": "L5ERe",
+          "x": 96,
+          "y": 388,
+          "name": "Notice Event Module",
+          "width": 210,
+          "height": 238,
+          "fill": "$mettle-white",
+          "stroke": "$mettle-ink",
+          "strokeWidth": 1,
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            22,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "x78L7",
+              "name": "Notice Step",
+              "fill": "$mettle-orange",
+              "content": "00 / EVENT",
+              "fontFamily": "Geist Mono",
+              "fontSize": 13,
+              "fontWeight": "700",
+              "letterSpacing": 1
+            },
+            {
+              "type": "icon",
+              "id": "sBhln",
+              "name": "Notice File Icon",
+              "width": 32,
+              "height": 32,
+              "icon": "file-text",
+              "library": "lucide",
+              "fill": "$mettle-ink"
+            },
+            {
+              "type": "text",
+              "id": "YBoyY",
+              "name": "Notice Heading",
+              "fill": "$mettle-ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Failed notice lands",
+              "lineHeight": 1.05,
+              "fontFamily": "Funnel Sans",
+              "fontSize": 26,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "fP5JM",
+              "name": "Notice Detail",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Municipal language + a reinspection clock. No project setup.",
+              "lineHeight": 1.4,
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "icon",
+          "id": "SRmOA",
+          "x": 317,
+          "y": 492,
+          "name": "Arrow Notice to Gate One",
+          "width": 26,
+          "height": 26,
+          "icon": "chevron-right",
+          "library": "lucide",
+          "fill": "$mettle-orange"
+        },
+        {
+          "type": "frame",
+          "id": "eP9T4",
+          "x": 354,
+          "y": 374,
+          "name": "Authority Gate One — Correction Review",
+          "width": 226,
+          "height": 266,
+          "fill": "$mettle-amber",
+          "stroke": "#9D6E08",
+          "strokeWidth": 1,
+          "layout": "vertical",
+          "gap": 11,
+          "padding": [
+            20,
+            18
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "niZ2d",
+              "name": "Gate One Stop Flag",
+              "width": "fill_container",
+              "height": 30,
+              "gap": 9,
+              "alignItems": "center"
+            },
+            {
+              "type": "text",
+              "id": "y2qfww",
+              "name": "Gate One Stop Label",
+              "fill": "#704B00",
+              "content": "◆  STOP 01",
+              "fontFamily": "Geist Mono",
+              "fontSize": 13,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "w7wqR5",
+              "name": "Gate One Owner",
+              "fill": "#8B5E00",
+              "content": "CONTRACTOR",
+              "fontFamily": "Geist Mono",
+              "fontSize": 12,
+              "fontWeight": "700",
+              "letterSpacing": 0.8
+            },
+            {
+              "type": "text",
+              "id": "jTn0x",
+              "name": "Gate One Heading",
+              "fill": "$mettle-ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Confirm route + proof boundary",
+              "lineHeight": 1.05,
+              "fontFamily": "Funnel Sans",
+              "fontSize": 24,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "hLzp1",
+              "name": "Gate One Detail",
+              "fill": "#705B28",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Every citation, trade owner, closure route, and visible-proof request is reviewed. Zero outreach before this gate.",
+              "lineHeight": 1.42,
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "icon",
+          "id": "Zj27S",
+          "x": 592,
+          "y": 492,
+          "name": "Arrow Gate One to Engine",
+          "width": 26,
+          "height": 26,
+          "icon": "chevron-right",
+          "library": "lucide",
+          "fill": "$mettle-orange"
+        },
+        {
+          "type": "frame",
+          "id": "cJGa7",
+          "x": 630,
+          "y": 350,
+          "name": "Strands Recovery Engine",
+          "width": 594,
+          "height": 314,
+          "fill": "$mettle-ink",
+          "stroke": "$mettle-ink",
+          "strokeWidth": 1,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "L9lEPq",
+              "x": 24,
+              "y": 22,
+              "name": "Engine Eyebrow",
+              "fill": "$mettle-orange",
+              "content": "STRANDS GRAPH  /  AUTONOMY ZONE",
+              "fontFamily": "Geist Mono",
+              "fontSize": 13,
+              "fontWeight": "700",
+              "letterSpacing": 1
+            },
+            {
+              "type": "text",
+              "id": "ZeaBB",
+              "x": 24,
+              "y": 52,
+              "name": "Engine Heading",
+              "fill": "$mettle-white",
+              "content": "Recovery runs between events",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 33,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "rqOI5",
+              "x": 24,
+              "y": 98,
+              "name": "Engine Detail",
+              "fill": "#BCC0BE",
+              "textGrowth": "fixed-width",
+              "width": 530,
+              "content": "Open-only replanning • replay-safe outreach • evidence assessment • deadline-aware cadence",
+              "lineHeight": 1.4,
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "rectangle",
+              "id": "JsKRK",
+              "x": 28,
+              "y": 172,
+              "name": "Engine Timeline Rail",
+              "fill": "#5A5F60",
+              "width": 534,
+              "height": 2
+            },
+            {
+              "type": "ellipse",
+              "id": "cmHxr",
+              "x": 28,
+              "y": 163,
+              "name": "Engine Timeline Node T−7",
+              "fill": "$mettle-white",
+              "width": 20,
+              "height": 20,
+              "stroke": "$mettle-ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "id": "N4JrxG",
+              "x": 22,
+              "y": 195,
+              "name": "Engine Timeline Key T−7",
+              "fill": "$mettle-white",
+              "content": "T−7",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "m3poj",
+              "x": 22,
+              "y": 217,
+              "name": "Engine Timeline Value T−7",
+              "fill": "#8F9492",
+              "content": "ASSIGN",
+              "fontFamily": "Geist Mono",
+              "fontSize": 10,
+              "fontWeight": "700",
+              "letterSpacing": 0.5
+            },
+            {
+              "type": "ellipse",
+              "id": "MtZUn",
+              "x": 150,
+              "y": 163,
+              "name": "Engine Timeline Node T−3",
+              "fill": "$mettle-white",
+              "width": 20,
+              "height": 20,
+              "stroke": "$mettle-ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "id": "nUgMU",
+              "x": 144,
+              "y": 195,
+              "name": "Engine Timeline Key T−3",
+              "fill": "$mettle-white",
+              "content": "T−3",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "OVfd1",
+              "x": 144,
+              "y": 217,
+              "name": "Engine Timeline Value T−3",
+              "fill": "#8F9492",
+              "content": "CHASE",
+              "fontFamily": "Geist Mono",
+              "fontSize": 10,
+              "fontWeight": "700",
+              "letterSpacing": 0.5
+            },
+            {
+              "type": "ellipse",
+              "id": "q4ht5",
+              "x": 272,
+              "y": 163,
+              "name": "Engine Timeline Node T−2",
+              "fill": "$mettle-orange",
+              "width": 20,
+              "height": 20,
+              "stroke": "$mettle-ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "id": "VQTyw",
+              "x": 266,
+              "y": 195,
+              "name": "Engine Timeline Key T−2",
+              "fill": "$mettle-orange",
+              "content": "T−2",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "D1yFZ",
+              "x": 266,
+              "y": 217,
+              "name": "Engine Timeline Value T−2",
+              "fill": "#8F9492",
+              "content": "ESCALATE",
+              "fontFamily": "Geist Mono",
+              "fontSize": 10,
+              "fontWeight": "700",
+              "letterSpacing": 0.5
+            },
+            {
+              "type": "ellipse",
+              "id": "c3087",
+              "x": 394,
+              "y": 163,
+              "name": "Engine Timeline Node T−1",
+              "fill": "$mettle-white",
+              "width": 20,
+              "height": 20,
+              "stroke": "$mettle-ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "id": "BrMtC",
+              "x": 388,
+              "y": 195,
+              "name": "Engine Timeline Key T−1",
+              "fill": "$mettle-white",
+              "content": "T−1",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "dMgSD",
+              "x": 388,
+              "y": 217,
+              "name": "Engine Timeline Value T−1",
+              "fill": "#8F9492",
+              "content": "OPEN ONLY",
+              "fontFamily": "Geist Mono",
+              "fontSize": 10,
+              "fontWeight": "700",
+              "letterSpacing": 0.5
+            },
+            {
+              "type": "ellipse",
+              "id": "RhViQ",
+              "x": 516,
+              "y": 163,
+              "name": "Engine Timeline Node ✓",
+              "fill": "$mettle-white",
+              "width": 20,
+              "height": 20,
+              "stroke": "$mettle-ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "id": "uqCwE",
+              "x": 510,
+              "y": 195,
+              "name": "Engine Timeline Key ✓",
+              "fill": "$mettle-white",
+              "content": "✓",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "pKHdx",
+              "x": 510,
+              "y": 217,
+              "name": "Engine Timeline Value ✓",
+              "fill": "#8F9492",
+              "content": "CLOSE",
+              "fontFamily": "Geist Mono",
+              "fontSize": 10,
+              "fontWeight": "700",
+              "letterSpacing": 0.5
+            },
+            {
+              "type": "frame",
+              "id": "iPHjD",
+              "x": 28,
+              "y": 258,
+              "name": "Evidence Loop Marker",
+              "width": 534,
+              "height": 34,
+              "stroke": "#5A5F60",
+              "strokeWidth": 1,
+              "gap": 10,
+              "padding": [
+                0,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "uwP0y",
+                  "name": "Evidence Loop Icon",
+                  "width": 17,
+                  "height": 17,
+                  "icon": "refresh-cw",
+                  "library": "lucide",
+                  "fill": "$mettle-orange"
+                },
+                {
+                  "type": "text",
+                  "id": "GKv6O",
+                  "name": "Evidence Loop Text",
+                  "fill": "$mettle-white",
+                  "content": "PHOTO → VISIBLE / NOT SHOWN / UNCERTAIN → ACCEPT OR RE-REQUEST",
+                  "fontFamily": "Geist Mono",
+                  "fontSize": 11,
+                  "fontWeight": "700",
+                  "letterSpacing": 0.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "icon",
+          "id": "AG8qk",
+          "x": 1232,
+          "y": 492,
+          "name": "Arrow Engine to Gate Two",
+          "width": 26,
+          "height": 26,
+          "icon": "chevron-right",
+          "library": "lucide",
+          "fill": "$mettle-orange"
+        },
+        {
+          "type": "frame",
+          "id": "RvjNz",
+          "x": 1268,
+          "y": 374,
+          "name": "Authority Gate Two — Deadline Tradeoff",
+          "width": 214,
+          "height": 266,
+          "fill": "$mettle-amber",
+          "stroke": "#9D6E08",
+          "strokeWidth": 1,
+          "layout": "vertical",
+          "gap": 11,
+          "padding": [
+            20,
+            18
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "w1i8NI",
+              "name": "Gate Two Stop Label",
+              "fill": "#704B00",
+              "content": "◆  STOP 02",
+              "fontFamily": "Geist Mono",
+              "fontSize": 13,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "t1YaTZ",
+              "name": "Gate Two Owner",
+              "fill": "#8B5E00",
+              "content": "T−2 / CONTRACTOR",
+              "fontFamily": "Geist Mono",
+              "fontSize": 12,
+              "fontWeight": "700",
+              "letterSpacing": 0.8
+            },
+            {
+              "type": "text",
+              "id": "glwVH",
+              "name": "Gate Two Heading",
+              "fill": "$mettle-ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Keep or move the date",
+              "lineHeight": 1.05,
+              "fontFamily": "Funnel Sans",
+              "fontSize": 24,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "IfFmU",
+              "name": "Gate Two Detail",
+              "fill": "#705B28",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Mettle escalates open trades. The contractor owns the schedule commitment.",
+              "lineHeight": 1.42,
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "icon",
+          "id": "u7yFuz",
+          "x": 1487,
+          "y": 492,
+          "name": "Arrow Gate Two to Packet",
+          "width": 26,
+          "height": 26,
+          "icon": "chevron-right",
+          "library": "lucide",
+          "fill": "$mettle-orange"
+        },
+        {
+          "type": "frame",
+          "id": "NBL7v",
+          "x": 1518,
+          "y": 374,
+          "name": "Packet Assembly and Release Module",
+          "width": 306,
+          "height": 266,
+          "fill": "$mettle-sage",
+          "stroke": "#3F7258",
+          "strokeWidth": 1,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "y2hKm9",
+              "x": 18,
+              "y": 18,
+              "name": "Packet Step",
+              "fill": "#35684E",
+              "content": "PACKET AGENT",
+              "fontFamily": "Geist Mono",
+              "fontSize": 12,
+              "fontWeight": "700",
+              "letterSpacing": 0.8
+            },
+            {
+              "type": "icon",
+              "id": "YxfOu",
+              "x": 18,
+              "y": 47,
+              "name": "Packet Icon",
+              "width": 28,
+              "height": 28,
+              "icon": "file-check",
+              "library": "lucide",
+              "fill": "#35684E"
+            },
+            {
+              "type": "text",
+              "id": "YZfQR",
+              "x": 18,
+              "y": 88,
+              "name": "Packet Heading",
+              "fill": "$mettle-ink",
+              "textGrowth": "fixed-width",
+              "width": 120,
+              "content": "Assemble the evidence trail",
+              "lineHeight": 1.08,
+              "fontFamily": "Funnel Sans",
+              "fontSize": 21,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "uIyj4",
+              "x": 18,
+              "y": 146,
+              "name": "Packet Detail",
+              "fill": "#4C685A",
+              "textGrowth": "fixed-width",
+              "width": 124,
+              "content": "Citation ↔ proof ↔ timestamp ↔ recovery history",
+              "lineHeight": 1.36,
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "rectangle",
+              "id": "qGyrf",
+              "x": 154,
+              "y": 0,
+              "name": "Packet Release Divider",
+              "fill": "#7D9F8A",
+              "width": 1,
+              "height": 266
+            },
+            {
+              "type": "text",
+              "id": "FgU5Y",
+              "x": 170,
+              "y": 18,
+              "name": "Gate Three Stop Label",
+              "fill": "#704B00",
+              "content": "◆ STOP 03",
+              "fontFamily": "Geist Mono",
+              "fontSize": 13,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "vGe5e",
+              "x": 170,
+              "y": 48,
+              "name": "Gate Three Owner",
+              "fill": "#35684E",
+              "content": "CONTRACTOR",
+              "fontFamily": "Geist Mono",
+              "fontSize": 11,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "z7Pwh",
+              "x": 170,
+              "y": 82,
+              "name": "Gate Three Heading",
+              "fill": "$mettle-ink",
+              "textGrowth": "fixed-width",
+              "width": 118,
+              "content": "Approve final release",
+              "lineHeight": 1.05,
+              "fontFamily": "Funnel Sans",
+              "fontSize": 21,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "WeLgs",
+              "x": 170,
+              "y": 146,
+              "name": "Gate Three Detail",
+              "fill": "#4C685A",
+              "textGrowth": "fixed-width",
+              "width": 116,
+              "content": "The system drafts. Only the contractor unlocks the PDF.",
+              "lineHeight": 1.36,
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "njn4l",
+              "x": 170,
+              "y": 220,
+              "name": "Reinspection Ready Badge",
+              "width": 118,
+              "height": 28,
+              "fill": "#2F6B4F",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "pxu4Z",
+                  "name": "Reinspection Ready Label",
+                  "fill": "$mettle-white",
+                  "content": "REINSPECTION READY",
+                  "fontFamily": "Geist Mono",
+                  "fontSize": 10,
+                  "fontWeight": "700",
+                  "letterSpacing": 0.6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "lRQwg",
+          "x": 96,
+          "y": 712,
+          "name": "Authority Strip Label",
+          "fill": "$mettle-muted",
+          "content": "DECISION RIGHTS  /  THE BOUNDARY IS THE PRODUCT",
+          "fontFamily": "Geist Mono",
+          "fontSize": 15,
+          "fontWeight": "700",
+          "letterSpacing": 1.1
+        },
+        {
+          "type": "frame",
+          "id": "rbXr2",
+          "x": 96,
+          "y": 750,
+          "name": "Decision Rights Strip",
+          "width": 1728,
+          "height": 196,
+          "fill": "$mettle-white",
+          "stroke": "$mettle-ink",
+          "strokeWidth": 1,
+          "layout": "none",
+          "children": [
+            {
+              "type": "frame",
+              "id": "ayJGF",
+              "x": 0,
+              "y": 0,
+              "name": "Boundary Lead Panel",
+              "width": 260,
+              "height": 196,
+              "fill": "$mettle-ink",
+              "layout": "vertical",
+              "gap": 10,
+              "padding": [
+                26,
+                24
+              ]
+            },
+            {
+              "type": "text",
+              "id": "m89biC",
+              "x": 24,
+              "y": 24,
+              "name": "Boundary Lead Eyebrow",
+              "fill": "$mettle-orange",
+              "content": "AUTHORITY MAP",
+              "fontFamily": "Geist Mono",
+              "fontSize": 12,
+              "fontWeight": "700",
+              "letterSpacing": 1
+            },
+            {
+              "type": "text",
+              "id": "j3dbb",
+              "x": 24,
+              "y": 60,
+              "name": "Boundary Lead Heading",
+              "fill": "$mettle-white",
+              "textGrowth": "fixed-width",
+              "width": 210,
+              "content": "Autonomy is useful only when its limits are visible.",
+              "lineHeight": 1.08,
+              "fontFamily": "Funnel Sans",
+              "fontSize": 27,
+              "fontWeight": "700"
+            },
+            {
+              "type": "rectangle",
+              "id": "k6yKxk",
+              "x": 260,
+              "y": 0,
+              "name": "Boundary Divider One",
+              "fill": "$mettle-line",
+              "width": 1,
+              "height": 196
+            },
+            {
+              "type": "text",
+              "id": "ZpS8O",
+              "x": 292,
+              "y": 30,
+              "name": "Model Authority Label",
+              "fill": "$mettle-orange",
+              "content": "● MODEL  /  DESCRIBE",
+              "fontFamily": "Geist Mono",
+              "fontSize": 13,
+              "fontWeight": "700",
+              "letterSpacing": 1
+            },
+            {
+              "type": "text",
+              "id": "uGRCu",
+              "x": 292,
+              "y": 63,
+              "name": "Model Authority Heading",
+              "fill": "$mettle-ink",
+              "content": "Unstructured → structured",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 24,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "APgKL",
+              "x": 292,
+              "y": 104,
+              "name": "Model Authority Detail",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": 390,
+              "content": "Quotes notice language and describes visible evidence. Never certifies compliance.",
+              "lineHeight": 1.42,
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "rectangle",
+              "id": "lcjTB",
+              "x": 732,
+              "y": 0,
+              "name": "Boundary Divider Two",
+              "fill": "$mettle-line",
+              "width": 1,
+              "height": 196
+            },
+            {
+              "type": "text",
+              "id": "TOY76",
+              "x": 764,
+              "y": 30,
+              "name": "Code Authority Label",
+              "fill": "#35684E",
+              "content": "■ CODE  /  ENFORCE",
+              "fontFamily": "Geist Mono",
+              "fontSize": 13,
+              "fontWeight": "700",
+              "letterSpacing": 1
+            },
+            {
+              "type": "text",
+              "id": "u5Lpr",
+              "x": 764,
+              "y": 63,
+              "name": "Code Authority Heading",
+              "fill": "$mettle-ink",
+              "content": "State moves by policy",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 24,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "AAI1Z",
+              "x": 764,
+              "y": 104,
+              "name": "Code Authority Detail",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": 390,
+              "content": "Deadlines, idempotency, open-only replanning, file limits, and packet locks stay deterministic.",
+              "lineHeight": 1.42,
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "rectangle",
+              "id": "o8TEX",
+              "x": 1204,
+              "y": 0,
+              "name": "Boundary Divider Three",
+              "fill": "$mettle-line",
+              "width": 1,
+              "height": 196
+            },
+            {
+              "type": "text",
+              "id": "nnyLx",
+              "x": 1236,
+              "y": 30,
+              "name": "Human Authority Label",
+              "fill": "#8B5E00",
+              "content": "◆ HUMAN  /  AUTHORIZE",
+              "fontFamily": "Geist Mono",
+              "fontSize": 13,
+              "fontWeight": "700",
+              "letterSpacing": 1
+            },
+            {
+              "type": "text",
+              "id": "X5sa9j",
+              "x": 1236,
+              "y": 63,
+              "name": "Human Authority Heading",
+              "fill": "$mettle-ink",
+              "content": "Professional calls stay human",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 24,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "Haqd7",
+              "x": 1236,
+              "y": 104,
+              "name": "Human Authority Detail",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": 430,
+              "content": "Owns routing, interpretation, schedule commitment, and final inspector-facing release.",
+              "lineHeight": 1.42,
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "in7Xl",
+          "x": 1397,
+          "y": 1017,
+          "name": "Product Diagram Footer",
+          "fill": "$mettle-muted",
+          "content": "NOTICE IN  →  RECOVERY OUT  /  PROFESSIONAL AGENTS",
+          "fontFamily": "Geist Mono",
+          "fontSize": 11,
+          "fontWeight": "700",
+          "letterSpacing": 1
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "PPQbb",
+      "x": 3040,
+      "y": 0,
+      "name": "Mettle AWS Architecture — Bounded Runtime",
+      "clip": true,
+      "width": 1920,
+      "height": 1080,
+      "fill": "$mettle-paper",
+      "layout": "none",
+      "children": [
+        {
+          "type": "rectangle",
+          "id": "w26QVM",
+          "x": 0,
+          "y": 0,
+          "name": "AWS Orange Registration Bar",
+          "fill": "$mettle-orange",
+          "width": 1920,
+          "height": 16
+        },
+        {
+          "type": "text",
+          "id": "xctid",
+          "x": 96,
+          "y": 54,
+          "name": "AWS Diagram Eyebrow",
+          "fill": "$mettle-orange",
+          "content": "AWS INTERNALS  /  TRUST, REQUEST, AND WAKE-UP PATHS",
+          "fontFamily": "Geist Mono",
+          "fontSize": 18,
+          "fontWeight": "700",
+          "letterSpacing": 1.8
+        },
+        {
+          "type": "text",
+          "id": "j8g8n",
+          "x": 96,
+          "y": 90,
+          "name": "AWS Diagram Title",
+          "fill": "$mettle-ink",
+          "textGrowth": "fixed-width",
+          "width": 1330,
+          "content": "THE BROWSER GETS A PRODUCT.\nTHE AGENT GETS A BOUNDED RUNTIME.",
+          "lineHeight": 1.02,
+          "fontFamily": "Funnel Sans",
+          "fontSize": 62,
+          "fontWeight": "700",
+          "letterSpacing": -2.2
+        },
+        {
+          "type": "text",
+          "id": "nhrAa",
+          "x": 100,
+          "y": 235,
+          "name": "AWS Diagram Subtitle",
+          "fill": "$mettle-muted",
+          "textGrowth": "fixed-width",
+          "width": 1280,
+          "content": "Credentials, model choice, runtime identity, evidence, and campaign state remain server-side. Solid orange is a user request; amber is a scheduled wake-up; green is private state and artifacts.",
+          "lineHeight": 1.45,
+          "fontFamily": "Inter",
+          "fontSize": 20
+        },
+        {
+          "type": "frame",
+          "id": "m7PeM",
+          "x": 1600,
+          "y": 62,
+          "name": "AWS Mettle Wordmark",
+          "width": 224,
+          "height": 52,
+          "gap": 14,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "polygon",
+              "polygonCount": 4,
+              "id": "mc469",
+              "name": "AWS Mettle Diamond",
+              "rotation": 45,
+              "fill": "$mettle-orange",
+              "width": 25,
+              "height": 25
+            },
+            {
+              "type": "text",
+              "id": "fIN01",
+              "name": "AWS Mettle Name",
+              "fill": "$mettle-ink",
+              "content": "METTLE",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 28,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "nK2h2",
+          "x": 96,
+          "y": 316,
+          "name": "Authenticated Path Label",
+          "fill": "$mettle-muted",
+          "content": "01 / AUTHENTICATED REQUEST  →  02 / BOUNDED AGENT RUN",
+          "fontFamily": "Geist Mono",
+          "fontSize": 15,
+          "fontWeight": "700",
+          "letterSpacing": 1.1
+        },
+        {
+          "type": "frame",
+          "id": "KXRRD",
+          "x": 96,
+          "y": 366,
+          "name": "Contractor Browser Node",
+          "width": 230,
+          "height": 324,
+          "fill": "$mettle-white",
+          "stroke": "$mettle-ink",
+          "strokeWidth": 1,
+          "layout": "vertical",
+          "gap": 14,
+          "padding": [
+            24,
+            22
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "n91bGq",
+              "name": "Browser Zone Label",
+              "fill": "$mettle-orange",
+              "content": "USER SURFACE",
+              "fontFamily": "Geist Mono",
+              "fontSize": 12,
+              "fontWeight": "700",
+              "letterSpacing": 1
+            },
+            {
+              "type": "icon",
+              "id": "dSYgS",
+              "name": "Browser Icon",
+              "width": 38,
+              "height": 38,
+              "icon": "laptop",
+              "library": "lucide",
+              "fill": "$mettle-ink"
+            },
+            {
+              "type": "text",
+              "id": "dMWD9",
+              "name": "Browser Heading",
+              "fill": "$mettle-ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Contractor command center",
+              "lineHeight": 1.05,
+              "fontFamily": "Funnel Sans",
+              "fontSize": 28,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "ubWpT",
+              "name": "Browser Detail",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Uploads notice text, resolves judgment cards, submits evidence, and approves the final packet.",
+              "lineHeight": 1.45,
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "oOE6l",
+              "name": "No Credential Badge",
+              "width": "fill_container",
+              "height": 30,
+              "stroke": "$mettle-orange",
+              "strokeWidth": 1,
+              "justifyContent": "center",
+              "alignItems": "center"
+            },
+            {
+              "type": "text",
+              "id": "v06CYN",
+              "name": "No Credential Label",
+              "fill": "$mettle-orange",
+              "content": "NO AWS CREDENTIALS",
+              "fontFamily": "Geist Mono",
+              "fontSize": 10,
+              "fontWeight": "700",
+              "letterSpacing": 0.5
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "ysSHK",
+          "x": 326,
+          "y": 515,
+          "name": "Authenticated Request Rail",
+          "fill": "$mettle-orange",
+          "width": 930,
+          "height": 3
+        },
+        {
+          "type": "icon",
+          "id": "bAD1g",
+          "x": 350,
+          "y": 503,
+          "name": "Request Rail Chevron 350",
+          "width": 28,
+          "height": 28,
+          "icon": "chevron-right",
+          "library": "lucide",
+          "fill": "$mettle-orange"
+        },
+        {
+          "type": "icon",
+          "id": "U295Pb",
+          "x": 620,
+          "y": 503,
+          "name": "Request Rail Chevron 620",
+          "width": 28,
+          "height": 28,
+          "icon": "chevron-right",
+          "library": "lucide",
+          "fill": "$mettle-orange"
+        },
+        {
+          "type": "icon",
+          "id": "WLCUY",
+          "x": 900,
+          "y": 503,
+          "name": "Request Rail Chevron 900",
+          "width": 28,
+          "height": 28,
+          "icon": "chevron-right",
+          "library": "lucide",
+          "fill": "$mettle-orange"
+        },
+        {
+          "type": "icon",
+          "id": "odpUt",
+          "x": 1224,
+          "y": 503,
+          "name": "Request Rail Chevron 1224",
+          "width": 28,
+          "height": 28,
+          "icon": "chevron-right",
+          "library": "lucide",
+          "fill": "$mettle-orange"
+        },
+        {
+          "type": "frame",
+          "id": "sBkxh",
+          "x": 380,
+          "y": 382,
+          "name": "CloudFront and WAF Node",
+          "width": 216,
+          "height": 276,
+          "fill": "$mettle-paper",
+          "layout": "vertical",
+          "gap": 13,
+          "padding": [
+            22,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "h89zBP",
+              "name": "Edge Step",
+              "fill": "$mettle-orange",
+              "content": "01 / EDGE",
+              "fontFamily": "Geist Mono",
+              "fontSize": 12,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "x3LlW",
+              "name": "Edge Heading",
+              "fill": "$mettle-ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "CloudFront + WAF",
+              "lineHeight": 1.05,
+              "fontFamily": "Funnel Sans",
+              "fontSize": 25,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "nK4LE",
+              "name": "Edge Detail",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "TLS, private static origin, managed protections, and request throttling.",
+              "lineHeight": 1.42,
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "w0kSKk",
+              "name": "Edge Policy",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "/static  →  PRIVATE S3\n/api/*   →  API GATEWAY",
+              "lineHeight": 1.4,
+              "fontFamily": "Geist Mono",
+              "fontSize": 10,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "hecrs",
+          "x": 650,
+          "y": 382,
+          "name": "Cognito and API Gateway Node",
+          "width": 226,
+          "height": 276,
+          "fill": "$mettle-paper",
+          "layout": "vertical",
+          "gap": 13,
+          "padding": [
+            22,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "E4IY2",
+              "name": "Identity Step",
+              "fill": "$mettle-orange",
+              "content": "02 / IDENTITY + API",
+              "fontFamily": "Geist Mono",
+              "fontSize": 12,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "srzZr",
+              "name": "Identity Heading",
+              "fill": "$mettle-ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Cognito PKCE + API Gateway",
+              "lineHeight": 1.05,
+              "fontFamily": "Funnel Sans",
+              "fontSize": 25,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "E2wbw",
+              "name": "Identity Detail",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "JWT validation and typed protected routes. Paid paths throttle at 1 rps, burst 2.",
+              "lineHeight": 1.42,
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "lpVy3",
+          "x": 930,
+          "y": 382,
+          "name": "Lambda Gateway Node",
+          "width": 250,
+          "height": 276,
+          "fill": "$mettle-paper",
+          "layout": "vertical",
+          "gap": 13,
+          "padding": [
+            22,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "XD2FN",
+              "name": "Gateway Step",
+              "fill": "$mettle-orange",
+              "content": "03 / SERVER BOUNDARY",
+              "fontFamily": "Geist Mono",
+              "fontSize": 12,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "zbtfz",
+              "name": "Gateway Heading",
+              "fill": "$mettle-ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Lambda gateway",
+              "lineHeight": 1.05,
+              "fontFamily": "Funnel Sans",
+              "fontSize": 25,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "IFZXX",
+              "name": "Gateway Detail",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Validates bounded operations, normalizes uploads, owns the AgentCore session ID, and invokes one exact endpoint.",
+              "lineHeight": 1.42,
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "nCbPS",
+              "name": "Exact Resource Badge",
+              "width": "fill_container",
+              "height": 30,
+              "fill": "$mettle-amber",
+              "justifyContent": "center",
+              "alignItems": "center"
+            },
+            {
+              "type": "text",
+              "id": "rY2Xz",
+              "name": "Exact Resource Label",
+              "fill": "#704B00",
+              "content": "EXACT-RESOURCE IAM",
+              "fontFamily": "Geist Mono",
+              "fontSize": 10,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dhhEI",
+          "x": 1256,
+          "y": 342,
+          "name": "Amazon Bedrock AgentCore Runtime",
+          "width": 568,
+          "height": 378,
+          "fill": "$mettle-ink",
+          "stroke": "$mettle-ink",
+          "strokeWidth": 1,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "tCQ92",
+              "x": 24,
+              "y": 22,
+              "name": "Runtime Step",
+              "fill": "$mettle-orange",
+              "content": "04 / AMAZON BEDROCK AGENTCORE",
+              "fontFamily": "Geist Mono",
+              "fontSize": 12,
+              "fontWeight": "700",
+              "letterSpacing": 1
+            },
+            {
+              "type": "text",
+              "id": "kMs7e",
+              "x": 24,
+              "y": 52,
+              "name": "Runtime Heading",
+              "fill": "$mettle-white",
+              "content": "One session. Typed operations.",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 34,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "AzLDx",
+              "x": 24,
+              "y": 98,
+              "name": "Runtime Detail",
+              "fill": "#BCC0BE",
+              "textGrowth": "fixed-width",
+              "width": 515,
+              "content": "The entrypoint accepts start, review, resume, evidence, checkpoint, packet, approval, and render—not arbitrary prompts.",
+              "lineHeight": 1.42,
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "Sz8tT",
+              "x": 24,
+              "y": 158,
+              "name": "Strands Graph Runtime Lane",
+              "width": 520,
+              "height": 94,
+              "fill": "#23272A",
+              "stroke": "#565B5C",
+              "strokeWidth": 1,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "mLFk5",
+                  "name": "Runtime Lane INTAKE",
+                  "width": 120,
+                  "height": 92,
+                  "stroke": "#565B5C",
+                  "strokeWidth": {
+                    "right": 1
+                  },
+                  "layout": "vertical",
+                  "gap": 7,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "c8tdM",
+                      "name": "INTAKE Lane Name",
+                      "fill": "$mettle-white",
+                      "content": "INTAKE",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "pWTQz",
+                      "name": "INTAKE Lane Detail",
+                      "fill": "#8F9492",
+                      "content": "NOVA MICRO",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 9,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "PhdEq",
+                  "name": "Runtime Lane RECOVERY",
+                  "width": 150,
+                  "height": 92,
+                  "stroke": "#565B5C",
+                  "strokeWidth": {
+                    "right": 1
+                  },
+                  "layout": "vertical",
+                  "gap": 7,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "e4fKxa",
+                      "name": "RECOVERY Lane Name",
+                      "fill": "$mettle-orange",
+                      "content": "RECOVERY",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ijVSA",
+                      "name": "RECOVERY Lane Detail",
+                      "fill": "#8F9492",
+                      "content": "GRAPH + HOOKS",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 9,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "B9dX4G",
+                  "name": "Runtime Lane EVIDENCE",
+                  "width": 130,
+                  "height": 92,
+                  "stroke": "#565B5C",
+                  "strokeWidth": {
+                    "right": 1
+                  },
+                  "layout": "vertical",
+                  "gap": 7,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "a4xrxr",
+                      "name": "EVIDENCE Lane Name",
+                      "fill": "$mettle-white",
+                      "content": "EVIDENCE",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "l5N6Z",
+                      "name": "EVIDENCE Lane Detail",
+                      "fill": "#8F9492",
+                      "content": "NOVA LITE",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 9,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "AnFtI",
+                  "name": "Runtime Lane PACKET",
+                  "width": 120,
+                  "height": 92,
+                  "stroke": "#565B5C",
+                  "strokeWidth": {
+                    "right": 1
+                  },
+                  "layout": "vertical",
+                  "gap": 7,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "io6vp",
+                      "name": "PACKET Lane Name",
+                      "fill": "$mettle-white",
+                      "content": "PACKET",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "J6oUQ",
+                      "name": "PACKET Lane Detail",
+                      "fill": "#8F9492",
+                      "content": "POLICY",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 9,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "OVRln",
+              "x": 24,
+              "y": 278,
+              "name": "Runtime Interrupt Label",
+              "fill": "$mettle-orange",
+              "content": "◆ NATIVE INTERRUPTS  →  SAME GRAPH RESUMES AFTER CONTRACTOR DECISION",
+              "fontFamily": "Geist Mono",
+              "fontSize": 11,
+              "fontWeight": "700",
+              "letterSpacing": 0.7
+            },
+            {
+              "type": "frame",
+              "id": "RJIG2",
+              "x": 24,
+              "y": 314,
+              "name": "Runtime Claim Boundary",
+              "width": 520,
+              "height": 40,
+              "stroke": "#565B5C",
+              "strokeWidth": 1,
+              "gap": 11,
+              "padding": [
+                0,
+                13
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "DLMxV",
+                  "name": "Runtime Shield Icon",
+                  "width": 17,
+                  "height": 17,
+                  "icon": "shield-check",
+                  "library": "lucide",
+                  "fill": "$mettle-orange"
+                },
+                {
+                  "type": "text",
+                  "id": "j7aGFU",
+                  "name": "Runtime Claim Text",
+                  "fill": "$mettle-white",
+                  "content": "DESCRIBE VISIBLE EVIDENCE  ≠  CERTIFY CODE COMPLIANCE",
+                  "fontFamily": "Geist Mono",
+                  "fontSize": 10,
+                  "fontWeight": "700",
+                  "letterSpacing": 0.4
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "FUUDf",
+          "x": 96,
+          "y": 754,
+          "name": "Wake Loop Label",
+          "fill": "$mettle-muted",
+          "content": "05 / WORK ACROSS TIME  /  THE BROWSER MAY BE CLOSED",
+          "fontFamily": "Geist Mono",
+          "fontSize": 15,
+          "fontWeight": "700",
+          "letterSpacing": 1.1
+        },
+        {
+          "type": "frame",
+          "id": "J5k5WJ",
+          "x": 96,
+          "y": 792,
+          "name": "Scheduled Recovery Wake Loop",
+          "width": 1060,
+          "height": 188,
+          "fill": "$mettle-amber",
+          "stroke": "#9D6E08",
+          "strokeWidth": 1,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "QqQMv",
+              "x": 22,
+              "y": 18,
+              "name": "Wake Loop Heading",
+              "fill": "$mettle-ink",
+              "content": "One-time schedule → stale-event check → same AgentCore session",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 22,
+              "fontWeight": "700"
+            },
+            {
+              "type": "rectangle",
+              "id": "o5ryG6",
+              "x": 26,
+              "y": 91,
+              "name": "Wake Loop Rail",
+              "fill": "#9D6E08",
+              "width": 1006,
+              "height": 2
+            },
+            {
+              "type": "frame",
+              "id": "p5OmB",
+              "x": 22,
+              "y": 54,
+              "name": "Wake Step EVENTBRIDGE",
+              "width": 218,
+              "height": 112,
+              "fill": "#FFF8DC",
+              "stroke": "#C49A35",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 7,
+              "padding": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Wydw5",
+                  "name": "EVENTBRIDGE Header",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "z91B59",
+                      "name": "EVENTBRIDGE Icon",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "calendar-clock",
+                      "library": "lucide",
+                      "fill": "#8B5E00"
+                    },
+                    {
+                      "type": "text",
+                      "id": "n05xGr",
+                      "name": "EVENTBRIDGE Label",
+                      "fill": "#704B00",
+                      "content": "EVENTBRIDGE",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 11,
+                      "fontWeight": "700",
+                      "letterSpacing": 0.6
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "XEtgI",
+                  "name": "EVENTBRIDGE Detail",
+                  "fill": "#705B28",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Create one exact at(…) checkpoint",
+                  "lineHeight": 1.35,
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "sXb6s",
+              "x": 264,
+              "y": 54,
+              "name": "Wake Step WORKER LAMBDA",
+              "width": 218,
+              "height": 112,
+              "fill": "#FFF8DC",
+              "stroke": "#C49A35",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 7,
+              "padding": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "b2dn2W",
+                  "name": "WORKER LAMBDA Header",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "UD01l",
+                      "name": "WORKER LAMBDA Icon",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "zap",
+                      "library": "lucide",
+                      "fill": "#8B5E00"
+                    },
+                    {
+                      "type": "text",
+                      "id": "G6W3rt",
+                      "name": "WORKER LAMBDA Label",
+                      "fill": "#704B00",
+                      "content": "WORKER LAMBDA",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 11,
+                      "fontWeight": "700",
+                      "letterSpacing": 0.6
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "hyy24",
+                  "name": "WORKER LAMBDA Detail",
+                  "fill": "#705B28",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Private target wakes without a browser",
+                  "lineHeight": 1.35,
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "jzJa4",
+              "x": 506,
+              "y": 54,
+              "name": "Wake Step DYNAMODB GATE",
+              "width": 218,
+              "height": 112,
+              "fill": "#FFF8DC",
+              "stroke": "#C49A35",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 7,
+              "padding": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "J2IVz",
+                  "name": "DYNAMODB GATE Header",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "OoULb",
+                      "name": "DYNAMODB GATE Icon",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "database",
+                      "library": "lucide",
+                      "fill": "#8B5E00"
+                    },
+                    {
+                      "type": "text",
+                      "id": "j47Ipe",
+                      "name": "DYNAMODB GATE Label",
+                      "fill": "#704B00",
+                      "content": "DYNAMODB GATE",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 11,
+                      "fontWeight": "700",
+                      "letterSpacing": 0.6
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "ggckC",
+                  "name": "DYNAMODB GATE Detail",
+                  "fill": "#705B28",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Load hashed session map; reject stale version",
+                  "lineHeight": 1.35,
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "hWHJj",
+              "x": 748,
+              "y": 54,
+              "name": "Wake Step AGENTCORE / DEFAULT",
+              "width": 278,
+              "height": 112,
+              "fill": "#FFF8DC",
+              "stroke": "#C49A35",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 7,
+              "padding": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "cutrf",
+                  "name": "AGENTCORE / DEFAULT Header",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "Jyo9k",
+                      "name": "AGENTCORE / DEFAULT Icon",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "rotate-cw",
+                      "library": "lucide",
+                      "fill": "#8B5E00"
+                    },
+                    {
+                      "type": "text",
+                      "id": "KYAfY",
+                      "name": "AGENTCORE / DEFAULT Label",
+                      "fill": "#704B00",
+                      "content": "AGENTCORE / DEFAULT",
+                      "fontFamily": "Geist Mono",
+                      "fontSize": 11,
+                      "fontWeight": "700",
+                      "letterSpacing": 0.6
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "MaZvk",
+                  "name": "AGENTCORE / DEFAULT Detail",
+                  "fill": "#705B28",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Idempotent invoke of the same bounded run",
+                  "lineHeight": 1.35,
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "icon",
+          "id": "t5jgz",
+          "x": 1170,
+          "y": 861,
+          "name": "Wake Loop Returns to Runtime",
+          "width": 30,
+          "height": 30,
+          "icon": "corner-right-up",
+          "library": "lucide",
+          "fill": "$mettle-orange"
+        },
+        {
+          "type": "frame",
+          "id": "Bxszw",
+          "x": 1200,
+          "y": 792,
+          "name": "Private Resource Plane",
+          "width": 624,
+          "height": 188,
+          "fill": "$mettle-white",
+          "stroke": "$mettle-ink",
+          "strokeWidth": 1,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "BjXfP",
+              "x": 20,
+              "y": 18,
+              "name": "Resource Plane Heading",
+              "fill": "$mettle-ink",
+              "content": "Private resource plane",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 22,
+              "fontWeight": "700"
+            },
+            {
+              "type": "rectangle",
+              "id": "MTZf5",
+              "x": 20,
+              "y": 56,
+              "name": "S3 Resource Divider",
+              "fill": "$mettle-line",
+              "width": 184,
+              "height": 1
+            },
+            {
+              "type": "text",
+              "id": "ZMPjU",
+              "x": 20,
+              "y": 72,
+              "name": "S3 Resource Key",
+              "fill": "#35684E",
+              "content": "EVIDENCE + PACKETS",
+              "fontFamily": "Geist Mono",
+              "fontSize": 10,
+              "fontWeight": "700",
+              "letterSpacing": 0.5
+            },
+            {
+              "type": "text",
+              "id": "nq8q7",
+              "x": 20,
+              "y": 99,
+              "name": "S3 Resource Name",
+              "fill": "$mettle-ink",
+              "content": "S3",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 20,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "O5RUu",
+              "x": 20,
+              "y": 132,
+              "name": "S3 Resource Detail",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": 174,
+              "content": "SSE-S3 • 1-day expiry • 60s URL",
+              "lineHeight": 1.35,
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "rectangle",
+              "id": "SLkZj",
+              "x": 220,
+              "y": 56,
+              "name": "OBSERVE Resource Divider",
+              "fill": "$mettle-line",
+              "width": 184,
+              "height": 1
+            },
+            {
+              "type": "text",
+              "id": "r07O4V",
+              "x": 220,
+              "y": 72,
+              "name": "OBSERVE Resource Key",
+              "fill": "$mettle-orange",
+              "content": "CLOUDWATCH + X-RAY",
+              "fontFamily": "Geist Mono",
+              "fontSize": 10,
+              "fontWeight": "700",
+              "letterSpacing": 0.5
+            },
+            {
+              "type": "text",
+              "id": "Q2mQQ",
+              "x": 220,
+              "y": 99,
+              "name": "OBSERVE Resource Name",
+              "fill": "$mettle-ink",
+              "content": "OBSERVE",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 20,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "bq2Uz",
+              "x": 220,
+              "y": 132,
+              "name": "OBSERVE Resource Detail",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": 174,
+              "content": "Sanitized traces • errors • alarms",
+              "lineHeight": 1.35,
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "rectangle",
+              "id": "PLAdD",
+              "x": 420,
+              "y": 56,
+              "name": "OUTBOUND Resource Divider",
+              "fill": "$mettle-line",
+              "width": 184,
+              "height": 1
+            },
+            {
+              "type": "text",
+              "id": "k8fkpg",
+              "x": 420,
+              "y": 72,
+              "name": "OUTBOUND Resource Key",
+              "fill": "$mettle-orange",
+              "content": "SNS / OPT-IN ONLY",
+              "fontFamily": "Geist Mono",
+              "fontSize": 10,
+              "fontWeight": "700",
+              "letterSpacing": 0.5
+            },
+            {
+              "type": "text",
+              "id": "TJaWK",
+              "x": 420,
+              "y": 99,
+              "name": "OUTBOUND Resource Name",
+              "fill": "$mettle-ink",
+              "content": "OUTBOUND",
+              "fontFamily": "Funnel Sans",
+              "fontSize": 20,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "BhA0G",
+              "x": 420,
+              "y": 132,
+              "name": "OUTBOUND Resource Detail",
+              "fill": "$mettle-muted",
+              "textGrowth": "fixed-width",
+              "width": 174,
+              "content": "One hashed demo destination",
+              "lineHeight": 1.35,
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "Ayc04",
+          "x": 1342,
+          "y": 1028,
+          "name": "AWS Diagram Footer",
+          "fill": "$mettle-muted",
+          "content": "NO BROWSER KEYS  /  PRIVATE ORIGINS  /  HUMAN RELEASE GATE",
+          "fontFamily": "Geist Mono",
+          "fontSize": 11,
+          "fontWeight": "700",
+          "letterSpacing": 1
+        }
+      ]
     }
   ],
+  "variables": {
+    "mettle-paper": {
+      "type": "color",
+      "value": "#F3F0E8"
+    },
+    "mettle-ink": {
+      "type": "color",
+      "value": "#171A1D"
+    },
+    "mettle-orange": {
+      "type": "color",
+      "value": "#F4632A"
+    },
+    "mettle-sage": {
+      "type": "color",
+      "value": "#DCE7DC"
+    },
+    "mettle-amber": {
+      "type": "color",
+      "value": "#F4E7B9"
+    },
+    "mettle-muted": {
+      "type": "color",
+      "value": "#686D6B"
+    },
+    "mettle-line": {
+      "type": "color",
+      "value": "#B6B7AE"
+    },
+    "mettle-white": {
+      "type": "color",
+      "value": "#FFFDF8"
+    }
+  },
   "fileToken": "27001662-dfcc-401a-9683-ad5fa1283b81"
 }
