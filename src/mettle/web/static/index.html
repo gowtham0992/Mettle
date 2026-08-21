@@ -212,6 +212,7 @@
                 <input id="photo-file" type="file" accept="image/jpeg,image/png">
               </label>
               <button class="button button--orange" id="photo-submit" type="submit" disabled>Assess with Bedrock Vision</button>
+              <p class="photo-evidence__mode" id="photo-mode-note">Start a recovery to assess a real photo. The fixtures below replay recorded synthetic outcomes.</p>
               <p class="photo-evidence__error" id="photo-error" role="alert" hidden></p>
             </form>
             <details class="demo-evidence" id="demo-evidence">
@@ -256,13 +257,18 @@
 
           <section class="panel log-panel agent-run-panel" data-workspace-panel="activity">
             <div class="panel__header">
-              <div><span class="section-index">06</span><h2>Agent run</h2></div>
+              <div><span class="section-index">06</span><h2>Strands graph run</h2></div>
               <span class="agent-run__mode" id="agent-run-mode">SAMPLE TRACE</span>
             </div>
-            <p class="panel__kicker">HANDOFFS, AUTONOMOUS WORK, AND HUMAN INTERRUPTS</p>
+            <p class="panel__kicker">GRAPHBUILDER NODES · SPECIALIST HANDOFFS · BEFORENODECALL INTERRUPTS</p>
+            <div class="agent-run__engine" aria-label="Strands orchestration topology">
+              <span>STRANDS GRAPHBUILDER</span>
+              <code id="agent-run-topology">recovery → deadline_chase</code>
+              <span id="agent-run-hooks">3 HOOK-GATED DECISIONS</span>
+            </div>
             <div class="agent-run__summary">
               <strong id="agent-run-summary">Mettle is coordinating the recovery across specialist agents.</strong>
-              <span>Every displayed step is bounded by notice language and recorded without exposing prompts or private payloads.</span>
+              <span id="agent-run-detail">Every displayed step is bounded by notice language and recorded without exposing prompts or private payloads.</span>
             </div>
             <ol class="agent-nodes" id="agent-node-list" aria-label="Agent execution path"></ol>
             <ol id="event-list" class="event-list"></ol>

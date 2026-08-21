@@ -384,7 +384,10 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Extract locally" in page.text
     assert "Approve & begin recovery" in page.text
     assert "Recovery clock" in page.text
-    assert "Agent run" in page.text
+    assert "Strands graph run" in page.text
+    assert "STRANDS GRAPHBUILDER" in page.text
+    assert "BEFORENODECALL INTERRUPTS" in page.text
+    assert 'id="photo-mode-note"' in page.text
     assert "Recovery workspace" in page.text
     assert "Evidence &amp; packet" in page.text
     assert "Agent activity" in page.text
@@ -393,7 +396,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Sample controls" in page.text
     assert "Background recovery brief" in page.text
     assert 'id="away-briefing"' in page.text
-    assert "HANDOFFS, AUTONOMOUS WORK, AND HUMAN INTERRUPTS" in page.text
+    assert "GRAPHBUILDER NODES · SPECIALIST HANDOFFS · BEFORENODECALL INTERRUPTS" in page.text
     assert "Compress to next checkpoint" in page.text
     assert "Simulate scheduled check" not in page.text
     assert page.headers["content-security-policy"].startswith("default-src 'self'")
@@ -412,7 +415,10 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function renderJudgeTour(data)" in script.text
     assert "async function runSampleUntilPause()" in script.text
     assert "function stageTourClock(days, cadence)" in script.text
-    assert 'viewer.src = "/api/demo/packet/preview.pdf#page=1&toolbar=0&navpanes=0"' in script.text
+    assert "function createPacketFinale(data)" in script.text
+    assert 'viewer.src = "/api/demo/packet/preview.pdf#page=2&toolbar=1&navpanes=0"' in script.text
+    assert "Recorded synthetic assessment replayed. No model or AWS service was called." in script.text
+    assert '"3 BEFORENODECALL GATES"' in script.text
     assert 'sessionStorage.setItem("mettle_entry_selected", "tour")' in script.text
     assert styles.status_code == 200
     assert ".workspace-panel--view-hidden" in styles.text
@@ -421,6 +427,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert ".tour-mode .dashboard" in styles.text
     assert ".command-stack { position: sticky" in styles.text
     assert ".packet-finale" in styles.text
+    assert '.judge-tour[data-phase="deadline"] .tour-stage__visual' in styles.text
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"
 

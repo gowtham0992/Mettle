@@ -51,6 +51,9 @@ const elements = {
   events: document.querySelector("#event-list"),
   agentRunMode: document.querySelector("#agent-run-mode"),
   agentRunSummary: document.querySelector("#agent-run-summary"),
+  agentRunDetail: document.querySelector("#agent-run-detail"),
+  agentRunTopology: document.querySelector("#agent-run-topology"),
+  agentRunHooks: document.querySelector("#agent-run-hooks"),
   agentNodes: document.querySelector("#agent-node-list"),
   judgments: document.querySelector("#judgment-list"),
   judgmentCount: document.querySelector("#judgment-count"),
@@ -67,6 +70,7 @@ const elements = {
   photoCitation: document.querySelector("#photo-citation"),
   photoFile: document.querySelector("#photo-file"),
   photoSubmit: document.querySelector("#photo-submit"),
+  photoModeNote: document.querySelector("#photo-mode-note"),
   photoError: document.querySelector("#photo-error"),
   metrics: document.querySelector("#metrics-list"),
   packet: document.querySelector("#packet-status"),
@@ -624,7 +628,8 @@ function normalizedPhone(value) {
 }
 
 function activePhotoEnabled() {
-  return activeWorkflowTarget === "agentcore" ? agentCoreEnabled : bedrockEnabled;
+  return Boolean(activeWorkflowId)
+    && (activeWorkflowTarget === "agentcore" ? agentCoreEnabled : bedrockEnabled);
 }
 
 function setSetupStep(step) {
@@ -966,26 +971,103 @@ function renderEvent(event) {
   return item;
 }
 
+const graphNodeDetails = {
+  intake: ["Intake agent", "Ground correction notice"],
+  plan: ["Recovery planner", "Derive bounded campaign plan"],
+  review_gate: ["Contractor gate", "BeforeNodeCall · correction-review"],
+  coordinate: ["Coordination agent", "Route notice-anchored outreach"],
+  judgment_gate: ["Contractor gate", "BeforeNodeCall · contractor-judgment"],
+  coordinate_decision: ["Coordination agent", "Resume with approved boundary"],
+  finish: ["Recovery orchestrator", "Checkpoint recovery graph"],
+  replan_open: ["Recovery planner", "Replan open citations only"],
+  follow_up: ["Coordination agent", "Escalate unresolved trades"],
+  deadline_gate: ["Contractor gate", "BeforeNodeCall · deadline-tradeoff"],
+  finish_chase: ["Recovery orchestrator", "Checkpoint deadline chase"],
+  ground_requirements: ["Evidence agent", "Bind notice requirements"],
+  inspect_visible_evidence: ["Evidence agent", "Inspect pixels with Bedrock"],
+  apply_safety_policy: ["Evidence agent", "Route ambiguity to contractor"],
+};
+
+const recordedEvidenceAssessments = {
+  panel_closeup_insufficient: {
+    citation_id: "1",
+    status: "rejected",
+    label: "Recorded sample · rejected",
+    explanation: "The panel is visible, but the full working area and a measurable clearance scale are not. Re-request a wider photo with the service area and tape measure in one frame.",
+  },
+  panel_wide_measured: {
+    citation_id: "1",
+    status: "accepted",
+    label: "Recorded sample · accepted",
+    explanation: "The wide view visibly includes the full panel area and measurement scale requested by the notice. This records evidence sufficiency, not code compliance.",
+  },
+  framing_plates_complete: {
+    citation_id: "2",
+    status: "accepted",
+    label: "Recorded sample · accepted",
+    explanation: "The submission visibly includes both the installed protection plates and the corrected wall location requested by the notice.",
+  },
+  mechanical_access_wide: {
+    citation_id: "3",
+    status: "manual_review",
+    label: "Recorded sample · contractor review",
+    explanation: "The photo shows the equipment and service area, but Mettle will not invent the clearance standard. A contractor-defined evidence boundary is required before acceptance.",
+  },
+};
+
+function renderEvidenceAssessment(assessment) {
+  elements.evidenceResult.dataset.mode = assessment.label?.startsWith("Recorded sample") ? "recorded" : "live";
+  elements.evidenceResult.hidden = false;
+  elements.evidenceResult.className = `evidence-result evidence-result--${assessment.status}`;
+  elements.evidenceResult.replaceChildren(
+    node("strong", "", assessment.label || assessment.status.replaceAll("_", " ")),
+    node("span", "", assessment.explanation),
+  );
+}
+
+function graphNodeDetail(step) {
+  const known = graphNodeDetails[step.node_id];
+  return {
+    ...step,
+    actor: step.actor || known?.[0] || "Mettle agent",
+    detail: step.graph === "evidence" && step.detail
+      ? step.detail
+      : known?.[1] || step.detail || step.node_id.replaceAll("_", " "),
+  };
+}
+
 function sampleAgentRun(data) {
-  const actorStatus = new Map();
-  for (const event of [...data.events].reverse()) {
-    const actor = event.actor.replace(/^Mettle · /, "");
-    const interrupted = event.kind === "judgment_requested";
-    actorStatus.set(actor, {
-      actor,
-      status: interrupted ? "interrupted" : "completed",
-      detail: event.title,
-    });
-  }
-  return [...actorStatus.values()].map((item, index) => ({ ...item, sequence: index + 1 }));
+  const pending = data.judgments.find((item) => item.status === "pending");
+  const complete = data.scenario_complete === true;
+  const coreNodes = ["intake", "plan", "review_gate", "coordinate", "judgment_gate", "coordinate_decision", "finish"];
+  const chaseNodes = ["replan_open", "follow_up", "deadline_gate", "finish_chase"];
+  const visibleNodes = Number(data.scenario_step || 0) >= 3 || complete
+    ? [...coreNodes, ...chaseNodes]
+    : coreNodes;
+  return visibleNodes.map((nodeId, index) => {
+    const graph = chaseNodes.includes(nodeId) ? "deadline_chase" : "recovery";
+    let status = "completed";
+    if (pending?.judgment_id === "code-c3" && nodeId === "judgment_gate") status = "interrupted";
+    if (pending?.judgment_id === "deadline-choice" && nodeId === "deadline_gate") status = "interrupted";
+    return graphNodeDetail({ sequence: index + 1, graph, node_id: nodeId, status });
+  });
 }
 
 function renderAgentRun(data) {
   const isWorkflow = data.source_mode === "workflow";
-  const steps = isWorkflow ? (data.agent_run || []) : sampleAgentRun(data);
+  const steps = (isWorkflow ? (data.agent_run || []) : sampleAgentRun(data)).map(graphNodeDetail);
   elements.agentRunMode.textContent = isWorkflow
     ? data.execution_target === "agentcore" ? "LIVE · AGENTCORE" : "LIVE · STRANDS"
-    : "SAMPLE TRACE";
+    : "RECORDED · SAMPLE";
+  const graphs = [...new Set(steps.map((step) => step.graph).filter(Boolean))];
+  elements.agentRunTopology.textContent = graphs.length ? graphs.join(" → ") : "recovery → deadline_chase";
+  elements.agentRunHooks.textContent = "3 BEFORENODECALL GATES";
+  const intakeLabel = data.intake_provider === "bedrock"
+    ? "Amazon Nova Micro notice intake"
+    : "deterministic local notice intake";
+  elements.agentRunDetail.textContent = isWorkflow
+    ? `${data.execution_target === "agentcore" ? "AgentCore" : "Local"} execution trace from Strands GraphBuilder with ${intakeLabel}; node payloads and prompts remain private.`
+    : "Recorded synthetic playback of the Strands GraphBuilder topology deployed on AgentCore. The live path uses Amazon Nova Micro for notice intake; this playback makes no model invocation.";
   const interrupted = steps.filter((step) => step.status === "interrupted").length;
   const completed = steps.filter((step) => step.status === "completed").length;
   elements.agentRunSummary.textContent = interrupted
@@ -997,6 +1079,7 @@ function renderAgentRun(data) {
     const item = node("li", `agent-node agent-node--${step.status}`);
     item.append(node("span", "agent-node__sequence", String(step.sequence).padStart(2, "0")));
     const body = node("div", "agent-node__body");
+    body.append(node("code", "agent-node__id", step.node_id));
     body.append(node("strong", "", step.actor));
     body.append(node("span", "", step.detail));
     item.append(body, node("span", "agent-node__status", step.status.toUpperCase()));
@@ -1113,7 +1196,7 @@ function tourPhase(data) {
       controlTitle: "The packet is real. So is the restraint behind it.",
       controlCopy: "Download the approved artifact, then inspect the Strands run that coordinated the work without taking the contractor’s authority.",
       actionLabel: "Download the approved packet",
-      actionNote: "4-PAGE PDF · GENERATED FROM THIS RECOVERY",
+      actionNote: "5-PAGE PDF · GENERATED FROM THIS RECOVERY",
       action: "download-packet",
     };
   }
@@ -1211,6 +1294,107 @@ function citationTourArtifact(citation) {
   });
 }
 
+const packetEvidenceImages = {
+  "1": "/static/evidence/panel-wide-measured.png",
+  "2": "/static/evidence/framing-plates-complete.png",
+  "3": "/static/evidence/mechanical-access-wide.png",
+};
+
+function renderPacketFinalePage(preview, page, data) {
+  preview.replaceChildren();
+  preview.dataset.page = String(page);
+  if (page === 1) {
+    const cover = node("div", "packet-page packet-page--cover");
+    cover.append(
+      node("span", "packet-page__eyebrow", "FAILED INSPECTION RECOVERY"),
+      node("strong", "packet-page__title", "Reinspection evidence packet"),
+      node("p", "", "A notice-anchored record of corrections, evidence, communication, and contractor decisions."),
+    );
+    const facts = node("dl", "packet-page__facts");
+    for (const [label, value] of [["Notice", data.notice_id], ["Citations", `${data.metrics.citations_ready} / ${data.metrics.citations_total} ready`], ["Authority", "Contractor approved"]]) {
+      const item = node("div", "");
+      item.append(node("dt", "", label), node("dd", "", value));
+      facts.append(item);
+    }
+    cover.append(facts, node("span", "packet-page__stamp", "APPROVED BY CONTRACTOR"));
+    preview.append(cover);
+    return;
+  }
+  if (page >= 2 && page <= 4) {
+    const citation = data.citations.find((item) => item.citation_id === String(page - 1));
+    const evidence = node("div", "packet-page packet-page--evidence");
+    const photo = document.createElement("img");
+    photo.src = packetEvidenceImages[citation.citation_id];
+    photo.alt = `Accepted synthetic evidence for citation ${citation.citation_id}`;
+    const copy = node("div", "packet-page__evidence-copy");
+    copy.append(
+      node("span", "packet-page__eyebrow", `PAGE ${page} · CITATION ${citation.citation_id} · ${citation.code_reference}`),
+      node("strong", "", `${titleCase(citation.trade)} evidence accepted`),
+      node("blockquote", "", `“${citation.notice_text}”`),
+      node("p", "", citation.evidence_note || citation.evidence_requirements[0]),
+      node("span", "packet-page__accepted", "VISIBLE PROOF ACCEPTED · NOT CODE CERTIFICATION"),
+    );
+    evidence.append(photo, copy);
+    preview.append(evidence);
+    return;
+  }
+  const record = node("div", "packet-page packet-page--record");
+  record.append(
+    node("span", "packet-page__eyebrow", "PAGE 5 · RECOVERY COMMUNICATION RECORD"),
+    node("strong", "packet-page__title", "An inspectable trail of the recovery"),
+  );
+  const rows = node("ol", "packet-page__record-list");
+  for (const event of data.events.slice(-4)) {
+    const row = node("li", "");
+    row.append(node("time", "", formatTime(event.happened_at)), node("span", "", event.title));
+    rows.append(row);
+  }
+  record.append(rows, node("span", "packet-page__stamp", "RELEASE AUTHORITY RECORDED"));
+  preview.append(record);
+}
+
+function createPacketFinale(data) {
+  const finale = node("article", "packet-finale");
+  const bar = node("div", "packet-finale__bar");
+  bar.append(node("span", "", `METTLE · ${data.notice_id} · APPROVED PACKET`), node("span", "", "READY FOR REINSPECTION"));
+  const body = node("div", "packet-finale__body");
+  const heading = node("div", "packet-finale__heading");
+  heading.append(
+    node("span", "packet-page__eyebrow", "EVIDENCE INSIDE THE APPROVED ARTIFACT"),
+    node("strong", "", "Five pages. Every citation tied back to visible proof."),
+  );
+  const navigation = node("nav", "packet-finale__nav");
+  navigation.setAttribute("aria-label", "Packet page preview");
+  const preview = node("div", "packet-finale__preview");
+  const labels = ["Cover", "C1 Electrical", "C2 Framing", "C3 Mechanical", "Recovery record"];
+  const buttons = labels.map((label, index) => {
+    const button = node("button", "", `${index + 1} · ${label}`);
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(index === 1));
+    button.addEventListener("click", () => {
+      for (const candidate of buttons) candidate.setAttribute("aria-pressed", String(candidate === button));
+      renderPacketFinalePage(preview, index + 1, data);
+    });
+    navigation.append(button);
+    return button;
+  });
+  renderPacketFinalePage(preview, 2, data);
+  const documentDetails = node("details", "packet-finale__document");
+  documentDetails.append(node("summary", "", "Open the actual five-page PDF"));
+  const viewer = document.createElement("iframe");
+  viewer.title = "Actual approved five-page reinspection packet PDF";
+  viewer.loading = "lazy";
+  viewer.src = "/api/demo/packet/preview.pdf#page=2&toolbar=1&navpanes=0";
+  const fallback = node("a", "packet-finale__fallback", "Open PDF in a new tab ↗");
+  fallback.href = "/api/demo/packet/preview.pdf";
+  fallback.target = "_blank";
+  fallback.rel = "noopener";
+  documentDetails.append(viewer, fallback);
+  body.append(heading, navigation, preview, documentDetails);
+  finale.append(bar, body);
+  return finale;
+}
+
 function renderTourVisual(data, phase) {
   const artifacts = [];
   if (phase.key === "boundary") {
@@ -1246,14 +1430,7 @@ function renderTourVisual(data, phase) {
     }));
   } else if (phase.key === "approval" || phase.key === "complete") {
     if (phase.key === "complete") {
-      const finale = node("article", "packet-finale");
-      const bar = node("div", "packet-finale__bar");
-      bar.append(node("span", "", "METTLE · CR-2026-0417 · APPROVED PACKET"), node("span", "", "READY FOR REINSPECTION"));
-      const viewer = document.createElement("iframe");
-      viewer.title = "Approved reinspection evidence packet";
-      viewer.src = "/api/demo/packet/preview.pdf#page=1&toolbar=0&navpanes=0";
-      finale.append(bar, viewer);
-      artifacts.push(finale);
+      artifacts.push(createPacketFinale(data));
     } else {
       artifacts.push(
         ...data.citations.map(citationTourArtifact),
@@ -1623,33 +1800,38 @@ function render(data) {
   renderJudgeTour(data);
   const isWorkflow = data.source_mode === "workflow";
   const isAgentCore = isWorkflow && data.execution_target === "agentcore";
-  elements.evidencePanel.hidden = !isWorkflow;
+  elements.evidencePanel.hidden = false;
   elements.recoveryClock.hidden = !isWorkflow;
   elements.driverTag.textContent = isWorkflow ? "RECOVERY" : "SAMPLE";
   if (isWorkflow) renderRecoveryClock(data);
+  const selectedCitation = elements.photoCitation.value;
+  elements.photoCitation.replaceChildren(...data.citations.map((citation) => {
+    const option = node("option", "", `C${citation.citation_id} · ${citation.trade}`);
+    option.value = citation.citation_id;
+    return option;
+  }));
+  if ([...elements.photoCitation.options].some((option) => option.value === selectedCitation)) {
+    elements.photoCitation.value = selectedCitation;
+  }
+  const canAssessPhoto = activePhotoEnabled();
+  elements.photoCitation.disabled = !isWorkflow;
+  elements.photoFile.disabled = !isWorkflow;
+  elements.photoSubmit.disabled = !canAssessPhoto || !elements.photoFile.files?.length;
+  elements.photoSubmit.title = canAssessPhoto
+    ? "This live vision check consumes a small amount of AWS credit"
+    : isWorkflow
+      ? "Start Mettle with Bedrock or AgentCore enabled to assess real photos"
+      : "Start a recovery to enable live Bedrock Vision";
+  elements.photoModeNote.textContent = canAssessPhoto
+    ? "LIVE BEDROCK VISION AVAILABLE · AWS CREDIT IS CONSUMED ONLY WHEN YOU SUBMIT"
+    : isWorkflow
+      ? "THIS RECOVERY HAS NO LIVE VISION PROVIDER · SYNTHETIC FIXTURES REMAIN AVAILABLE"
+      : "SAMPLE MODE · FIXTURES REPLAY RECORDED SYNTHETIC OUTCOMES · NO MODEL CALL";
   if (isWorkflow) {
-    const selectedCitation = elements.photoCitation.value;
-    elements.photoCitation.replaceChildren(...data.citations.map((citation) => {
-      const option = node("option", "", `C${citation.citation_id} · ${citation.trade}`);
-      option.value = citation.citation_id;
-      return option;
-    }));
-    if ([...elements.photoCitation.options].some((option) => option.value === selectedCitation)) {
-      elements.photoCitation.value = selectedCitation;
-    }
-    const canAssessPhoto = activePhotoEnabled();
-    elements.photoSubmit.disabled = !canAssessPhoto || !elements.photoFile.files?.length;
-    elements.photoSubmit.title = canAssessPhoto
-      ? "This live vision check consumes a small amount of AWS credit"
-      : "Start Mettle with Bedrock or AgentCore enabled to assess real photos";
     const latestEvidence = data.evidence.at(-1);
     elements.evidenceResult.hidden = !latestEvidence;
     if (latestEvidence) {
-      elements.evidenceResult.className = `evidence-result evidence-result--${latestEvidence.status}`;
-      elements.evidenceResult.replaceChildren(
-        node("strong", "", latestEvidence.status.replaceAll("_", " ")),
-        node("span", "", latestEvidence.explanation),
-      );
+      renderEvidenceAssessment(latestEvidence);
     }
     const contractorDecisionRecorded = data.events.some(
       (event) => event.title === "Contractor decision recorded; graph resumed",
@@ -1657,6 +1839,24 @@ function render(data) {
     for (const button of elements.evidenceButtons) {
       button.disabled = button.dataset.requiresDecision === "true" && !contractorDecisionRecorded;
       button.title = button.disabled ? "Resolve the mechanical evidence specification first" : "";
+      button.textContent = button.dataset.sample === "panel_closeup_insufficient"
+        ? "Assess close-up"
+        : button.dataset.sample === "panel_wide_measured"
+          ? "Assess wide photo"
+          : button.dataset.sample === "framing_plates_complete"
+            ? "Assess framing photo"
+            : "Assess mechanical photo";
+    }
+  } else {
+    if (elements.evidenceResult.dataset.mode === "live") elements.evidenceResult.hidden = true;
+    for (const button of elements.evidenceButtons) {
+      button.disabled = false;
+      button.title = "Replay a recorded synthetic assessment without calling a model";
+      button.textContent = button.dataset.sample === "panel_closeup_insufficient"
+        ? "Replay rejection"
+        : button.dataset.sample === "mechanical_access_wide"
+          ? "Replay judgment gate"
+          : "Replay acceptance";
     }
   }
   elements.packetAction.hidden = isWorkflow
@@ -2096,7 +2296,14 @@ elements.noticeForm.addEventListener("input", () => {
 
 for (const button of elements.evidenceButtons) {
   button.addEventListener("click", async () => {
-    if (!activeWorkflowId) return;
+    if (!activeWorkflowId) {
+      const assessment = recordedEvidenceAssessments[button.dataset.sample];
+      if (!assessment) return;
+      renderEvidenceAssessment(assessment);
+      elements.evidenceResult.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      showToast("Recorded synthetic assessment replayed. No model or AWS service was called.");
+      return;
+    }
     setBusy(button, true);
     try {
       const workflowRoot = activeWorkflowTarget === "agentcore"
