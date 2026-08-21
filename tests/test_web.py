@@ -438,8 +438,8 @@ def test_cloudfront_forwards_only_the_guided_demo_session_cookie() -> None:
 
     assert "CookieBehavior: none" in static_policy
     assert "mettle_demo_session" not in static_policy
-    assert "CookieBehavior: whitelist" in api_cache_policy
-    assert "- mettle_demo_session" in api_cache_policy
+    assert "CookieBehavior: none" in api_cache_policy
+    assert "mettle_demo_session" not in api_cache_policy
     assert "CookieBehavior: whitelist" in api_origin_policy
     assert "- mettle_demo_session" in api_origin_policy
     assert "CookieBehavior: all" not in WEB_TEMPLATE
