@@ -51,6 +51,7 @@ aws s3 sync \
   "${repo_dir}/src/mettle/web/static/" \
   "s3://${static_bucket}/static/" \
   --exclude index.html \
+  --exclude '.DS_Store' \
   --delete \
   --sse AES256 \
   --cache-control 'public,max-age=300,must-revalidate'
