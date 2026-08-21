@@ -1191,8 +1191,8 @@ function tourPhase(data) {
     return {
       key: "complete", scene: 5, stopIndex: 4, complete: true,
       eyebrow: "RECOVERY COMPLETE · CONTRACTOR APPROVED",
-      title: "15 actions absorbed. 3 decisions kept.",
-      copy: "The failed notice is now an approved, reviewable reinspection packet—with every evidence decision and authority boundary intact.",
+      title: "Five pages. All of it earned.",
+      copy: "Each citation carries its authority language, accepted photograph, communication trail, and contractor decision. Nothing was written that the evidence did not support.",
       controlTitle: "The packet is real. So is the restraint behind it.",
       controlCopy: "Download the approved artifact, then inspect the Strands run that coordinated the work without taking the contractor’s authority.",
       actionLabel: "Download the approved packet",
@@ -1217,7 +1217,7 @@ function tourPhase(data) {
     return {
       key: "deadline", scene: 3, stopIndex: 2,
       eyebrow: "BACKGROUND RECOVERY · DEADLINE ADAPTED",
-      title: "Mettle rejected weak proof and changed the chase as the clock tightened.",
+      title: "Two days left. Not Mettle’s call.",
       copy: "Accepted work left the campaign. The incomplete framing photo triggered a precise re-request; two days out, only unresolved trades were escalated.",
       controlTitle: "The agent handled the routine pressure. The deadline tradeoff stays yours.",
       controlCopy: "Mettle can escalate follow-up, but it will not decide whether a contractor should keep or move the reinspection date.",
@@ -1230,8 +1230,8 @@ function tourPhase(data) {
     return {
       key: "boundary", scene: 1, stopIndex: 0,
       eyebrow: "NOTICE IN · RECOVERY OUT",
-      title: "One failed-inspection notice becomes an active recovery.",
-      copy: "Mettle derives the docket from the authority’s own language, sends the unambiguous requests, and stops where professional interpretation begins.",
+      title: "The notice is the only input.",
+      copy: "Mettle derives the work from the authority’s exact language, sends the unambiguous requests, and stops where professional interpretation begins.",
       controlTitle: "The agent did not invent a missing evidence requirement.",
       controlCopy: "It prepared the recovery and contacted two trades, then reserved the ambiguous mechanical requirement for the contractor.",
       actionLabel: "Approve the evidence boundary",
@@ -1255,8 +1255,8 @@ function tourPhase(data) {
   return {
     key: "recovery", scene: 2, stopIndex: 1,
     eyebrow: "BOUNDARY SET · CAMPAIGN RESUMED",
-    title: "Now Mettle can work while the contractor is somewhere else.",
-    copy: "The approved evidence rule is attached to citation 3. From here, specialist agents coordinate trades, assess visible proof, and adapt follow-up against the deadline.",
+    title: "The chase runs without you.",
+    copy: "Five days of coordination cross three trades: requests out, photographs in, one rejection, and deadline-aware checkpoints while no browser needs to stay open.",
     controlTitle: "The next click represents days of background coordination.",
     controlCopy: "Mettle will accept sufficient proof, reject an incomplete submission with a specific re-request, and interrupt only when the deadline creates a real tradeoff.",
     actionLabel: "Run the background campaign",
@@ -1334,6 +1334,77 @@ function createEvidenceComparison() {
     }),
   );
   return comparison;
+}
+
+function timelineEvent(label, tone = "") {
+  const event = node("span", `coordination-timeline__event${tone ? ` coordination-timeline__event--${tone}` : ""}`, label);
+  event.title = label;
+  return event;
+}
+
+function createCoordinationTimeline() {
+  const timeline = node("section", "coordination-timeline");
+  timeline.setAttribute("aria-label", "Recorded five-day coordination timeline");
+  const heading = node("div", "coordination-timeline__heading");
+  heading.append(
+    node("div", "", "Coordination, five days"),
+    node("span", "", "TIME COMPRESSED · AUG 10 → AUG 15 · RECORDED SAMPLE"),
+  );
+  const grid = node("div", "coordination-timeline__grid");
+  const days = ["TRADE / DAY", "10", "11", "12", "13", "14", "15"];
+  for (const day of days) grid.append(node("span", "coordination-timeline__day", day));
+  const rows = [
+    ["C1 · ELECTRICAL", [timelineEvent("REQUEST", "request"), timelineEvent("ACCEPTED", "accepted"), "", "", "", timelineEvent("CLOSED", "closed")]],
+    ["C2 · FRAMING", [timelineEvent("REQUEST", "request"), "", timelineEvent("REJECTED", "rejected"), timelineEvent("RE-REQUEST", "request"), timelineEvent("AWAITING", "waiting"), timelineEvent("ESCALATED", "critical")]],
+    ["C3 · MECHANICAL", [timelineEvent("HELD", "held"), timelineEvent("REQUEST", "request"), "", timelineEvent("AWAITING", "waiting"), "", timelineEvent("ESCALATED", "critical")]],
+  ];
+  for (const [label, cells] of rows) {
+    grid.append(node("strong", "coordination-timeline__trade", label));
+    for (const cell of cells) {
+      const slot = node("span", "coordination-timeline__slot");
+      if (cell) slot.append(cell);
+      grid.append(slot);
+    }
+  }
+  const legend = node("p", "coordination-timeline__legend", "▲ request  ·  ■ accepted  ·  × rejected  ·  ○ awaiting  ·  ◆ checkpoint");
+  timeline.append(heading, grid, legend);
+  return timeline;
+}
+
+function tourWorkspaceView(phase) {
+  if (["deadline", "approval", "complete"].includes(phase.key)) return "evidence";
+  return "recovery";
+}
+
+function createTourWorkspaceFrame(data, phase, artifacts) {
+  const frame = node("section", "tour-workspace");
+  const navigation = node("nav", "tour-workspace__tabs");
+  navigation.setAttribute("aria-label", "Tour workspace views");
+  const activeView = tourWorkspaceView(phase);
+  for (const [view, label] of [["recovery", "01 Recovery"], ["evidence", "02 Evidence & packet"], ["activity", "03 Agent activity"]]) {
+    const button = node("button", "", label);
+    button.type = "button";
+    button.setAttribute("aria-current", activeView === view ? "page" : "false");
+    button.addEventListener("click", () => {
+      if (view === activeView) return;
+      sessionStorage.setItem("mettle_entry_selected", "sample");
+      setJudgeTourActive(false, { updateUrl: true, focus: false });
+      setWorkspaceView(view, { updateUrl: true, focusTab: true });
+    });
+    navigation.append(button);
+  }
+  const status = node("div", "tour-workspace__status");
+  const ready = Number(data.metrics?.citations_ready || 0);
+  const total = Number(data.metrics?.citations_total || 0);
+  const open = Math.max(0, total - ready);
+  status.append(
+    node("strong", "", phase.complete ? "RECOVERY COMPLETE" : open ? `${open} CORRECTION${open === 1 ? "" : "S"} OPEN` : "PACKET AWAITING APPROVAL"),
+    node("span", "", phase.complete ? `${ready} OF ${total} ACCEPTED · RECORD CLOSED` : `${data.days_remaining} DAYS TO REINSPECTION · OPEN-ONLY CHASE`),
+  );
+  const content = node("div", "tour-workspace__content");
+  content.append(...artifacts);
+  frame.append(navigation, status, content);
+  return frame;
 }
 
 function createTourAgentProof(data) {
@@ -1446,7 +1517,7 @@ function createPacketFinale(data) {
   const buttons = labels.map((label, index) => {
     const button = node("button", "", `${index + 1} · ${label}`);
     button.type = "button";
-    button.setAttribute("aria-pressed", String(index === 1));
+    button.setAttribute("aria-pressed", String(index === 0));
     button.addEventListener("click", () => {
       for (const candidate of buttons) candidate.setAttribute("aria-pressed", String(candidate === button));
       renderPacketFinalePage(preview, index + 1, data);
@@ -1454,7 +1525,7 @@ function createPacketFinale(data) {
     navigation.append(button);
     return button;
   });
-  renderPacketFinalePage(preview, 2, data);
+  renderPacketFinalePage(preview, 1, data);
   const documentDetails = node("details", "packet-finale__document");
   documentDetails.append(node("summary", "", "Open the actual five-page PDF"));
   const viewer = document.createElement("iframe");
@@ -1520,10 +1591,11 @@ function renderTourVisual(data, phase) {
       );
     }
   } else {
-    artifacts.push(...data.citations.map(citationTourArtifact));
+    if (phase.key === "recovery") artifacts.push(createCoordinationTimeline());
+    else artifacts.push(...data.citations.map(citationTourArtifact));
   }
   if (!phase.complete) artifacts.push(createTourAgentProof(data));
-  elements.tourVisual.replaceChildren(...artifacts);
+  elements.tourVisual.replaceChildren(createTourWorkspaceFrame(data, phase, artifacts));
 }
 
 async function resolveTourJudgment(judgmentId, decision, successMessage) {
@@ -1546,6 +1618,7 @@ async function resolveTourJudgment(judgmentId, decision, successMessage) {
 function renderJudgeTour(data) {
   if (!judgeTourActive || data.source_mode === "workflow") return;
   const phase = tourPhase(data);
+  const phaseChanged = elements.judgeTour.dataset.phase !== phase.key;
   elements.judgeTour.hidden = false;
   elements.judgeTour.dataset.phase = phase.key;
   document.body.classList.add("tour-mode");
@@ -1612,6 +1685,9 @@ function renderJudgeTour(data) {
         : phase.action === "download-packet"
           ? downloadDemoPacket
           : runSampleUntilPause;
+  if (phaseChanged) {
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
+  }
 }
 
 function inspectAgentRun() {

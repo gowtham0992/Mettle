@@ -60,7 +60,7 @@
       <section class="judge-tour" id="judge-tour" aria-labelledby="tour-title" hidden>
         <header class="judge-tour__header">
           <div>
-            <p class="mono-label">GUIDED EVALUATOR PATH · SYNTHETIC DATA</p>
+            <p class="mono-label">RECORDED SAMPLE · GUIDED EVALUATOR PATH</p>
             <strong id="tour-progress-label">SCENE 1 OF 5</strong>
           </div>
           <div class="tour-header-actions">
@@ -283,35 +283,65 @@
       <div class="welcome-dialog__brand">
         <img src="/static/mettle-mark.png" alt="" width="54" height="54">
         <span>METTLE / FAILED-INSPECTION RECOVERY</span>
+        <span class="welcome-dialog__mode">SAMPLE AVAILABLE · LIVE STRANDS BEHIND SIGN-IN</span>
       </div>
-      <div class="welcome-dialog__copy">
-        <p class="mono-label">NOTICE IN → RECOVERY OUT</p>
-        <h1 id="welcome-title">Get the correction work back under control.</h1>
-        <p>Mettle reads the failed-inspection report, organizes the responsible trades and proof, follows the deadline, and interrupts you only for decisions.</p>
+      <div class="welcome-dialog__grid">
+        <div class="welcome-dialog__editorial">
+          <div class="welcome-dialog__copy">
+            <p class="mono-label">NOTICE IN → RECOVERY OUT</p>
+            <h1 id="welcome-title">Get the correction work back under control.</h1>
+            <p>Mettle reads the failed-inspection report, organizes the responsible trades and proof, follows the deadline, and interrupts you only for decisions.</p>
+          </div>
+          <div class="welcome-dialog__choices">
+            <button class="entry-choice entry-choice--primary" id="start-tour-entry" type="button">
+              <span class="entry-choice__index">01</span>
+              <strong>Take the guided tour</strong>
+              <span>Five scenes. One failed inspection from notice to contractor-approved packet.</span>
+              <span class="entry-choice__action">START →</span>
+            </button>
+            <button class="entry-choice" id="start-recovery-entry" type="button">
+              <span class="entry-choice__index">02</span>
+              <strong>Start a real recovery</strong>
+              <span>Paste a redacted report and run the deployed product flow.</span>
+            </button>
+            <button class="entry-choice" id="try-sample-entry" type="button">
+              <span class="entry-choice__index">03</span>
+              <strong>Explore the sample freely</strong>
+              <span>Skip the tour and open the complete synthetic workspace.</span>
+            </button>
+            <button class="entry-choice entry-choice--resume" id="resume-current-entry" type="button" hidden>
+              <span class="entry-choice__index">↩</span>
+              <strong>Return to current recovery</strong>
+              <span>Close this chooser without changing the recovery already in progress.</span>
+            </button>
+          </div>
+          <p class="public-demo-note"><strong>Public prototype.</strong> Every name, address, permit, and photograph in the sample is synthetic. Use redacted information when starting a recovery.</p>
+        </div>
+        <article class="entry-notice" aria-label="Synthetic failed-inspection notice">
+          <header>
+            <span>DOUGLAS COUNTY BUILDING DIVISION</span>
+            <strong>CR-2026-0417</strong>
+          </header>
+          <div class="entry-notice__title">
+            <div>
+              <span>INSPECTION CORRECTION</span>
+              <h2>Notice</h2>
+            </div>
+            <strong>DISAPPROVED</strong>
+          </div>
+          <dl>
+            <div><dt>Inspection</dt><dd>Residential rough-in</dd></div>
+            <div><dt>Property</dt><dd>100 Demo Way<br>Castle Pines, CO</dd></div>
+            <div><dt>Reinspection</dt><dd>08/17/2026</dd></div>
+          </dl>
+          <ol>
+            <li><span>01</span><p><strong>NEC 110.26</strong> Maintain the required working clearance in front of the service panel.</p></li>
+            <li><span>02</span><p><strong>IRC R602.6</strong> Protect bored framing members where the edge distance is less than required.</p></li>
+            <li><span>03</span><p><strong>IMC 304.10</strong> Provide clearance and service access at the installed mechanical equipment.</p></li>
+          </ol>
+          <footer>SYNTHETIC NOTICE · DEMONSTRATION INPUT</footer>
+        </article>
       </div>
-      <div class="welcome-dialog__choices">
-        <button class="entry-choice entry-choice--primary" id="start-tour-entry" type="button">
-          <span class="entry-choice__index">01</span>
-          <strong>Take the 90-second tour</strong>
-          <span>Follow one failed inspection from notice to contractor-approved packet.</span>
-        </button>
-        <button class="entry-choice" id="start-recovery-entry" type="button">
-          <span class="entry-choice__index">02</span>
-          <strong>Start a recovery</strong>
-          <span>Paste a redacted inspection report and guide the setup.</span>
-        </button>
-        <button class="entry-choice" id="try-sample-entry" type="button">
-          <span class="entry-choice__index">03</span>
-          <strong>Explore the sample freely</strong>
-          <span>Open the complete recovery workspace with synthetic data.</span>
-        </button>
-        <button class="entry-choice entry-choice--resume" id="resume-current-entry" type="button" hidden>
-          <span class="entry-choice__index">↩</span>
-          <strong>Return to current recovery</strong>
-          <span>Close this chooser without changing the recovery already in progress.</span>
-        </button>
-      </div>
-      <p class="public-demo-note"><strong>Public prototype:</strong> use the sample or redact addresses, names, phone numbers, and permit details. Live projects belong behind sign-in.</p>
     </dialog>
 
     <dialog class="notice-dialog" id="notice-dialog" aria-labelledby="notice-dialog-title">

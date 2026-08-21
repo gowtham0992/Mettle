@@ -373,7 +373,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Recovery command center" in page.text
     assert "Start with the failed-inspection report" in page.text
     assert "Start a recovery" in page.text
-    assert "Take the 90-second tour" in page.text
+    assert "Take the guided tour" in page.text
     assert "Explore the sample freely" in page.text
     assert 'id="judge-tour"' in page.text
     assert 'id="tour-skip"' in page.text
@@ -434,6 +434,10 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert ".packet-finale" in styles.text
     assert ".tour-evidence-compare" in styles.text
     assert ".tour-agent-proof" in styles.text
+    assert ".coordination-timeline" in styles.text
+    assert ".tour-workspace__tabs" in styles.text
+    assert "function createCoordinationTimeline()" in script.text
+    assert "function createTourWorkspaceFrame(data, phase, artifacts)" in script.text
     assert '.judge-tour[data-phase="deadline"] .tour-stage__visual' in styles.text
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"
