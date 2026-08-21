@@ -116,6 +116,24 @@ class DemoConflict(RuntimeError):
     pass
 
 
+class DemoStoreState(BaseModel):
+    """Serializable state for one isolated guided-demo browser session."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    as_of: date
+    step: int = Field(ge=0, le=6)
+    messages_handled: int = Field(ge=0)
+    automated_actions: int = Field(ge=0)
+    contractor_decisions: int = Field(ge=0)
+    packet_status: str
+    seen_keys: set[str]
+    resolved_decisions: dict[str, str]
+    citations: list[DemoCitation]
+    events: list[DemoEvent]
+    judgments: list[DemoJudgment]
+
+
 class DemoStore:
     """Thread-safe, in-memory scenario store for the local judge demo."""
 
@@ -128,6 +146,40 @@ class DemoStore:
     def snapshot(self) -> DemoCampaign:
         with self._lock:
             return self._snapshot_unlocked()
+
+    def dump_state(self) -> DemoStoreState:
+        with self._lock:
+            return DemoStoreState(
+                as_of=self._as_of,
+                step=self._step,
+                messages_handled=self._messages_handled,
+                automated_actions=self._automated_actions,
+                contractor_decisions=self._contractor_decisions,
+                packet_status=self._packet_status,
+                seen_keys=set(self._seen_keys),
+                resolved_decisions=dict(self._resolved_decisions),
+                citations=[item.model_copy(deep=True) for item in self._citations],
+                events=[item.model_copy(deep=True) for item in self._events],
+                judgments=[item.model_copy(deep=True) for item in self._judgments],
+            )
+
+    @classmethod
+    def from_state(cls, state: DemoStoreState) -> DemoStore:
+        store = cls()
+        with store._lock:
+            store._notice = parse_notice(REPRESENTATIVE_NOTICE_TEXT)
+            store._as_of = state.as_of
+            store._step = state.step
+            store._messages_handled = state.messages_handled
+            store._automated_actions = state.automated_actions
+            store._contractor_decisions = state.contractor_decisions
+            store._packet_status = state.packet_status
+            store._seen_keys = set(state.seen_keys)
+            store._resolved_decisions = dict(state.resolved_decisions)
+            store._citations = [item.model_copy(deep=True) for item in state.citations]
+            store._events = [item.model_copy(deep=True) for item in state.events]
+            store._judgments = [item.model_copy(deep=True) for item in state.judgments]
+        return store
 
     def reset(self) -> DemoCampaign:
         with self._lock:

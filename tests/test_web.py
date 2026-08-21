@@ -15,6 +15,7 @@ from mettle.workflow_registry import WorkflowRegistry
 
 
 NOTICE = Path("examples/notices/failed-rough-in.txt").read_text(encoding="utf-8")
+WEB_TEMPLATE = Path("infra/web/template.yaml").read_text(encoding="utf-8")
 
 
 class FakeAgentCoreGateway:
@@ -375,6 +376,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Take the 90-second tour" in page.text
     assert "Explore the sample freely" in page.text
     assert 'id="judge-tour"' in page.text
+    assert 'id="tour-skip"' in page.text
+    assert 'id="tour-secondary"' in page.text
     assert "Same product, staged for evaluation" in page.text
     assert "Failed-inspection recovery stages" in page.text
     assert "Extract on AgentCore" in page.text
@@ -408,14 +411,24 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function tourPhase(data)" in script.text
     assert "function renderJudgeTour(data)" in script.text
     assert "async function runSampleUntilPause()" in script.text
+    assert "function stageTourClock(days, cadence)" in script.text
+    assert 'viewer.src = "/api/demo/packet/preview.pdf#page=1&toolbar=0&navpanes=0"' in script.text
     assert 'sessionStorage.setItem("mettle_entry_selected", "tour")' in script.text
     assert styles.status_code == 200
     assert ".workspace-panel--view-hidden" in styles.text
     assert ".dashboard--focused" in styles.text
     assert ".recovery-line" in styles.text
     assert ".tour-mode .dashboard" in styles.text
+    assert ".command-stack { position: sticky" in styles.text
+    assert ".packet-finale" in styles.text
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"
+
+
+def test_cloudfront_forwards_only_the_guided_demo_session_cookie() -> None:
+    assert WEB_TEMPLATE.count("CookieBehavior: whitelist") == 2
+    assert WEB_TEMPLATE.count("- mettle_demo_session") == 2
+    assert "CookieBehavior: all" not in WEB_TEMPLATE
 
 
 def test_advance_replay_is_idempotent_at_http_boundary() -> None:
@@ -429,6 +442,34 @@ def test_advance_replay_is_idempotent_at_http_boundary() -> None:
     assert replay.json()["scenario_step"] == first.json()["scenario_step"] == 1
     assert replay.json()["metrics"] == first.json()["metrics"]
 
+
+def test_guided_demo_state_is_isolated_per_browser_session() -> None:
+    app = create_app(store=DemoStore())
+    with TestClient(app) as first_browser, TestClient(app) as second_browser:
+        assert first_browser.get("/api/campaign").json()["scenario_step"] == 0
+        assert second_browser.get("/api/campaign").json()["scenario_step"] == 0
+
+        advanced = first_browser.post(
+            "/api/demo/advance",
+            json={"idempotency_key": "isolated_browser_advance_123"},
+        )
+
+        assert advanced.status_code == 200
+        assert advanced.json()["scenario_step"] == 1
+        assert second_browser.get("/api/campaign").json()["scenario_step"] == 0
+
+
+def test_guided_demo_session_cookie_is_opaque_and_hardened() -> None:
+    app = create_app(store=DemoStore())
+    with TestClient(app, base_url="https://testserver") as browser:
+        response = browser.get("/api/campaign")
+
+    cookie = response.headers["set-cookie"]
+    assert "mettle_demo_session=" in cookie
+    assert "HttpOnly" in cookie
+    assert "Secure" in cookie
+    assert "SameSite=lax" in cookie
+    assert "Max-Age=7200" in cookie
 
 def test_guided_demo_packet_requires_approval_then_downloads_pdf() -> None:
     with client() as browser:
@@ -456,6 +497,7 @@ def test_guided_demo_packet_requires_approval_then_downloads_pdf() -> None:
             json={"decision": "Approve packet for reinspection scheduling"},
         )
         downloaded = browser.get("/api/demo/packet.pdf")
+        previewed = browser.get("/api/demo/packet/preview.pdf")
 
     assert blocked.status_code == 409
     assert campaign["packet_status"] == "awaiting_approval"
@@ -463,6 +505,11 @@ def test_guided_demo_packet_requires_approval_then_downloads_pdf() -> None:
     assert downloaded.headers["content-type"] == "application/pdf"
     assert len(PdfReader(BytesIO(downloaded.content)).pages) == 4
     assert len(downloaded.content) < 4_000_000
+    assert previewed.status_code == 200
+    assert previewed.headers["content-disposition"].startswith("inline;")
+    assert previewed.headers["x-frame-options"] == "SAMEORIGIN"
+    assert "frame-ancestors 'self'" in previewed.headers["content-security-policy"]
+    assert len(PdfReader(BytesIO(previewed.content)).pages) == 4
 
 
 def test_api_rejects_oversized_decision_and_unknown_fields() -> None:

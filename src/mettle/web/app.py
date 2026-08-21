@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+import re
+import secrets
+from hashlib import sha256
 from pathlib import Path
 
 import boto3
@@ -28,6 +31,7 @@ from mettle.agentcore_gateway import (
 from mettle.automation import EventBridgeCampaignScheduler
 from mettle.durable_agentcore_gateway import DurableAgentCoreWorkflowGateway
 from mettle.demo import DemoCampaign, DemoConflict, DemoNotFound, DemoStore
+from mettle.demo_sessions import DynamoDemoSessions, InMemoryDemoSessions
 from mettle.workflow import WorkflowConfigurationError
 from mettle.photo_upload import MAX_UPLOAD_BYTES, PhotoUploadError, normalize_photo
 from mettle.request_identity import (
@@ -58,6 +62,8 @@ from mettle.workflow_registry import (
 
 
 STATIC_DIR = Path(__file__).with_name("static")
+DEMO_SESSION_COOKIE = "mettle_demo_session"
+DEMO_SESSION_PATTERN = re.compile(r"^[A-Za-z0-9_-]{32,64}$")
 
 
 class AdvanceRequest(BaseModel):
@@ -173,6 +179,16 @@ def configured_agentcore_gateway() -> AgentCoreWorkflowGateway | DurableAgentCor
     return AgentCoreWorkflowGateway(client=session.client("bedrock-agentcore"), runtime_arn=runtime_arn)
 
 
+def configured_demo_sessions(*, first_store: DemoStore | None = None):
+    table_name = os.getenv("METTLE_DYNAMODB_TABLE")
+    if not table_name or os.getenv("METTLE_DEMO_DURABLE", "0") != "1":
+        return InMemoryDemoSessions(first_store=first_store)
+    region = os.getenv("METTLE_AWS_REGION", "us-east-1")
+    profile = os.getenv("METTLE_AWS_PROFILE") or None
+    session = boto3.Session(profile_name=profile, region_name=region)
+    return DynamoDemoSessions(table=session.resource("dynamodb").Table(table_name))
+
+
 def _verified_subject(request: Request) -> str | None:
     event = request.scope.get("aws.event")
     if not isinstance(event, dict):
@@ -192,6 +208,7 @@ def create_app(
     store: DemoStore | None = None,
     workflows: WorkflowRegistry | None = None,
     agentcore: AgentCoreWorkflowGateway | None = None,
+    demo_sessions=None,
 ) -> FastAPI:
     app = FastAPI(
         title="Mettle local demo",
@@ -199,12 +216,17 @@ def create_app(
         redoc_url=None,
         openapi_url=None,
     )
-    app.state.store = store or DemoStore()
+    app.state.demo_sessions = demo_sessions or configured_demo_sessions(first_store=store)
     app.state.workflows = workflows or configured_workflow_registry()
     app.state.agentcore = agentcore or configured_agentcore_gateway()
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
+        raw_session = request.cookies.get(DEMO_SESSION_COOKIE, "")
+        new_session = not DEMO_SESSION_PATTERN.fullmatch(raw_session)
+        if new_session:
+            raw_session = secrets.token_urlsafe(24)
+        request.state.demo_session_key = sha256(raw_session.encode("ascii")).hexdigest()
         principal_token = set_principal(_verified_subject(request))
         try:
             response = await call_next(request)
@@ -215,11 +237,21 @@ def create_app(
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; img-src 'self' data:; style-src 'self'; "
             f"script-src 'self'; connect-src {connect_sources}; base-uri 'none'; "
-            "frame-ancestors 'none'; form-action 'self'"
+            "frame-ancestors 'self'; form-action 'self'"
         )
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        if new_session:
+            response.set_cookie(
+                key=DEMO_SESSION_COOKIE,
+                value=raw_session,
+                max_age=2 * 60 * 60,
+                path="/",
+                secure=request.url.scheme == "https",
+                httponly=True,
+                samesite="lax",
+            )
         return response
 
     @app.exception_handler(AuthenticationRequired)
@@ -400,7 +432,10 @@ def create_app(
 
     @app.get("/api/campaign", response_model=DemoCampaign)
     async def get_campaign(request: Request) -> DemoCampaign:
-        return request.app.state.store.snapshot()
+        return await run_in_threadpool(
+            request.app.state.demo_sessions.snapshot,
+            request.state.demo_session_key,
+        )
 
     @app.get("/api/capabilities", response_model=CapabilitiesResponse)
     async def get_capabilities(request: Request) -> CapabilitiesResponse:
@@ -452,16 +487,24 @@ def create_app(
 
     @app.post("/api/demo/advance", response_model=DemoCampaign)
     async def advance_demo(payload: AdvanceRequest, request: Request) -> DemoCampaign:
-        return request.app.state.store.advance(idempotency_key=payload.idempotency_key)
+        return await run_in_threadpool(
+            request.app.state.demo_sessions.advance,
+            request.state.demo_session_key,
+            idempotency_key=payload.idempotency_key,
+        )
 
     @app.post("/api/demo/reset", response_model=DemoCampaign)
     async def reset_demo(request: Request) -> DemoCampaign:
-        return request.app.state.store.reset()
+        return await run_in_threadpool(
+            request.app.state.demo_sessions.reset,
+            request.state.demo_session_key,
+        )
 
     @app.get("/api/demo/packet.pdf")
     async def download_demo_packet(request: Request) -> Response:
         pdf = await run_in_threadpool(
-            request.app.state.store.render_packet,
+            request.app.state.demo_sessions.render_packet,
+            request.state.demo_session_key,
             evidence_dir=STATIC_DIR / "evidence",
         )
         return Response(
@@ -474,6 +517,23 @@ def create_app(
             },
         )
 
+    @app.get("/api/demo/packet/preview.pdf")
+    async def preview_demo_packet(request: Request) -> Response:
+        pdf = await run_in_threadpool(
+            request.app.state.demo_sessions.render_packet,
+            request.state.demo_session_key,
+            evidence_dir=STATIC_DIR / "evidence",
+        )
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": (
+                    'inline; filename="mettle-guided-reinspection-packet.pdf"'
+                )
+            },
+        )
+
     @app.post("/api/judgments/{judgment_id}/resolve", response_model=DemoCampaign)
     async def resolve_judgment(
         judgment_id: str,
@@ -482,7 +542,9 @@ def create_app(
     ) -> DemoCampaign:
         if not judgment_id or len(judgment_id) > 64:
             raise DemoNotFound("judgment does not exist")
-        return request.app.state.store.resolve_judgment(
+        return await run_in_threadpool(
+            request.app.state.demo_sessions.resolve_judgment,
+            request.state.demo_session_key,
             judgment_id,
             decision=payload.decision,
         )

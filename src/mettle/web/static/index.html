@@ -12,6 +12,7 @@
   <body>
     <a class="skip-link" href="#main">Skip to campaign</a>
 
+    <div class="command-stack">
     <header class="command-band">
       <a class="brand" id="mettle-home" href="/" aria-label="Mettle home">
         <img src="/static/mettle-icon.png" alt="" width="44" height="44">
@@ -44,6 +45,7 @@
       </div>
       <span id="as-of-date">—</span>
     </section>
+    </div>
 
     <main id="main" class="shell" data-workspace-view="recovery">
       <div id="error-banner" class="error-banner" role="alert" hidden>
@@ -61,7 +63,10 @@
             <p class="mono-label">GUIDED EVALUATOR PATH · SYNTHETIC DATA</p>
             <strong id="tour-progress-label">SCENE 1 OF 5</strong>
           </div>
-          <button class="tour-exit" id="tour-exit" type="button">Explore the full product <span aria-hidden="true">↗</span></button>
+          <div class="tour-header-actions">
+            <button class="tour-skip" id="tour-skip" type="button" hidden>Skip animation</button>
+            <button class="tour-exit" id="tour-exit" type="button">Explore the full product <span aria-hidden="true">↗</span></button>
+          </div>
         </header>
 
         <ol class="recovery-line" aria-label="Failed-inspection recovery stages">
@@ -86,12 +91,13 @@
             <strong id="tour-control-title">The agent did not invent a missing requirement.</strong>
             <p id="tour-control-copy">It prepared the recovery, contacted the unambiguous trades, and reserved one consequential decision for the contractor.</p>
             <button class="button button--orange tour-action" id="tour-action" type="button">Approve the evidence boundary</button>
+            <button class="button button--outline tour-secondary" id="tour-secondary" type="button" hidden>Inspect the Strands run</button>
             <span id="tour-action-note">ONE HUMAN DECISION · THEN THE CAMPAIGN RESUMES</span>
           </aside>
         </div>
 
         <footer class="tour-outcome">
-          <p><span aria-hidden="true">◆</span><strong>Same product, staged for evaluation.</strong> Every scene uses the sample campaign’s real endpoints and remains inspectable in the full workspace.</p>
+          <p id="tour-outcome-copy"><span aria-hidden="true">◆</span><strong>Same product, staged for evaluation.</strong> Every scene uses the sample campaign’s real endpoints and remains inspectable in the full workspace.</p>
           <dl id="tour-metrics" aria-label="Recovery outcome so far"></dl>
         </footer>
       </section>

@@ -263,6 +263,7 @@ Resources:
           METTLE_AGENTCORE_RUNTIME_ARN: !Ref AgentCoreRuntimeArn
           METTLE_AWS_REGION: !Ref AWS::Region
           METTLE_DYNAMODB_TABLE: !Ref WorkflowTable
+          METTLE_DEMO_DURABLE: '1'
           METTLE_PACKET_BUCKET: !Ref PacketBucket
           METTLE_MAX_UPLOAD_BYTES: '3500000'
           METTLE_COGNITO_CLIENT_ID: !Ref UserPoolClient
@@ -507,12 +508,12 @@ Resources:
         Name: MettleSecurityHeaders
         SecurityHeadersConfig:
           ContentSecurityPolicy:
-            ContentSecurityPolicy: !Sub "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+            ContentSecurityPolicy: !Sub "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"
             Override: true
           ContentTypeOptions:
             Override: true
           FrameOptions:
-            FrameOption: DENY
+            FrameOption: SAMEORIGIN
             Override: true
           ReferrerPolicy:
             ReferrerPolicy: no-referrer
@@ -540,7 +541,9 @@ Resources:
           EnableAcceptEncodingBrotli: true
           EnableAcceptEncodingGzip: true
           CookiesConfig:
-            CookieBehavior: none
+            CookieBehavior: whitelist
+            Cookies:
+              - mettle_demo_session
           HeadersConfig:
             HeaderBehavior: none
           QueryStringsConfig:
@@ -570,7 +573,9 @@ Resources:
       OriginRequestPolicyConfig:
         Name: MettleApiOriginRequest
         CookiesConfig:
-          CookieBehavior: none
+          CookieBehavior: whitelist
+          Cookies:
+            - mettle_demo_session
         HeadersConfig:
           HeaderBehavior: whitelist
           Headers:

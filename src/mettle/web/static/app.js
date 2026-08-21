@@ -17,9 +17,12 @@ const elements = {
   tourControlTitle: document.querySelector("#tour-control-title"),
   tourControlCopy: document.querySelector("#tour-control-copy"),
   tourAction: document.querySelector("#tour-action"),
+  tourSecondary: document.querySelector("#tour-secondary"),
+  tourSkip: document.querySelector("#tour-skip"),
   tourActionNote: document.querySelector("#tour-action-note"),
   tourExit: document.querySelector("#tour-exit"),
   tourMetrics: document.querySelector("#tour-metrics"),
+  tourOutcomeCopy: document.querySelector("#tour-outcome-copy"),
   demoDriver: document.querySelector(".demo-driver"),
   nextAction: document.querySelector("#next-action"),
   nextActionEyebrow: document.querySelector("#next-action-eyebrow"),
@@ -137,6 +140,9 @@ let pendingCorrectionReview = null;
 let correctionReviewKey = null;
 let nextActionHandler = null;
 let tourActionHandler = null;
+let tourSecondaryHandler = null;
+let animationSkipRequested = false;
+let finishTourDelay = null;
 const workspaceViews = new Set(["recovery", "evidence", "activity"]);
 let activeWorkspaceView = workspaceViewFromUrl();
 let judgeTourActive = new URLSearchParams(window.location.search).get("tour") === "1"
@@ -1102,18 +1108,18 @@ function tourPhase(data) {
     return {
       key: "complete", scene: 5, stopIndex: 4, complete: true,
       eyebrow: "RECOVERY COMPLETE · CONTRACTOR APPROVED",
-      title: "Reinspection ready—with the authority trail intact.",
-      copy: "The notice, accepted proof, recovery history, and contractor approval now live in one reviewable packet.",
-      controlTitle: "The agent absorbed the coordination, not the accountability.",
-      controlCopy: "Inspect the Strands run to see every specialist handoff, autonomous action, and professional interrupt behind this result.",
-      actionLabel: "Inspect the Strands agent run",
-      actionNote: "FULL EXECUTION TRACE · NO PROMPTS OR PRIVATE PAYLOADS",
-      action: "inspect",
+      title: "15 actions absorbed. 3 decisions kept.",
+      copy: "The failed notice is now an approved, reviewable reinspection packet—with every evidence decision and authority boundary intact.",
+      controlTitle: "The packet is real. So is the restraint behind it.",
+      controlCopy: "Download the approved artifact, then inspect the Strands run that coordinated the work without taking the contractor’s authority.",
+      actionLabel: "Download the approved packet",
+      actionNote: "4-PAGE PDF · GENERATED FROM THIS RECOVERY",
+      action: "download-packet",
     };
   }
   if (pendingJudgment(data, "final-approval")) {
     return {
-      key: "approval", scene: 5, stopIndex: 3,
+      key: "approval", scene: 4, stopIndex: 3,
       eyebrow: "FINAL GATE · PROFESSIONAL CONTROL",
       title: "The packet is assembled. Mettle still cannot release it.",
       copy: "Every citation has accepted proof, but contacting the inspector remains a contractor-controlled action.",
@@ -1152,7 +1158,7 @@ function tourPhase(data) {
   }
   if (Number(data.scenario_step || 0) >= 3) {
     return {
-      key: "finish", scene: 4, stopIndex: 2,
+      key: "finish", scene: 3, stopIndex: 2,
       eyebrow: "OPEN-ONLY REPLANNING · RECOVERY CONTINUES",
       title: "Closed work stays closed. Mettle keeps chasing only what remains.",
       copy: "The contractor’s deadline decision is recorded. The recovery graph can now accept replacement proof, close the final citations, and assemble the packet.",
@@ -1239,17 +1245,28 @@ function renderTourVisual(data, phase) {
       tone: "blocked",
     }));
   } else if (phase.key === "approval" || phase.key === "complete") {
-    artifacts.push(
-      ...data.citations.map(citationTourArtifact),
-      node("div", "tour-transition", phase.key === "complete" ? "Contractor approval recorded" : "Packet agent assembled the trail"),
-      tourArtifact({
-        index: "PDF",
-        title: phase.key === "complete" ? "Reinspection evidence packet approved" : "Reinspection evidence packet prepared",
-        detail: "Notice language, accepted evidence, recovery history, and the human approval record in one artifact.",
-        status: phase.key === "complete" ? "READY" : "LOCKED",
-        tone: phase.key === "complete" ? "ready" : "blocked",
-      }),
-    );
+    if (phase.key === "complete") {
+      const finale = node("article", "packet-finale");
+      const bar = node("div", "packet-finale__bar");
+      bar.append(node("span", "", "METTLE · CR-2026-0417 · APPROVED PACKET"), node("span", "", "READY FOR REINSPECTION"));
+      const viewer = document.createElement("iframe");
+      viewer.title = "Approved reinspection evidence packet";
+      viewer.src = "/api/demo/packet/preview.pdf#page=1&toolbar=0&navpanes=0";
+      finale.append(bar, viewer);
+      artifacts.push(finale);
+    } else {
+      artifacts.push(
+        ...data.citations.map(citationTourArtifact),
+        node("div", "tour-transition", "Packet agent assembled the trail"),
+        tourArtifact({
+          index: "PDF",
+          title: "Reinspection evidence packet prepared",
+          detail: "Notice language, accepted evidence, recovery history, and the human approval record in one artifact.",
+          status: "LOCKED",
+          tone: "blocked",
+        }),
+      );
+    }
   } else {
     artifacts.push(...data.citations.map(citationTourArtifact));
   }
@@ -1277,6 +1294,7 @@ function renderJudgeTour(data) {
   if (!judgeTourActive || data.source_mode === "workflow") return;
   const phase = tourPhase(data);
   elements.judgeTour.hidden = false;
+  elements.judgeTour.dataset.phase = phase.key;
   document.body.classList.add("tour-mode");
   setTourIsolation(true);
   elements.tourProgressLabel.textContent = phase.complete ? "RECOVERY COMPLETE" : `SCENE ${phase.scene} OF 5`;
@@ -1289,6 +1307,22 @@ function renderJudgeTour(data) {
   elements.tourActionNote.textContent = phase.actionNote;
   elements.tourAction.disabled = demoRunning;
   elements.tourAction.setAttribute("aria-busy", String(demoRunning));
+  elements.tourSecondary.hidden = !phase.complete;
+  elements.tourSecondary.disabled = demoRunning;
+  elements.tourOutcomeCopy.replaceChildren();
+  if (phase.complete) {
+    elements.tourOutcomeCopy.append(
+      node("span", "", "◆"),
+      node("strong", "", "15 agent actions absorbed. 3 contractor decisions preserved. "),
+      document.createTextNode("That is the product: autonomous recovery with an inspectable authority trail."),
+    );
+  } else {
+    elements.tourOutcomeCopy.append(
+      node("span", "", "◆"),
+      node("strong", "", "Same product, staged for evaluation. "),
+      document.createTextNode("Every scene uses this browser session’s real sample endpoints and remains inspectable in the full workspace."),
+    );
+  }
   for (const [index, stop] of elements.tourStops.entries()) {
     const state = phase.complete || index < phase.stopIndex
       ? "complete"
@@ -1307,32 +1341,56 @@ function renderJudgeTour(data) {
     metric.append(node("dd", "", String(value)), node("dt", "", label));
     return metric;
   }));
+  tourSecondaryHandler = phase.complete ? inspectAgentRun : null;
   tourActionHandler = phase.action === "resolve-code"
     ? () => resolveTourJudgment(
       "code-c3",
       "Wide photo showing the equipment and measured service clearance",
       "Evidence boundary approved. Mettle resumed the recovery.",
     )
-    : phase.action === "resolve-deadline"
-      ? () => resolveTourJudgment(
-        "deadline-choice",
-        "Keep the current reinspection target and continue critical recovery",
-        "Deadline decision recorded. Critical recovery resumed.",
-      )
+      : phase.action === "resolve-deadline"
+      ? resolveDeadlineAndContinue
       : phase.action === "approve-packet"
         ? () => resolveTourJudgment(
           "final-approval",
           "Approve packet for reinspection scheduling",
           "Final approval recorded. The reinspection packet is ready.",
         )
-        : phase.action === "inspect"
-          ? () => {
-            setJudgeTourActive(false, { updateUrl: true, focus: false });
-            sessionStorage.setItem("mettle_entry_selected", "sample");
-            setWorkspaceView("activity", { updateUrl: true, focusTab: true });
-            window.setTimeout(() => document.querySelector(".agent-run-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-          }
+        : phase.action === "download-packet"
+          ? downloadDemoPacket
           : runSampleUntilPause;
+}
+
+function inspectAgentRun() {
+  setJudgeTourActive(false, { updateUrl: true, focus: false });
+  sessionStorage.setItem("mettle_entry_selected", "sample");
+  setWorkspaceView("activity", { updateUrl: true, focusTab: true });
+  window.setTimeout(() => document.querySelector(".agent-run-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+}
+
+function downloadDemoPacket() {
+  const link = document.createElement("a");
+  link.href = "/api/demo/packet.pdf";
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.click();
+}
+
+async function resolveDeadlineAndContinue() {
+  setBusy(elements.tourAction, true);
+  try {
+    campaign = await request("/api/judgments/deadline-choice/resolve", {
+      method: "POST",
+      body: JSON.stringify({ decision: "Keep the current reinspection target and continue critical recovery" }),
+    });
+    render(campaign);
+    showToast("Deadline decision recorded. Mettle is closing only the remaining work.");
+    await runSampleUntilPause();
+  } catch (error) {
+    showError(error);
+  } finally {
+    setBusy(elements.tourAction, false);
+  }
 }
 
 function buildBackgroundBrief(data) {
@@ -1723,6 +1781,8 @@ elements.photoForm.addEventListener("submit", async (event) => {
 async function runSampleUntilPause() {
   if (demoRunning || activeWorkflowId || campaign?.scenario_complete) return;
   demoRunning = true;
+  animationSkipRequested = false;
+  elements.tourSkip.hidden = !judgeTourActive;
   render(campaign);
   try {
     while (!campaign.scenario_complete) {
@@ -1740,18 +1800,60 @@ async function runSampleUntilPause() {
         break;
       }
       if (!updated.scenario_complete) {
-        await new Promise((resolve) => window.setTimeout(resolve, 1400));
+        if (judgeTourActive && updated.scenario_step === 1) {
+          await tourBeat(1600);
+          stageTourClock(5, "FOLLOW-UP CHECKPOINT · TWO TRADES STILL OPEN");
+          await tourBeat(1100);
+        } else if (judgeTourActive && updated.scenario_step === 2) {
+          stageTourClock(3, "DEADLINE CLOSING · OPEN-ONLY CHASE INTENSIFIES");
+          await tourBeat(2200);
+        } else {
+          await tourBeat(1100);
+        }
       }
     }
   } catch (error) {
     showError(error);
   } finally {
     demoRunning = false;
+    finishTourDelay = null;
+    elements.tourSkip.hidden = true;
+    elements.tourSkip.textContent = "Skip animation";
+    elements.tourSkip.disabled = false;
     if (campaign) {
       render(campaign);
       if (judgeTourActive) elements.tourAction.focus();
     }
   }
+}
+
+function tourBeat(milliseconds) {
+  if (animationSkipRequested || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      finishTourDelay = null;
+      resolve();
+    };
+    const timer = window.setTimeout(finish, milliseconds);
+    finishTourDelay = () => {
+      window.clearTimeout(timer);
+      finish();
+    };
+  });
+}
+
+function stageTourClock(days, cadence) {
+  if (!judgeTourActive || animationSkipRequested) return;
+  elements.days.textContent = String(days);
+  elements.cadence.textContent = cadence;
+  elements.days.classList.remove("tour-clock-transition");
+  void elements.days.offsetWidth;
+  elements.days.classList.add("tour-clock-transition");
 }
 
 elements.advance.addEventListener("click", runSampleUntilPause);
@@ -1786,6 +1888,13 @@ window.addEventListener("popstate", () => {
 
 elements.nextActionButton.addEventListener("click", () => nextActionHandler?.());
 elements.tourAction.addEventListener("click", () => tourActionHandler?.());
+elements.tourSecondary.addEventListener("click", () => tourSecondaryHandler?.());
+elements.tourSkip.addEventListener("click", () => {
+  animationSkipRequested = true;
+  elements.tourSkip.textContent = "Finishing…";
+  elements.tourSkip.disabled = true;
+  finishTourDelay?.();
+});
 elements.tourExit.addEventListener("click", () => {
   sessionStorage.setItem("mettle_entry_selected", "sample");
   setJudgeTourActive(false, { updateUrl: true });
