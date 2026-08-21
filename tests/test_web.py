@@ -426,8 +426,22 @@ def test_dashboard_and_campaign_api_load() -> None:
 
 
 def test_cloudfront_forwards_only_the_guided_demo_session_cookie() -> None:
-    assert WEB_TEMPLATE.count("CookieBehavior: whitelist") == 2
-    assert WEB_TEMPLATE.count("- mettle_demo_session") == 2
+    static_policy = WEB_TEMPLATE.split("  StaticCachePolicy:", 1)[1].split(
+        "  ApiCachePolicy:", 1
+    )[0]
+    api_cache_policy = WEB_TEMPLATE.split("  ApiCachePolicy:", 1)[1].split(
+        "  ApiOriginRequestPolicy:", 1
+    )[0]
+    api_origin_policy = WEB_TEMPLATE.split("  ApiOriginRequestPolicy:", 1)[1].split(
+        "  WebAcl:", 1
+    )[0]
+
+    assert "CookieBehavior: none" in static_policy
+    assert "mettle_demo_session" not in static_policy
+    assert "CookieBehavior: whitelist" in api_cache_policy
+    assert "- mettle_demo_session" in api_cache_policy
+    assert "CookieBehavior: whitelist" in api_origin_policy
+    assert "- mettle_demo_session" in api_origin_policy
     assert "CookieBehavior: all" not in WEB_TEMPLATE
 
 

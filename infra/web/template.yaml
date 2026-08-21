@@ -541,9 +541,7 @@ Resources:
           EnableAcceptEncodingBrotli: true
           EnableAcceptEncodingGzip: true
           CookiesConfig:
-            CookieBehavior: whitelist
-            Cookies:
-              - mettle_demo_session
+            CookieBehavior: none
           HeadersConfig:
             HeaderBehavior: none
           QueryStringsConfig:
@@ -561,7 +559,9 @@ Resources:
           EnableAcceptEncodingBrotli: false
           EnableAcceptEncodingGzip: false
           CookiesConfig:
-            CookieBehavior: none
+            CookieBehavior: whitelist
+            Cookies:
+              - mettle_demo_session
           HeadersConfig:
             HeaderBehavior: none
           QueryStringsConfig:
