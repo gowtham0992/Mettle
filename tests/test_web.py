@@ -416,6 +416,11 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "async function runSampleUntilPause()" in script.text
     assert "function stageTourClock(days, cadence)" in script.text
     assert "function createPacketFinale(data)" in script.text
+    assert "function createEvidenceComparison()" in script.text
+    assert "function createTourAgentProof(data)" in script.text
+    assert 'node("span", "tour-agent-proof__mode", "SAMPLE · STRANDS")' in script.text
+    assert "Send a wider shot that identifies the corrected wall location." in script.text
+    assert 'if (!phase.complete) artifacts.push(createTourAgentProof(data));' in script.text
     assert 'viewer.src = "/api/demo/packet/preview.pdf#page=2&toolbar=1&navpanes=0"' in script.text
     assert "Recorded synthetic assessment replayed. No model or AWS service was called." in script.text
     assert '"3 BEFORENODECALL GATES"' in script.text
@@ -427,6 +432,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert ".tour-mode .dashboard" in styles.text
     assert ".command-stack { position: sticky" in styles.text
     assert ".packet-finale" in styles.text
+    assert ".tour-evidence-compare" in styles.text
+    assert ".tour-agent-proof" in styles.text
     assert '.judge-tour[data-phase="deadline"] .tour-stage__visual' in styles.text
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"
@@ -524,13 +531,13 @@ def test_guided_demo_packet_requires_approval_then_downloads_pdf() -> None:
     assert campaign["packet_status"] == "awaiting_approval"
     assert downloaded.status_code == 200
     assert downloaded.headers["content-type"] == "application/pdf"
-    assert len(PdfReader(BytesIO(downloaded.content)).pages) == 4
+    assert len(PdfReader(BytesIO(downloaded.content)).pages) == 5
     assert len(downloaded.content) < 4_000_000
     assert previewed.status_code == 200
     assert previewed.headers["content-disposition"].startswith("inline;")
     assert previewed.headers["x-frame-options"] == "SAMEORIGIN"
     assert "frame-ancestors 'self'" in previewed.headers["content-security-policy"]
-    assert len(PdfReader(BytesIO(previewed.content)).pages) == 4
+    assert len(PdfReader(BytesIO(previewed.content)).pages) == 5
 
 
 def test_api_rejects_oversized_decision_and_unknown_fields() -> None:
@@ -755,7 +762,7 @@ def test_agentcore_http_boundary_starts_restores_and_resumes_cloud_workflow() ->
     assert approved.json()["packet"]["status"] == "approved"
     assert downloaded.status_code == 200
     assert downloaded.headers["content-type"] == "application/pdf"
-    assert len(PdfReader(BytesIO(downloaded.content)).pages) == 4
+    assert len(PdfReader(BytesIO(downloaded.content)).pages) == 5
 
 
 def test_agentcore_http_boundary_fails_closed_without_explicit_server_enablement() -> None:

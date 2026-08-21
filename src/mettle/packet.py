@@ -304,7 +304,10 @@ def render_packet_pdf(
             ]
         )
 
-    story.extend([Spacer(1, 0.18 * inch), Paragraph("Recovery communication record", styles["heading"])])
+    # The communication trail is a first-class fifth page, not content that
+    # happens to spill over when a workflow has enough delivery rows.
+    story.extend([PageBreak(), Paragraph("RECOVERY RECORD", styles["eyebrow"])])
+    story.append(Paragraph("Recovery communication record", styles["heading"]))
     delivery_rows = [["CITATION", "RECIPIENT", "STATUS", "SCHEDULED"]]
     for delivery in deliveries:
         delivery_rows.append(

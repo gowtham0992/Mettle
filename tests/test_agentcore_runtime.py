@@ -301,7 +301,7 @@ def test_agentcore_session_completes_evidence_approval_and_pdf_packet() -> None:
     assert rendered["ok"] is True
     assert rendered["content_type"] == "application/pdf"
     assert rendered["filename"] == "mettle-reinspection-packet.pdf"
-    assert len(PdfReader(BytesIO(pdf)).pages) == 4
+    assert len(PdfReader(BytesIO(pdf)).pages) == 5
 
 
 def test_agentcore_evidence_rejects_unknown_sample_without_echoing_it() -> None:

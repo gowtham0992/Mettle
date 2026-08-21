@@ -1294,6 +1294,82 @@ function citationTourArtifact(citation) {
   });
 }
 
+function evidenceComparisonCard({ image, alt, status, title, detail, tone }) {
+  const card = node("figure", `tour-evidence-compare__card tour-evidence-compare__card--${tone}`);
+  const photo = document.createElement("img");
+  photo.src = image;
+  photo.alt = alt;
+  const media = node("div", "tour-evidence-compare__media");
+  media.append(photo);
+  const caption = node("figcaption", "");
+  caption.append(
+    node("span", "tour-evidence-compare__status", status),
+    node("strong", "", title),
+    node("p", "", detail),
+  );
+  card.append(media, caption);
+  return card;
+}
+
+function createEvidenceComparison() {
+  const comparison = node("section", "tour-evidence-compare");
+  comparison.setAttribute("aria-label", "Rejected evidence and accepted replacement comparison");
+  comparison.append(
+    evidenceComparisonCard({
+      image: "/static/evidence/framing-plates-complete.png",
+      alt: "Synthetic close crop of framing protection plates that omits the wider wall location",
+      status: "RE-REQUESTED",
+      title: "Close-up omitted the corrected wall location",
+      detail: "Send a wider shot that identifies the corrected wall location.",
+      tone: "rejected",
+    }),
+    node("div", "tour-evidence-compare__handoff", "PRECISE RE-REQUEST → REPLACEMENT"),
+    evidenceComparisonCard({
+      image: "/static/evidence/framing-plates-complete.png",
+      alt: "Synthetic wide view showing framing protection plates and their corrected wall location",
+      status: "ACCEPTED",
+      title: "Replacement connected the repair to its location",
+      detail: "Protection plates and the wider wall location are visible. This is evidence sufficiency—not code certification.",
+      tone: "accepted",
+    }),
+  );
+  return comparison;
+}
+
+function createTourAgentProof(data) {
+  const steps = sampleAgentRun(data);
+  const interrupted = steps.find((step) => step.status === "interrupted");
+  const featured = [...steps.slice(0, 2), interrupted || steps.at(-1)]
+    .filter((step, index, items) => step && items.findIndex((item) => item.node_id === step.node_id) === index);
+  const proof = node("aside", "tour-agent-proof");
+  const header = node("div", "tour-agent-proof__header");
+  const heading = node("div", "");
+  heading.append(
+    node("span", "tour-agent-proof__mode", "SAMPLE · STRANDS"),
+    node("strong", "", "Inspectable orchestration"),
+  );
+  const inspect = node("button", "tour-agent-proof__inspect", "Open full trace ↗");
+  inspect.type = "button";
+  inspect.addEventListener("click", inspectAgentRun);
+  header.append(heading, inspect);
+  const topology = node("div", "tour-agent-proof__topology");
+  topology.append(
+    node("span", "", "recovery → deadline_chase"),
+    node("span", "", "3 BEFORENODECALL GATES"),
+  );
+  const nodes = node("ol", "tour-agent-proof__nodes");
+  for (const step of featured) {
+    const item = node("li", `tour-agent-proof__node tour-agent-proof__node--${step.status}`);
+    item.append(
+      node("code", "", step.node_id),
+      node("span", "", step.status === "interrupted" ? "PAUSED FOR CONTRACTOR" : step.status.toUpperCase()),
+    );
+    nodes.append(item);
+  }
+  proof.append(header, topology, nodes);
+  return proof;
+}
+
 const packetEvidenceImages = {
   "1": "/static/evidence/panel-wide-measured.png",
   "2": "/static/evidence/framing-plates-complete.png",
@@ -1417,17 +1493,16 @@ function renderTourVisual(data, phase) {
       citationTourArtifact(data.citations.find((citation) => citation.citation_id === "3")),
     );
   } else if (phase.key === "deadline") {
-    const accepted = data.citations.find((citation) => citation.stage === "ready");
-    const rejected = data.citations.find((citation) => citation.stage === "evidence_rejected");
-    if (accepted) artifacts.push(citationTourArtifact(accepted));
-    if (rejected) artifacts.push(citationTourArtifact(rejected));
-    artifacts.push(tourArtifact({
-      index: "T−2",
-      title: "Recovery cadence moved to critical",
-      detail: "Silent trades were escalated; the contractor received the deadline tradeoff instead of more routine noise.",
-      status: "NEEDS YOU",
-      tone: "blocked",
-    }));
+    artifacts.push(
+      createEvidenceComparison(),
+      tourArtifact({
+        index: "T−2",
+        title: "Recovery cadence moved to critical",
+        detail: "Only unresolved trades were escalated; the contractor received the deadline tradeoff instead of more routine noise.",
+        status: "NEEDS YOU",
+        tone: "blocked",
+      }),
+    );
   } else if (phase.key === "approval" || phase.key === "complete") {
     if (phase.key === "complete") {
       artifacts.push(createPacketFinale(data));
@@ -1447,6 +1522,7 @@ function renderTourVisual(data, phase) {
   } else {
     artifacts.push(...data.citations.map(citationTourArtifact));
   }
+  if (!phase.complete) artifacts.push(createTourAgentProof(data));
   elements.tourVisual.replaceChildren(...artifacts);
 }
 
