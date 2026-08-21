@@ -147,6 +147,7 @@ let tourActionHandler = null;
 let tourSecondaryHandler = null;
 let animationSkipRequested = false;
 let finishTourDelay = null;
+let tourClockOverride = null;
 const workspaceViews = new Set(["recovery", "evidence", "activity"]);
 let activeWorkspaceView = workspaceViewFromUrl();
 let judgeTourActive = new URLSearchParams(window.location.search).get("tour") === "1"
@@ -1229,7 +1230,7 @@ function tourPhase(data) {
   if (pendingJudgment(data, "code-c3")) {
     return {
       key: "boundary", scene: 1, stopIndex: 0,
-      eyebrow: "NOTICE IN · RECOVERY OUT",
+      eyebrow: "FOR THE CONTRACTOR HANDED A DISAPPROVED ROUGH-IN",
       title: "The notice is the only input.",
       copy: "Mettle derives the work from the authority’s exact language, sends the unambiguous requests, and stops where professional interpretation begins.",
       controlTitle: "The agent did not invent a missing evidence requirement.",
@@ -1316,8 +1317,8 @@ function createEvidenceComparison() {
   comparison.setAttribute("aria-label", "Rejected evidence and accepted replacement comparison");
   comparison.append(
     evidenceComparisonCard({
-      image: "/static/evidence/framing-plates-complete.png",
-      alt: "Synthetic close crop of framing protection plates that omits the wider wall location",
+      image: "/static/evidence/framing-closeup-insufficient.png",
+      alt: "Synthetic close-up of one framing protection plate without enough surrounding context to identify the corrected wall location",
       status: "RE-REQUESTED",
       title: "Close-up omitted the corrected wall location",
       detail: "Send a wider shot that identifies the corrected wall location.",
@@ -1342,7 +1343,8 @@ function timelineEvent(label, tone = "") {
   return event;
 }
 
-function createCoordinationTimeline() {
+function createCoordinationTimeline(data) {
+  const step = Number(data.scenario_step || 0);
   const timeline = node("section", "coordination-timeline");
   timeline.setAttribute("aria-label", "Recorded five-day coordination timeline");
   const heading = node("div", "coordination-timeline__heading");
@@ -1354,9 +1356,9 @@ function createCoordinationTimeline() {
   const days = ["TRADE / DAY", "10", "11", "12", "13", "14", "15"];
   for (const day of days) grid.append(node("span", "coordination-timeline__day", day));
   const rows = [
-    ["C1 · ELECTRICAL", [timelineEvent("REQUEST", "request"), timelineEvent("ACCEPTED", "accepted"), "", "", "", timelineEvent("CLOSED", "closed")]],
-    ["C2 · FRAMING", [timelineEvent("REQUEST", "request"), "", timelineEvent("REJECTED", "rejected"), timelineEvent("RE-REQUEST", "request"), timelineEvent("AWAITING", "waiting"), timelineEvent("ESCALATED", "critical")]],
-    ["C3 · MECHANICAL", [timelineEvent("HELD", "held"), timelineEvent("REQUEST", "request"), "", timelineEvent("AWAITING", "waiting"), "", timelineEvent("ESCALATED", "critical")]],
+    ["C1 · ELECTRICAL", [timelineEvent("REQUEST", "request"), step >= 1 ? timelineEvent("ACCEPTED", "accepted") : "", "", "", "", step >= 1 ? timelineEvent("CLOSED", "closed") : ""]],
+    ["C2 · FRAMING", [timelineEvent("REQUEST", "request"), "", step >= 2 ? timelineEvent("REJECTED", "rejected") : "", step >= 2 ? timelineEvent("RE-REQUEST", "request") : "", step >= 2 ? timelineEvent("AWAITING", "waiting") : "", ""]],
+    ["C3 · MECHANICAL", [timelineEvent("HELD", "held"), timelineEvent("REQUEST", "request"), "", timelineEvent("AWAITING", "waiting"), "", ""]],
   ];
   for (const [label, cells] of rows) {
     grid.append(node("strong", "coordination-timeline__trade", label));
@@ -1367,7 +1369,18 @@ function createCoordinationTimeline() {
     }
   }
   const legend = node("p", "coordination-timeline__legend", "▲ request  ·  ■ accepted  ·  × rejected  ·  ○ awaiting  ·  ◆ checkpoint");
-  timeline.append(heading, grid, legend);
+  const ledger = node("ol", "coordination-ledger");
+  ledger.setAttribute("aria-label", "Latest autonomous work records");
+  for (const event of (data.events || []).slice(0, 3)) {
+    const entry = node("li", "");
+    entry.append(
+      node("span", "coordination-ledger__marker", event.kind === "evidence_rejected" ? "×" : "◆"),
+      node("strong", "", event.title),
+      node("span", "", event.actor.toUpperCase()),
+    );
+    ledger.append(entry);
+  }
+  timeline.append(heading, grid, legend, ledger);
   return timeline;
 }
 
@@ -1382,16 +1395,10 @@ function createTourWorkspaceFrame(data, phase, artifacts) {
   navigation.setAttribute("aria-label", "Tour workspace views");
   const activeView = tourWorkspaceView(phase);
   for (const [view, label] of [["recovery", "01 Recovery"], ["evidence", "02 Evidence & packet"], ["activity", "03 Agent activity"]]) {
-    const button = node("button", "", label);
-    button.type = "button";
-    button.setAttribute("aria-current", activeView === view ? "page" : "false");
-    button.addEventListener("click", () => {
-      if (view === activeView) return;
-      sessionStorage.setItem("mettle_entry_selected", "sample");
-      setJudgeTourActive(false, { updateUrl: true, focus: false });
-      setWorkspaceView(view, { updateUrl: true, focusTab: true });
-    });
-    navigation.append(button);
+    const tab = node("span", "", label);
+    tab.setAttribute("aria-current", activeView === view ? "page" : "false");
+    tab.title = activeView === view ? "Current guided-tour view" : "Available in the full workspace after the tour";
+    navigation.append(tab);
   }
   const status = node("div", "tour-workspace__status");
   const ready = Number(data.metrics?.citations_ready || 0);
@@ -1410,8 +1417,19 @@ function createTourWorkspaceFrame(data, phase, artifacts) {
 function createTourAgentProof(data) {
   const steps = sampleAgentRun(data);
   const interrupted = steps.find((step) => step.status === "interrupted");
-  const featured = [...steps.slice(0, 2), interrupted || steps.at(-1)]
-    .filter((step, index, items) => step && items.findIndex((item) => item.node_id === step.node_id) === index);
+  const preferredIds = interrupted?.node_id === "deadline_gate"
+    ? ["intake", "plan", "coordinate", "replan_open", "deadline_gate"]
+    : interrupted?.node_id === "judgment_gate"
+      ? ["intake", "plan", "coordinate", "judgment_gate", "finish"]
+      : ["intake", "plan", "coordinate", "replan_open", "finish_chase"];
+  const featured = preferredIds
+    .map((nodeId) => steps.find((step) => step.node_id === nodeId))
+    .filter(Boolean)
+    .slice(0, 5);
+  for (const step of steps) {
+    if (featured.length >= 5) break;
+    if (!featured.some((item) => item.node_id === step.node_id)) featured.push(step);
+  }
   const proof = node("aside", "tour-agent-proof");
   const header = node("div", "tour-agent-proof__header");
   const heading = node("div", "");
@@ -1433,6 +1451,7 @@ function createTourAgentProof(data) {
     const item = node("li", `tour-agent-proof__node tour-agent-proof__node--${step.status}`);
     item.append(
       node("code", "", step.node_id),
+      node("strong", "", step.actor),
       node("span", "", step.status === "interrupted" ? "PAUSED FOR CONTRACTOR" : step.status.toUpperCase()),
     );
     nodes.append(item);
@@ -1517,7 +1536,7 @@ function createPacketFinale(data) {
   const buttons = labels.map((label, index) => {
     const button = node("button", "", `${index + 1} · ${label}`);
     button.type = "button";
-    button.setAttribute("aria-pressed", String(index === 0));
+    button.setAttribute("aria-pressed", String(index === 1));
     button.addEventListener("click", () => {
       for (const candidate of buttons) candidate.setAttribute("aria-pressed", String(candidate === button));
       renderPacketFinalePage(preview, index + 1, data);
@@ -1525,7 +1544,7 @@ function createPacketFinale(data) {
     navigation.append(button);
     return button;
   });
-  renderPacketFinalePage(preview, 1, data);
+  renderPacketFinalePage(preview, 2, data);
   const documentDetails = node("details", "packet-finale__document");
   documentDetails.append(node("summary", "", "Open the actual five-page PDF"));
   const viewer = document.createElement("iframe");
@@ -1591,7 +1610,7 @@ function renderTourVisual(data, phase) {
       );
     }
   } else {
-    if (phase.key === "recovery") artifacts.push(createCoordinationTimeline());
+    if (phase.key === "recovery") artifacts.push(createCoordinationTimeline(data));
     else artifacts.push(...data.citations.map(citationTourArtifact));
   }
   if (!phase.complete) artifacts.push(createTourAgentProof(data));
@@ -1656,12 +1675,19 @@ function renderJudgeTour(data) {
     stop.dataset.state = state;
   }
   renderTourVisual(data, phase);
-  const metricValues = [
-    ["Citations ready", `${data.metrics.citations_ready}/${data.metrics.citations_total}`],
-    ["Messages handled", data.metrics.messages_handled],
-    ["Agent actions", data.metrics.automated_actions],
-    ["Your decisions", data.metrics.contractor_decisions],
-  ];
+  const metricValues = phase.key === "boundary"
+    ? [
+      ["Notice input", "1 PDF"],
+      ["Trades contacted", "2"],
+      ["Agent actions", data.metrics.automated_actions],
+      ["Waiting on you", "1"],
+    ]
+    : [
+      ["Citations ready", `${data.metrics.citations_ready}/${data.metrics.citations_total}`],
+      ["Messages handled", data.metrics.messages_handled],
+      ["Agent actions", data.metrics.automated_actions],
+      ["Your decisions", data.metrics.contractor_decisions],
+    ];
   elements.tourMetrics.replaceChildren(...metricValues.map(([label, value]) => {
     const metric = node("div", "tour-metric");
     metric.append(node("dd", "", String(value)), node("dt", "", label));
@@ -1915,7 +1941,8 @@ function render(data) {
   setWorkspaceView(activeWorkspaceView);
   elements.noticeId.textContent = data.notice_id;
   elements.property.textContent = data.property_label;
-  elements.days.textContent = String(Math.max(data.days_remaining, 0));
+  const displayedDays = tourClockOverride ?? data.days_remaining;
+  elements.days.textContent = String(Math.max(displayedDays, 0));
   elements.asOf.textContent = `AS OF ${formatDate(data.as_of).toUpperCase()}`;
   elements.progressLabel.textContent = `${data.metrics.citations_ready} / ${data.metrics.citations_total} CITATIONS READY`;
   elements.progressBar.style.width = `${(data.metrics.citations_ready / data.metrics.citations_total) * 100}%`;
@@ -2143,6 +2170,7 @@ async function runSampleUntilPause() {
         method: "POST",
         body: JSON.stringify({ idempotency_key: crypto.randomUUID().replaceAll("-", "_") }),
       });
+      if (judgeTourActive && updated.scenario_step >= 3) tourClockOverride = null;
       campaign = updated;
       render(updated);
       if (updated.scenario_step === previousStep) {
@@ -2168,6 +2196,7 @@ async function runSampleUntilPause() {
     showError(error);
   } finally {
     demoRunning = false;
+    tourClockOverride = null;
     finishTourDelay = null;
     elements.tourSkip.hidden = true;
     elements.tourSkip.textContent = "Skip animation";
@@ -2201,6 +2230,7 @@ function tourBeat(milliseconds) {
 
 function stageTourClock(days, cadence) {
   if (!judgeTourActive || animationSkipRequested) return;
+  tourClockOverride = days;
   elements.days.textContent = String(days);
   elements.cadence.textContent = cadence;
   elements.days.classList.remove("tour-clock-transition");

@@ -419,6 +419,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function createEvidenceComparison()" in script.text
     assert "function createTourAgentProof(data)" in script.text
     assert 'node("span", "tour-agent-proof__mode", "SAMPLE · STRANDS")' in script.text
+    assert 'image: "/static/evidence/framing-closeup-insufficient.png"' in script.text
     assert "Send a wider shot that identifies the corrected wall location." in script.text
     assert 'if (!phase.complete) artifacts.push(createTourAgentProof(data));' in script.text
     assert 'viewer.src = "/api/demo/packet/preview.pdf#page=2&toolbar=1&navpanes=0"' in script.text
@@ -436,7 +437,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert ".tour-agent-proof" in styles.text
     assert ".coordination-timeline" in styles.text
     assert ".tour-workspace__tabs" in styles.text
-    assert "function createCoordinationTimeline()" in script.text
+    assert "function createCoordinationTimeline(data)" in script.text
     assert "function createTourWorkspaceFrame(data, phase, artifacts)" in script.text
     assert '.judge-tour[data-phase="deadline"] .tour-stage__visual' in styles.text
     assert campaign.status_code == 200
