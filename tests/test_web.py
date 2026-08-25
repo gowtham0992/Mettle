@@ -373,8 +373,11 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Recovery command center" in page.text
     assert "Start with the failed-inspection report" in page.text
     assert "Start a recovery" in page.text
-    assert "Take the guided tour" in page.text
-    assert "Explore the sample freely" in page.text
+    assert "Judge mode" in page.text
+    assert "Contractor mode" in page.text
+    assert "Explore mode" in page.text
+    assert "JUDGE MODE · GUIDED 3-MINUTE RUN" in page.text
+    assert 'id="judge-lens-impact"' in page.text
     assert 'id="judge-tour"' in page.text
     assert 'id="tour-skip"' in page.text
     assert 'id="tour-secondary"' in page.text
@@ -388,6 +391,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "How Mettle worked" in page.text
     assert "STRANDS GRAPHBUILDER" in page.text
     assert "SYSTEM PROVENANCE · READ ONLY" in page.text
+    assert "One recovery. Two model agents. Three hard stops." in page.text
+    assert 'id="agent-flow"' in page.text
     assert 'id="photo-mode-note"' in page.text
     assert "Mettle workspace" in page.text
     assert "Open work and decisions" in page.text
@@ -409,6 +414,9 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function renderAgentRun(data)" in script.text
     assert "function renderCorrectionSummary(data)" in script.text
     assert "function renderProvenance(data)" in script.text
+    assert "function renderAgentFlow(data)" in script.text
+    assert "const judgeLensByPhase" in script.text
+    assert "function openWelcomeChooser()" in script.text
     assert "EventBridge wakes the deadline-chase graph" in script.text
     assert "function setWorkspaceView(view" in script.text
     assert "function openWorkspacePanel(view" in script.text
@@ -434,6 +442,10 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert ".workspace-panel--view-hidden" in styles.text
     assert ".citation__summary" in styles.text
     assert ".provenance-step__artifact" in styles.text
+    assert ".agent-flow__track" in styles.text
+    assert ".judge-lens__item--agent" in styles.text
+    assert "body:not(.tour-mode) .auth-control" in styles.text
+    assert ".entry-choice--primary:hover { padding-inline: 16px; border-color: var(--orange); background: #242a2e; }" in styles.text
     assert ".dashboard--focused" in styles.text
     assert ".recovery-line" in styles.text
     assert ".tour-mode .dashboard" in styles.text

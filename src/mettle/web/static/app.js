@@ -16,6 +16,9 @@ const elements = {
   tourVisual: document.querySelector("#tour-visual"),
   tourControlTitle: document.querySelector("#tour-control-title"),
   tourControlCopy: document.querySelector("#tour-control-copy"),
+  judgeLensImpact: document.querySelector("#judge-lens-impact"),
+  judgeLensAgent: document.querySelector("#judge-lens-agent"),
+  judgeLensHuman: document.querySelector("#judge-lens-human"),
   tourAction: document.querySelector("#tour-action"),
   tourSecondary: document.querySelector("#tour-secondary"),
   tourSkip: document.querySelector("#tour-skip"),
@@ -81,6 +84,7 @@ const elements = {
   packetJudgment: document.querySelector("#packet-judgment"),
   packetNote: document.querySelector("#packet-note"),
   packetAction: document.querySelector("#packet-action"),
+  agentFlow: document.querySelector("#agent-flow"),
   provenanceSteps: document.querySelector("#provenance-steps"),
   demoStep: document.querySelector("#demo-step"),
   driverTag: document.querySelector("#driver-tag"),
@@ -101,6 +105,7 @@ const elements = {
   auth: document.querySelector("#auth-button"),
   home: document.querySelector("#mettle-home"),
   welcomeDialog: document.querySelector("#welcome-dialog"),
+  welcomeTitle: document.querySelector("#welcome-title"),
   startTourEntry: document.querySelector("#start-tour-entry"),
   startRecoveryEntry: document.querySelector("#start-recovery-entry"),
   trySampleEntry: document.querySelector("#try-sample-entry"),
@@ -277,7 +282,7 @@ function updateAuthControl() {
     return;
   }
   elements.auth.hidden = false;
-  elements.auth.textContent = accessToken ? "Sign out" : "Sign in for live run";
+  elements.auth.textContent = accessToken ? "Sign out" : "Sign in";
 }
 
 async function beginLogin() {
@@ -842,15 +847,22 @@ function openRecoverySetup({ returnToWelcome = false } = {}) {
   window.setTimeout(() => elements.noticeText.focus(), 0);
 }
 
+function openWelcomeChooser() {
+  if (!elements.welcomeDialog.open) elements.welcomeDialog.showModal();
+  window.requestAnimationFrame(() => {
+    elements.welcomeDialog.scrollTop = 0;
+    elements.welcomeTitle.focus({ preventScroll: true });
+    elements.welcomeDialog.scrollTop = 0;
+  });
+}
+
 function exitRecoverySetup() {
   const returnToWelcome = setupReturnsToWelcome;
   setupReturnsToWelcome = false;
   elements.noticeDialog.close();
   if (returnToWelcome) {
     sessionStorage.removeItem("mettle_entry_selected");
-    window.setTimeout(() => {
-      if (!elements.welcomeDialog.open) elements.welcomeDialog.showModal();
-    }, 0);
+    window.setTimeout(openWelcomeChooser, 0);
   }
 }
 
@@ -1190,6 +1202,43 @@ function provenanceStep({ number, kind, title, role, status, artifacts, open = f
   return item;
 }
 
+function agentFlowNode({ kind, label, title, detail, state }) {
+  const item = node("li", `agent-flow__node agent-flow__node--${kind} agent-flow__node--${state}`);
+  item.append(
+    node("span", "agent-flow__kind", label),
+    node("strong", "agent-flow__name", title),
+    node("span", "agent-flow__detail", detail),
+    node("span", "agent-flow__state", state === "done" ? "COMPLETED" : state === "paused" ? "PAUSED" : "UP NEXT"),
+  );
+  return item;
+}
+
+function renderAgentFlow(data) {
+  const events = data.events || [];
+  const evidenceRan = (data.evidence || []).length > 0
+    || events.some((event) => String(event.kind || "").startsWith("evidence_"));
+  const schedulerRan = data.automation_status === "scheduled"
+    || Number(data.scenario_step || 0) >= 3
+    || events.some((event) => event.kind === "deadline_escalation");
+  const pending = (data.judgments || []).some((judgment) => judgment.status === "pending");
+  const decisions = Number(data.metrics?.contractor_decisions || 0);
+  const allReady = Number(data.metrics?.citations_total || 0) > 0
+    && data.metrics.citations_ready === data.metrics.citations_total;
+  const packetDone = ["awaiting_approval", "approved"].includes(data.packet_status) || allReady;
+  const intakeLabel = data.source_mode === "workflow" && data.intake_provider !== "bedrock"
+    ? "BOUNDED INTAKE"
+    : "STRANDS AGENT · NOVA MICRO";
+  elements.agentFlow.replaceChildren(
+    agentFlowNode({ kind: "input", label: "INPUT", title: "Failed-inspection notice", detail: "One redacted authority document", state: "done" }),
+    agentFlowNode({ kind: "agent", label: intakeLabel, title: "Notice intake", detail: "Exact language → typed citations", state: "done" }),
+    agentFlowNode({ kind: "policy", label: "DETERMINISTIC GRAPH", title: "Recovery policy", detail: "Assign, chase, replan open work", state: "done" }),
+    agentFlowNode({ kind: "agent", label: "STRANDS AGENT · NOVA LITE", title: "Visible-evidence agent", detail: "Pixels → bounded findings", state: evidenceRan ? "done" : "waiting" }),
+    agentFlowNode({ kind: "scheduler", label: "AMAZON EVENTBRIDGE", title: "Deadline wake-up", detail: "Resume the checkpointed chase", state: schedulerRan ? "done" : "waiting" }),
+    agentFlowNode({ kind: "human", label: "BEFORENODECALL GATE", title: "Contractor judgment", detail: "Interpret, trade off, approve", state: pending ? "paused" : decisions > 0 ? "done" : "waiting" }),
+    agentFlowNode({ kind: "output", label: "OUTPUT", title: "Reinspection packet", detail: "Evidence + authority trail", state: packetDone ? "done" : "waiting" }),
+  );
+}
+
 function renderProvenance(data) {
   const isWorkflow = data.source_mode === "workflow";
   const isAgentCore = isWorkflow && data.execution_target === "agentcore";
@@ -1280,6 +1329,7 @@ function renderProvenance(data) {
       ["Next action", data.packet_status === "approved" ? "Download the contractor-approved artifact." : allReady ? "Require final contractor approval." : "Wait for the remaining accepted proof."],
     ] }),
   ];
+  renderAgentFlow(data);
   elements.provenanceSteps.replaceChildren(...steps);
 }
 
@@ -1829,6 +1879,39 @@ async function resolveTourJudgment(judgmentId, decision, successMessage) {
   }
 }
 
+const judgeLensByPhase = {
+  boundary: {
+    impact: "Zero-configuration intake: the failed-inspection notice becomes the recovery plan.",
+    agent: "The Nova Micro intake agent extracts three bounded citations; deterministic coordination sends only the two unambiguous requests.",
+    human: "Mettle refuses to invent proof for mechanical access and asks the contractor to define the boundary.",
+  },
+  recovery: {
+    impact: "This is background autonomy, not a chat response: the campaign continues while the contractor is away.",
+    agent: "The Nova Lite evidence agent checks visible proof; the recovery graph accepts, rejects, re-requests, and follows up across trades.",
+    human: "Routine evidence handling creates no interrupt. The contractor returns only when the deadline creates a real tradeoff.",
+  },
+  deadline: {
+    impact: "The campaign replans against time and removes completed work instead of restarting a generic checklist.",
+    agent: "EventBridge wakes the graph; open-only policy escalates the unresolved trade and preserves accepted evidence.",
+    human: "Whether to keep or move the reinspection date remains a business and professional decision.",
+  },
+  finish: {
+    impact: "One decision resumes the same checkpointed campaign—closed citations remain closed.",
+    agent: "Evidence assessment finishes the remaining citations and deterministic packet assembly prepares the handoff.",
+    human: "Mettle can prepare the artifact, but it cannot release or send it for reinspection.",
+  },
+  approval: {
+    impact: "Complete proof is not permission. The final artifact is deliberately locked.",
+    agent: "Packet assembly binds notice language, accepted proof, timestamps, and the recovery record into five pages.",
+    human: "Only the contractor can approve the packet for reinspection scheduling.",
+  },
+  complete: {
+    impact: "The full loop ends with a usable contractor artifact, not a dashboard or a generated summary.",
+    agent: "Fifteen background actions and two model-agent lanes are visible in the execution receipts.",
+    human: "Three explicit contractor decisions form the authority trail behind the approved packet.",
+  },
+};
+
 function renderJudgeTour(data) {
   if (!judgeTourActive || data.source_mode === "workflow") return;
   const phase = tourPhase(data);
@@ -1843,6 +1926,10 @@ function renderJudgeTour(data) {
   elements.tourCopy.textContent = phase.copy;
   elements.tourControlTitle.textContent = phase.controlTitle;
   elements.tourControlCopy.textContent = phase.controlCopy;
+  const lens = judgeLensByPhase[phase.key] || judgeLensByPhase.boundary;
+  elements.judgeLensImpact.textContent = lens.impact;
+  elements.judgeLensAgent.textContent = lens.agent;
+  elements.judgeLensHuman.textContent = lens.human;
   elements.tourAction.textContent = phase.actionLabel;
   elements.tourActionNote.textContent = phase.actionNote;
   elements.tourAction.disabled = demoRunning;
@@ -2300,9 +2387,7 @@ async function loadCampaign() {
       const directTour = params.get("tour") === "1" && entry !== "tour";
       if (directTour) sessionStorage.setItem("mettle_entry_selected", "tour");
       render(await request(directTour ? "/api/demo/reset" : "/api/campaign", directTour ? { method: "POST", body: "{}" } : {}));
-      if (!entry && !judgeTourActive && !elements.welcomeDialog.open) {
-        elements.welcomeDialog.showModal();
-      }
+      if (!entry && !judgeTourActive) openWelcomeChooser();
     }
   } catch (error) { showError(error); }
 }
@@ -2498,11 +2583,11 @@ elements.home.addEventListener("click", (event) => {
   setupReturnsToWelcome = false;
   if (elements.noticeDialog.open) elements.noticeDialog.close();
   elements.resumeCurrentEntry.hidden = !(activeWorkflowId || judgeTourActive);
-  elements.resumeCurrentEntry.querySelector("strong").textContent = judgeTourActive ? "Return to guided tour" : "Return to current recovery";
+  elements.resumeCurrentEntry.querySelector("strong").textContent = judgeTourActive ? "Return to Judge mode" : "Return to current recovery";
   elements.resumeCurrentEntry.querySelector("span:last-child").textContent = judgeTourActive
-    ? "Close this chooser without leaving the staged evaluator path."
+    ? "Close this chooser without leaving the guided evaluator path."
     : "Close this chooser without changing the recovery already in progress.";
-  if (!elements.welcomeDialog.open) elements.welcomeDialog.showModal();
+  openWelcomeChooser();
 });
 
 elements.startRecoveryEntry.addEventListener("click", () => {

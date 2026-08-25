@@ -27,7 +27,7 @@
         <span class="condition__dot"></span>
         <span id="condition-label">READING NOTICE</span>
       </div>
-      <button class="auth-control" id="auth-button" type="button" hidden>Sign in for live run</button>
+      <button class="auth-control" id="auth-button" type="button" hidden>Sign in</button>
       <div class="countdown" aria-live="polite">
         <span class="countdown__number" id="days-remaining">—</span>
         <span class="countdown__copy">DAYS<br>TO REINSPECTION</span>
@@ -60,7 +60,7 @@
       <section class="judge-tour" id="judge-tour" aria-labelledby="tour-title" hidden>
         <header class="judge-tour__header">
           <div>
-            <p class="mono-label">RECORDED SAMPLE · GUIDED EVALUATOR PATH</p>
+            <p class="mono-label">JUDGE MODE · GUIDED 3-MINUTE RUN</p>
             <strong id="tour-progress-label">SCENE 1 OF 5</strong>
           </div>
           <div class="tour-header-actions">
@@ -77,6 +77,25 @@
           <li data-tour-stop="reinspection"><span>05</span><strong>Reinspection</strong><small>Ready</small></li>
         </ol>
 
+        <aside class="judge-lens" aria-labelledby="judge-lens-title">
+          <div class="judge-lens__title">
+            <span class="judge-lens__marker" aria-hidden="true">◎</span>
+            <div><p class="mono-label">JUDGE BRIEF</p><strong id="judge-lens-title">Why this scene matters</strong></div>
+          </div>
+          <div class="judge-lens__item judge-lens__item--impact">
+            <span>THE PRODUCT CLAIM</span>
+            <strong id="judge-lens-impact">Mettle turns one notice into a bounded recovery campaign.</strong>
+          </div>
+          <div class="judge-lens__item judge-lens__item--agent">
+            <span>AGENT WORK</span>
+            <strong id="judge-lens-agent">Two Strands agents handle extraction and visible-evidence assessment.</strong>
+          </div>
+          <div class="judge-lens__item judge-lens__item--human">
+            <span>HUMAN AUTHORITY</span>
+            <strong id="judge-lens-human">Code interpretation and release remain with the contractor.</strong>
+          </div>
+        </aside>
+
         <div class="tour-stage">
           <div class="tour-stage__copy">
             <p class="mono-label" id="tour-eyebrow">NOTICE IN · RECOVERY OUT</p>
@@ -87,7 +106,7 @@
           <div class="tour-stage__visual" id="tour-visual" aria-live="polite"></div>
 
           <aside class="tour-stage__control" aria-labelledby="tour-control-title">
-            <p class="mono-label">WHAT TO NOTICE</p>
+            <p class="mono-label">YOUR ONE DECISION</p>
             <strong id="tour-control-title">The agent did not invent a missing requirement.</strong>
             <p id="tour-control-copy">It prepared the recovery, contacted the unambiguous trades, and reserved one consequential decision for the contractor.</p>
             <button class="button button--orange tour-action" id="tour-action" type="button">Approve the evidence boundary</button>
@@ -223,6 +242,13 @@
             </div>
             <span class="agent-run__mode" id="agent-run-mode">SAMPLE TRACE</span>
           </header>
+          <section class="agent-flow" aria-labelledby="agent-flow-title">
+            <header class="agent-flow__heading">
+              <div><p class="mono-label">ORCHESTRATION AT A GLANCE</p><h2 id="agent-flow-title">One recovery. Two model agents. Three hard stops.</h2></div>
+              <p>Dark nodes invoke a model. Light nodes are deterministic. Orange is contractor authority.</p>
+            </header>
+            <ol class="agent-flow__track" id="agent-flow" aria-label="Mettle agent orchestration flow"></ol>
+          </section>
           <div class="provenance-legend" aria-label="Execution role legend">
             <span><i class="legend-agent"></i>Strands agent · model call</span>
             <span><i class="legend-policy"></i>Deterministic graph operation</span>
@@ -255,32 +281,35 @@
     <dialog class="welcome-dialog" id="welcome-dialog" aria-labelledby="welcome-title">
       <div class="welcome-dialog__brand">
         <img src="/static/mettle-mark.png" alt="" width="54" height="54">
-        <span>METTLE / FAILED-INSPECTION RECOVERY</span>
+              <span>METTLE / FAILED-INSPECTION RECOVERY</span>
         <span class="welcome-dialog__mode">SAMPLE AVAILABLE · LIVE STRANDS BEHIND SIGN-IN</span>
       </div>
       <div class="welcome-dialog__grid">
         <div class="welcome-dialog__editorial">
           <div class="welcome-dialog__copy">
             <p class="mono-label">NOTICE IN → RECOVERY OUT</p>
-            <h1 id="welcome-title">Get the correction work back under control.</h1>
+            <h1 id="welcome-title" tabindex="-1">Get the correction work back under control.</h1>
             <p>Mettle reads the failed-inspection report, organizes the responsible trades and proof, follows the deadline, and interrupts you only for decisions.</p>
           </div>
           <div class="welcome-dialog__choices">
             <button class="entry-choice entry-choice--primary" id="start-tour-entry" type="button">
               <span class="entry-choice__index">01</span>
-              <strong>Take the guided tour</strong>
-              <span>Five scenes. One failed inspection from notice to contractor-approved packet.</span>
-              <span class="entry-choice__action">START →</span>
+              <span class="entry-choice__badge">RECOMMENDED · 3 MIN</span>
+              <strong>Judge mode</strong>
+              <span>Follow one failed inspection end to end, with the agent work and human boundaries explained in every scene.</span>
+              <span class="entry-choice__action">ENTER →</span>
             </button>
             <button class="entry-choice" id="start-recovery-entry" type="button">
               <span class="entry-choice__index">02</span>
-              <strong>Start a real recovery</strong>
-              <span>Paste a redacted report and run the deployed product flow.</span>
+              <strong>Contractor mode</strong>
+              <span>Paste a redacted report, add the responsible trades, and run the deployed recovery flow.</span>
+              <span class="entry-choice__action entry-choice__action--quiet">START →</span>
             </button>
             <button class="entry-choice" id="try-sample-entry" type="button">
               <span class="entry-choice__index">03</span>
-              <strong>Explore the sample freely</strong>
-              <span>Skip the tour and open the complete synthetic workspace.</span>
+              <strong>Explore mode</strong>
+              <span>Open the synthetic contractor workspace directly and inspect every screen at your own pace.</span>
+              <span class="entry-choice__action entry-choice__action--quiet">OPEN →</span>
             </button>
             <button class="entry-choice entry-choice--resume" id="resume-current-entry" type="button" hidden>
               <span class="entry-choice__index">↩</span>
