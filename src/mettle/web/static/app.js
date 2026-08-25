@@ -1203,7 +1203,7 @@ function provenanceStep({ number, kind, title, role, status, artifacts, open = f
 }
 
 function agentFlowNode({ kind, label, title, detail, state }) {
-  const item = node("li", `agent-flow__node agent-flow__node--${kind} agent-flow__node--${state}`);
+  const item = node("article", `agent-flow__node agent-flow__node--${kind} agent-flow__node--${state}`);
   item.append(
     node("span", "agent-flow__kind", label),
     node("strong", "agent-flow__name", title),
@@ -1211,6 +1211,23 @@ function agentFlowNode({ kind, label, title, detail, state }) {
     node("span", "agent-flow__state", state === "done" ? "COMPLETED" : state === "paused" ? "PAUSED" : "UP NEXT"),
   );
   return item;
+}
+
+function agentFlowStage({ number, title, cadence, kind, nodes }) {
+  const stage = node("section", `agent-flow__stage agent-flow__stage--${kind}`);
+  const heading = node("header", "agent-flow__stage-heading");
+  heading.append(
+    node("span", "agent-flow__stage-number", number),
+    node("strong", "agent-flow__stage-title", title),
+    node("span", "agent-flow__stage-cadence", cadence),
+  );
+  const rail = node("div", "agent-flow__rail");
+  nodes.forEach((flowNode, index) => {
+    rail.append(flowNode);
+    if (index < nodes.length - 1) rail.append(node("span", "agent-flow__connector", "→"));
+  });
+  stage.append(heading, rail);
+  return stage;
 }
 
 function renderAgentFlow(data) {
@@ -1229,13 +1246,37 @@ function renderAgentFlow(data) {
     ? "BOUNDED INTAKE"
     : "STRANDS AGENT · NOVA MICRO";
   elements.agentFlow.replaceChildren(
-    agentFlowNode({ kind: "input", label: "INPUT", title: "Failed-inspection notice", detail: "One redacted authority document", state: "done" }),
-    agentFlowNode({ kind: "agent", label: intakeLabel, title: "Notice intake", detail: "Exact language → typed citations", state: "done" }),
-    agentFlowNode({ kind: "policy", label: "DETERMINISTIC GRAPH", title: "Recovery policy", detail: "Assign, chase, replan open work", state: "done" }),
-    agentFlowNode({ kind: "agent", label: "STRANDS AGENT · NOVA LITE", title: "Visible-evidence agent", detail: "Pixels → bounded findings", state: evidenceRan ? "done" : "waiting" }),
-    agentFlowNode({ kind: "scheduler", label: "AMAZON EVENTBRIDGE", title: "Deadline wake-up", detail: "Resume the checkpointed chase", state: schedulerRan ? "done" : "waiting" }),
-    agentFlowNode({ kind: "human", label: "BEFORENODECALL GATE", title: "Contractor judgment", detail: "Interpret, trade off, approve", state: pending ? "paused" : decisions > 0 ? "done" : "waiting" }),
-    agentFlowNode({ kind: "output", label: "OUTPUT", title: "Reinspection packet", detail: "Evidence + authority trail", state: packetDone ? "done" : "waiting" }),
+    agentFlowStage({
+      number: "01",
+      title: "Understand the notice",
+      cadence: "RUNS ONCE",
+      kind: "intake",
+      nodes: [
+        agentFlowNode({ kind: "input", label: "INPUT", title: "Failed-inspection notice", detail: "One redacted authority document", state: "done" }),
+        agentFlowNode({ kind: "agent", label: intakeLabel, title: "Notice intake", detail: "Exact language → typed citations", state: "done" }),
+        agentFlowNode({ kind: "policy", label: "DETERMINISTIC GRAPH", title: "Recovery policy", detail: "Assign, chase, and replan open work", state: "done" }),
+      ],
+    }),
+    agentFlowStage({
+      number: "02",
+      title: "Recover in the background",
+      cadence: "REPEATS UNTIL READY",
+      kind: "background",
+      nodes: [
+        agentFlowNode({ kind: "agent", label: "STRANDS AGENT · NOVA LITE", title: "Visible-evidence agent", detail: "Pixels → bounded findings", state: evidenceRan ? "done" : "waiting" }),
+        agentFlowNode({ kind: "scheduler", label: "AMAZON EVENTBRIDGE", title: "Deadline wake-up", detail: "Resume the checkpointed chase", state: schedulerRan ? "done" : "waiting" }),
+      ],
+    }),
+    agentFlowStage({
+      number: "03",
+      title: "Stop for authority",
+      cadence: "JUDGMENT ONLY",
+      kind: "authority",
+      nodes: [
+        agentFlowNode({ kind: "human", label: "BEFORENODECALL GATE", title: "Contractor judgment", detail: "Interpret, trade off, and approve", state: pending ? "paused" : decisions > 0 ? "done" : "waiting" }),
+        agentFlowNode({ kind: "output", label: "OUTPUT", title: "Reinspection packet", detail: "Evidence + authority trail", state: packetDone ? "done" : "waiting" }),
+      ],
+    }),
   );
 }
 

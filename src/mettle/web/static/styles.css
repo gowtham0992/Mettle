@@ -1126,13 +1126,22 @@ body:not(.tour-mode) .campaign-strip { min-height: 36px; padding-block: 6px; }
 .agent-flow__heading { display: flex; align-items: end; justify-content: space-between; gap: 28px; padding: 18px 20px; border-bottom: 1px solid var(--line-strong); }
 .agent-flow__heading h2 { margin: 4px 0 0; font-family: var(--serif); font-size: 23px; line-height: 1.1; letter-spacing: -.02em; }
 .agent-flow__heading > p { max-width: 46ch; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; text-align: right; }
-.agent-flow__track { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); margin: 0; padding: 18px; list-style: none; }
-.agent-flow__node { position: relative; z-index: 1; display: grid; align-content: start; gap: 7px; min-width: 0; min-height: 154px; padding: 14px 12px; border: 1px solid var(--line-strong); border-right: 0; background: var(--well); }
-.agent-flow__node:last-child { border-right: 1px solid var(--line-strong); }
-.agent-flow__node::after { content: "→"; position: absolute; z-index: 3; top: 50%; right: -11px; display: grid; width: 21px; height: 21px; place-items: center; border: 1px solid var(--line-strong); background: var(--paper); color: var(--orange-ink); font: 700 10px/1 var(--mono); transform: translateY(-50%); }
-.agent-flow__node:last-child::after { display: none; }
-.agent-flow__kind { min-height: 22px; color: var(--faint); font: 700 7px/1.35 var(--mono); letter-spacing: .6px; text-transform: uppercase; }
-.agent-flow__name { font-family: var(--serif); font-size: 15px; line-height: 1.1; }
+.agent-flow__track { display: grid; margin: 0; padding: 0; }
+.agent-flow__stage { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-width: 0; border-bottom: 1px solid var(--line-strong); }
+.agent-flow__stage:last-child { border-bottom: 0; }
+.agent-flow__stage-heading { position: relative; display: grid; align-content: center; gap: 7px; min-width: 0; padding: 22px 20px 22px 58px; border-right: 1px solid var(--line-strong); background: var(--strip); }
+.agent-flow__stage-heading::after { content: "↓"; position: absolute; left: 24px; bottom: -11px; z-index: 2; display: grid; width: 21px; height: 21px; place-items: center; border: 1px solid var(--line-strong); background: var(--paper); color: var(--orange-ink); font: 700 10px/1 var(--mono); }
+.agent-flow__stage:last-child .agent-flow__stage-heading::after { display: none; }
+.agent-flow__stage-number { position: absolute; top: 22px; left: 20px; color: var(--orange-ink); font: 700 10px/1 var(--mono); }
+.agent-flow__stage-title { font-family: var(--serif); font-size: 18px; line-height: 1.08; }
+.agent-flow__stage-cadence { color: var(--faint); font: 700 7px/1.25 var(--mono); letter-spacing: .7px; }
+.agent-flow__rail { display: grid; grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr) 34px minmax(0, 1fr); align-items: stretch; gap: 0; min-width: 0; padding: 16px; background: var(--card); }
+.agent-flow__stage--background .agent-flow__rail,
+.agent-flow__stage--authority .agent-flow__rail { grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr); }
+.agent-flow__node { display: grid; align-content: start; gap: 7px; min-width: 0; min-height: 116px; padding: 14px 16px; border: 1px solid var(--line-strong); background: var(--well); }
+.agent-flow__connector { display: grid; place-items: center; color: var(--orange-ink); font: 700 12px/1 var(--mono); }
+.agent-flow__kind { min-height: 18px; color: var(--faint); font: 700 7px/1.35 var(--mono); letter-spacing: .6px; text-transform: uppercase; }
+.agent-flow__name { font-family: var(--serif); font-size: 17px; line-height: 1.08; overflow-wrap: normal; word-break: normal; }
 .agent-flow__detail { color: var(--muted); font-size: 10px; line-height: 1.45; }
 .agent-flow__state { align-self: end; margin-top: auto; color: var(--faint); font: 700 7px/1.2 var(--mono); letter-spacing: .6px; }
 .agent-flow__node--agent { border-color: var(--charcoal); background: var(--charcoal); color: var(--paper); }
@@ -1240,9 +1249,14 @@ body[data-source-mode="workflow"] .demo-driver { display: none; }
   .judge-lens__title, .judge-lens__item { border-bottom: 1px solid var(--line); }
   .judge-lens__item:nth-child(2) { border-right: 0; }
   .judge-lens__item:nth-last-child(-n + 2) { border-bottom: 0; }
-  .agent-flow__track { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-  .agent-flow__node { border-right: 1px solid var(--line-strong); }
-  .agent-flow__node::after { display: none; }
+  .agent-flow__stage { grid-template-columns: 175px minmax(0, 1fr); }
+  .agent-flow__stage-heading { padding-inline: 48px 14px; }
+  .agent-flow__stage-number { left: 14px; }
+  .agent-flow__stage-heading::after { left: 18px; }
+  .agent-flow__rail { grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr) 26px minmax(0, 1fr); padding: 12px; }
+  .agent-flow__stage--background .agent-flow__rail,
+  .agent-flow__stage--authority .agent-flow__rail { grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr); }
+  .agent-flow__node { padding-inline: 12px; }
 }
 
 @media (max-width: 800px) {
@@ -1253,11 +1267,17 @@ body[data-source-mode="workflow"] .demo-driver { display: none; }
   .judge-lens__item:last-child { border-bottom: 0; }
   .agent-flow__heading { align-items: start; flex-direction: column; }
   .agent-flow__heading > p { text-align: left; }
-  .agent-flow__track { grid-template-columns: 1fr; gap: 0; padding: 14px; }
-  .agent-flow__node { min-height: 112px; border-bottom: 0; }
-  .agent-flow__node:last-child { border-bottom: 1px solid var(--line-strong); }
-  .agent-flow__node::after { content: "↓"; top: auto; right: 18px; bottom: -11px; display: grid; transform: none; }
-  .agent-flow__node:last-child::after { display: none; }
+  .agent-flow__stage { grid-template-columns: 1fr; }
+  .agent-flow__stage-heading { min-height: 82px; padding: 18px 18px 18px 54px; border-right: 0; border-bottom: 1px solid var(--line-strong); }
+  .agent-flow__stage-number { top: 20px; left: 18px; }
+  .agent-flow__stage-heading::after { left: auto; right: 18px; bottom: -11px; }
+  .agent-flow__rail,
+  .agent-flow__stage--background .agent-flow__rail,
+  .agent-flow__stage--authority .agent-flow__rail { grid-template-columns: 1fr; padding: 14px; }
+  .agent-flow__connector { min-height: 26px; }
+  .agent-flow__connector { font-size: 0; }
+  .agent-flow__connector::after { content: "↓"; font: 700 12px/1 var(--mono); }
+  .agent-flow__node { min-height: 108px; }
 }
 
 @media (max-width: 520px) {

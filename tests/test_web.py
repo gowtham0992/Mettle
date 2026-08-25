@@ -391,7 +391,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "How Mettle worked" in page.text
     assert "STRANDS GRAPHBUILDER" in page.text
     assert "SYSTEM PROVENANCE · READ ONLY" in page.text
-    assert "One recovery. Two model agents. Three hard stops." in page.text
+    assert "What runs, what wakes it, where it stops." in page.text
     assert 'id="agent-flow"' in page.text
     assert 'id="photo-mode-note"' in page.text
     assert "Mettle workspace" in page.text
@@ -415,6 +415,9 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function renderCorrectionSummary(data)" in script.text
     assert "function renderProvenance(data)" in script.text
     assert "function renderAgentFlow(data)" in script.text
+    assert "function agentFlowStage(" in script.text
+    assert 'title: "Recover in the background"' in script.text
+    assert 'title: "Stop for authority"' in script.text
     assert "const judgeLensByPhase" in script.text
     assert "function openWelcomeChooser()" in script.text
     assert "EventBridge wakes the deadline-chase graph" in script.text
