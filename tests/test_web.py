@@ -373,10 +373,12 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Recovery command center" in page.text
     assert "Start with the failed-inspection report" in page.text
     assert "Start a recovery" in page.text
-    assert "Judge mode" in page.text
-    assert "Contractor mode" in page.text
-    assert "Explore mode" in page.text
-    assert "JUDGE MODE · GUIDED 3-MINUTE RUN" in page.text
+    assert "Try a sample recovery" in page.text
+    assert "Start with my notice" in page.text
+    assert "Agent receipt" in page.text
+    assert "The browser never owns the agent runtime." in page.text
+    assert "Explore mode" not in page.text
+    assert "JUDGE GUIDE · SAME REAL PRODUCT" in page.text
     assert 'id="judge-lens-impact"' in page.text
     assert 'id="judge-tour"' in page.text
     assert 'id="tour-skip"' in page.text
@@ -387,17 +389,17 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Extract locally" in page.text
     assert "Approve & begin recovery" in page.text
     assert "Corrections" in page.text
-    assert "Inspection packet" in page.text
-    assert "How Mettle worked" in page.text
+    assert "Evidence & packet" in page.text
+    assert "Inspectable Strands run" in page.text
     assert "STRANDS GRAPHBUILDER" in page.text
-    assert "SYSTEM PROVENANCE · READ ONLY" in page.text
+    assert "RUN RECEIPT · SANITIZED · READ ONLY" in page.text
     assert "What runs, what wakes it, where it stops." in page.text
     assert 'id="agent-flow"' in page.text
     assert 'id="photo-mode-note"' in page.text
-    assert "Mettle workspace" in page.text
-    assert "Open work and decisions" in page.text
+    assert "Recovery navigation" in page.text
+    assert "What needs attention" in page.text
     assert "Proof, review, and release" in page.text
-    assert "Evaluator provenance" in page.text
+    assert "Inspectable Strands run" in page.text
     assert 'data-workspace-view="recovery"' in page.text
     assert 'data-workspace-panel="activity"' in page.text
     assert "Demonstration controls" in page.text

@@ -57,15 +57,15 @@
         <div class="skeleton skeleton--wide"></div><div class="skeleton"></div>
       </div>
 
-      <section class="judge-tour" id="judge-tour" aria-labelledby="tour-title" hidden>
+      <section class="judge-tour" id="judge-tour" aria-labelledby="tour-title" aria-modal="false" hidden>
         <header class="judge-tour__header">
           <div>
-            <p class="mono-label">JUDGE MODE · GUIDED 3-MINUTE RUN</p>
+            <p class="mono-label">JUDGE GUIDE · SAME REAL PRODUCT</p>
             <strong id="tour-progress-label">SCENE 1 OF 5</strong>
           </div>
           <div class="tour-header-actions">
             <button class="tour-skip" id="tour-skip" type="button" hidden>Skip animation</button>
-            <button class="tour-exit" id="tour-exit" type="button">Explore the full product <span aria-hidden="true">↗</span></button>
+            <button class="tour-exit" id="tour-exit" type="button">Exit guide <span aria-hidden="true">×</span></button>
           </div>
         </header>
 
@@ -99,7 +99,7 @@
         <div class="tour-stage">
           <div class="tour-stage__copy">
             <p class="mono-label" id="tour-eyebrow">NOTICE IN · RECOVERY OUT</p>
-            <h1 id="tour-title">One failed-inspection notice becomes an active recovery.</h1>
+            <h1 id="tour-title" tabindex="-1">One failed-inspection notice becomes an active recovery.</h1>
             <p id="tour-copy">Mettle derives the work from the authority’s own language and stops where professional interpretation begins.</p>
           </div>
 
@@ -121,17 +121,30 @@
         </footer>
       </section>
 
-      <nav class="workspace-nav" id="workspace-nav" aria-label="Mettle workspace" hidden>
+      <div class="product-workspace" id="product-workspace">
+      <nav class="workspace-nav" id="workspace-nav" aria-label="Recovery navigation" hidden>
         <button class="workspace-tab" type="button" data-workspace-tab="recovery" aria-current="page">
-          <strong>Corrections</strong><small>Open work and decisions</small>
+          <span class="workspace-tab__icon" aria-hidden="true">01</span><strong>Today</strong><small>What needs attention</small>
         </button>
         <button class="workspace-tab" type="button" data-workspace-tab="evidence">
-          <strong>Inspection packet</strong><small>Proof, review, and release</small>
+          <span class="workspace-tab__icon" aria-hidden="true">02</span><strong>Evidence & packet</strong><small>Proof, review, and release</small>
         </button>
         <button class="workspace-tab workspace-tab--provenance" type="button" data-workspace-tab="activity" aria-label="How Mettle worked">
-          <strong><span class="workspace-label-full">How Mettle worked</span><span class="workspace-label-short" aria-hidden="true">System</span></strong><small>Evaluator provenance</small>
+          <span class="workspace-tab__icon" aria-hidden="true">03</span><strong><span class="workspace-label-full">Agent receipt</span><span class="workspace-label-short" aria-hidden="true">Agents</span></strong><small>Inspectable Strands run</small>
         </button>
+        <div class="workspace-agent-status" aria-label="Background recovery status">
+          <span><i aria-hidden="true"></i> METTLE IS WORKING</span>
+          <strong>Open-only follow-up is armed.</strong>
+          <small>Closed corrections leave the chase automatically.</small>
+          <button type="button" data-open-agent-receipt>View agent receipt →</button>
+        </div>
+        <div class="workspace-nav__support">
+          <button type="button" id="nav-new-recovery">＋ New recovery</button>
+          <button type="button" id="nav-exit-sample">← Exit sample</button>
+        </div>
       </nav>
+
+      <div class="workspace-content">
 
       <section class="next-action" id="next-action" aria-labelledby="next-action-title" hidden>
         <div class="next-action__marker" aria-hidden="true">!</div>
@@ -150,8 +163,8 @@
         <section class="corrections-workspace" aria-labelledby="docket-title" data-workspace-panel="recovery">
           <header class="workspace-heading">
             <div>
-              <p class="mono-label">FAILED-INSPECTION RECOVERY</p>
-              <h1 id="docket-title">Corrections</h1>
+              <p class="mono-label">TODAY · FAILED-INSPECTION RECOVERY</p>
+              <h1 id="docket-title">Here’s what needs attention.</h1>
             </div>
             <div class="correction-summary" id="correction-summary" aria-live="polite"></div>
           </header>
@@ -236,9 +249,9 @@
         <section class="provenance-workspace" data-workspace-panel="activity">
           <header class="workspace-heading workspace-heading--provenance">
             <div>
-              <p class="mono-label">SYSTEM PROVENANCE · READ ONLY</p>
-              <h1>How Mettle worked</h1>
-              <p>Two model-driven Strands agents, deterministic graph operations, background scheduling, and explicit contractor authority—labelled without exposing private reasoning or runtime identifiers.</p>
+              <p class="mono-label">RUN RECEIPT · SANITIZED · READ ONLY</p>
+              <h1>What acted, what paused, and why.</h1>
+              <p>Inspectable Strands control flow, safe outputs, and contractor boundaries—without prompts, private reasoning, credentials, or runtime identifiers.</p>
             </div>
             <span class="agent-run__mode" id="agent-run-mode">SAMPLE TRACE</span>
           </header>
@@ -264,8 +277,37 @@
             <ol class="agent-nodes" id="agent-node-list" aria-label="Agent execution path"></ol>
             <ol id="event-list" class="event-list"></ol>
           </details>
+          <section class="aws-boundary" aria-labelledby="aws-boundary-title">
+            <header class="aws-boundary__header">
+              <div><p class="mono-label">DEPLOYED CLOUD PATH</p><h2 id="aws-boundary-title">The browser never owns the agent runtime.</h2></div>
+              <span>RECORDED ACCEPTANCE · SANITIZED</span>
+            </header>
+            <div class="aws-boundary__flow" aria-label="AWS request and agent runtime path">
+              <div><strong>CloudFront + WAF</strong><small>TLS · filtering</small></div><i aria-hidden="true">→</i>
+              <div><strong>Cognito PKCE</strong><small>Short-lived identity</small></div><i aria-hidden="true">→</i>
+              <div><strong>API Gateway</strong><small>JWT-protected route</small></div><i aria-hidden="true">→</i>
+              <div><strong>Lambda gateway</strong><small>Typed operations</small></div><i aria-hidden="true">→</i>
+              <div class="aws-boundary__agentcore"><strong>Bedrock AgentCore</strong><small>Strands · Nova Micro · Nova Lite</small></div>
+            </div>
+            <div class="aws-boundary__lower">
+              <div class="aws-wakeup">
+                <p class="mono-label">BACKGROUND WAKE-UP · BROWSER MAY CLOSE</p>
+                <ol><li><strong>EventBridge</strong><span>one-time checkpoint</span></li><li><strong>Private Lambda</strong><span>reject stale event</span></li><li><strong>AgentCore</strong><span>resume same session</span></li><li><strong>Strands chase</strong><span>open work only</span></li></ol>
+              </div>
+              <dl class="aws-proof">
+                <div><dt>AgentCore</dt><dd>Runtime READY</dd></div>
+                <div><dt>Scheduler</dt><dd>v1 fired · v2 armed</dd></div>
+                <div><dt>DLQ</dt><dd>Empty</dd></div>
+                <div><dt>Alarm</dt><dd>OK</dd></div>
+              </dl>
+            </div>
+            <p class="aws-boundary__note"><strong>Server-side only:</strong> DynamoDB session mapping, encrypted private S3 packets, model configuration, schedules, credentials, and object keys.</p>
+          </section>
           <p class="provenance-boundary"><strong>Not shown:</strong> prompts, chain-of-thought, credentials, storage URLs, private payloads, account identifiers, or inspector contact. Mettle shows bounded inputs, structured outputs, and enforceable safety decisions.</p>
         </section>
+      </div>
+
+      </div>
       </div>
 
       <details class="demo-driver">
@@ -294,23 +336,18 @@
           <div class="welcome-dialog__choices">
             <button class="entry-choice entry-choice--primary" id="start-tour-entry" type="button">
               <span class="entry-choice__index">01</span>
-              <span class="entry-choice__badge">RECOMMENDED · 3 MIN</span>
-              <strong>Judge mode</strong>
-              <span>Follow one failed inspection end to end, with the agent work and human boundaries explained in every scene.</span>
-              <span class="entry-choice__action">ENTER →</span>
+              <span class="entry-choice__badge">RECOMMENDED FOR JUDGES · 3 MIN</span>
+              <strong>Try a sample recovery</strong>
+              <span>Follow one complete job while the Judge Guide explains the agent work and human boundaries inside the real product.</span>
+              <span class="entry-choice__action">START →</span>
             </button>
             <button class="entry-choice" id="start-recovery-entry" type="button">
               <span class="entry-choice__index">02</span>
-              <strong>Contractor mode</strong>
-              <span>Paste a redacted report, add the responsible trades, and run the deployed recovery flow.</span>
-              <span class="entry-choice__action entry-choice__action--quiet">START →</span>
+              <strong>Start with my notice</strong>
+              <span>Paste a redacted correction report, add the responsible trades, and start the same recovery workspace.</span>
+              <span class="entry-choice__action entry-choice__action--quiet">CONTINUE →</span>
             </button>
-            <button class="entry-choice" id="try-sample-entry" type="button">
-              <span class="entry-choice__index">03</span>
-              <strong>Explore mode</strong>
-              <span>Open the synthetic contractor workspace directly and inspect every screen at your own pace.</span>
-              <span class="entry-choice__action entry-choice__action--quiet">OPEN →</span>
-            </button>
+            <button id="try-sample-entry" type="button" hidden>Open sample workspace</button>
             <button class="entry-choice entry-choice--resume" id="resume-current-entry" type="button" hidden>
               <span class="entry-choice__index">↩</span>
               <strong>Return to current recovery</strong>

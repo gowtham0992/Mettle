@@ -124,6 +124,9 @@ const elements = {
   reviewContactSummary: document.querySelector("#review-contact-summary"),
   correctionReviewList: document.querySelector("#correction-review-list"),
   approveCorrections: document.querySelector("#approve-corrections-button"),
+  agentReceiptButtons: [...document.querySelectorAll("[data-open-agent-receipt]")],
+  navNewRecovery: document.querySelector("#nav-new-recovery"),
+  navExitSample: document.querySelector("#nav-exit-sample"),
 };
 
 const stepLabels = [
@@ -203,20 +206,9 @@ function openWorkspacePanel(view, targetSelector, focusSelector = null) {
 }
 
 function setTourIsolation(active) {
-  for (const region of [elements.workspaceNav, elements.nextAction, elements.demoDriver, elements.awayBriefing, elements.dashboard]) {
-    if (active) {
-      region.hidden = true;
-      region.setAttribute("inert", "");
-      region.setAttribute("aria-hidden", "true");
-    } else {
-      region.removeAttribute("inert");
-      region.removeAttribute("aria-hidden");
-    }
-  }
-  if (!active && campaign) {
+  elements.demoDriver.hidden = active;
+  if (campaign) {
     elements.workspaceNav.hidden = false;
-    elements.nextAction.hidden = false;
-    elements.demoDriver.hidden = false;
     elements.dashboard.hidden = false;
     renderBackgroundBrief(campaign);
   }
@@ -243,7 +235,7 @@ function setJudgeTourActive(active, { updateUrl = false, focus = true } = {}) {
   if (judgeTourActive && campaign) renderJudgeTour(campaign);
   if (focus) {
     window.setTimeout(() => {
-      if (judgeTourActive) elements.tourAction.focus();
+      if (judgeTourActive) elements.tourTitle.focus();
       else elements.workspaceTabs.find((tab) => tab.dataset.workspaceTab === activeWorkspaceView)?.focus();
     }, 0);
   }
@@ -275,6 +267,7 @@ function clearAuth() {
 function updateAuthControl() {
   if (!authConfig?.cognito_domain || !authConfig?.cognito_client_id) {
     elements.auth.hidden = true;
+    document.body.classList.remove("is-authenticated");
     return;
   }
   if (accessToken && !tokenIsCurrent(accessToken)) {
@@ -282,7 +275,11 @@ function updateAuthControl() {
     return;
   }
   elements.auth.hidden = false;
+  document.body.classList.toggle("is-authenticated", Boolean(accessToken));
   elements.auth.textContent = accessToken ? "Sign out" : "Sign in";
+  elements.auth.title = accessToken
+    ? "Signed in · live AgentCore recoveries use this same workspace"
+    : "Sign in to unlock the authenticated AgentCore recovery path";
 }
 
 async function beginLogin() {
@@ -2599,6 +2596,16 @@ for (const tab of elements.workspaceTabs) {
   tab.addEventListener("click", () => setWorkspaceView(tab.dataset.workspaceTab, { updateUrl: true }));
 }
 
+for (const button of elements.agentReceiptButtons) {
+  button.addEventListener("click", () => setWorkspaceView("activity", { updateUrl: true, focusTab: true }));
+}
+
+elements.navNewRecovery?.addEventListener("click", () => openRecoverySetup());
+elements.navExitSample?.addEventListener("click", () => {
+  setupReturnsToWelcome = false;
+  openWelcomeChooser();
+});
+
 window.addEventListener("popstate", () => {
   const tourFromUrl = new URLSearchParams(window.location.search).get("tour") === "1";
   setJudgeTourActive(tourFromUrl, { focus: false });
@@ -2654,7 +2661,7 @@ elements.startTourEntry.addEventListener("click", async () => {
   } finally {
     setBusy(elements.startTourEntry, false);
   }
-  elements.tourAction.focus();
+  elements.tourTitle.focus();
 });
 
 elements.trySampleEntry.addEventListener("click", async () => {
