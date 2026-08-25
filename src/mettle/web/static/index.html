@@ -102,181 +102,154 @@
         </footer>
       </section>
 
-      <nav class="workspace-nav" id="workspace-nav" aria-label="Recovery workspace" hidden>
+      <nav class="workspace-nav" id="workspace-nav" aria-label="Mettle workspace" hidden>
         <button class="workspace-tab" type="button" data-workspace-tab="recovery" aria-current="page">
-          <span>01</span><strong>Recovery</strong><small>What needs attention now</small>
+          <strong>Corrections</strong><small>Open work and decisions</small>
         </button>
         <button class="workspace-tab" type="button" data-workspace-tab="evidence">
-          <span>02</span><strong>Evidence &amp; packet</strong><small>Proof and reinspection handoff</small>
+          <strong>Inspection packet</strong><small>Proof, review, and release</small>
         </button>
-        <button class="workspace-tab" type="button" data-workspace-tab="activity">
-          <span>03</span><strong>Agent activity</strong><small>Handoffs and execution trace</small>
+        <button class="workspace-tab workspace-tab--provenance" type="button" data-workspace-tab="activity" aria-label="How Mettle worked">
+          <strong><span class="workspace-label-full">How Mettle worked</span><span class="workspace-label-short" aria-hidden="true">System</span></strong><small>Evaluator provenance</small>
         </button>
       </nav>
 
       <section class="next-action" id="next-action" aria-labelledby="next-action-title" hidden>
-        <div class="next-action__marker" aria-hidden="true">→</div>
+        <div class="next-action__marker" aria-hidden="true">!</div>
         <div class="next-action__body">
-          <p class="mono-label" id="next-action-eyebrow">YOUR NEXT MOVE</p>
+          <p class="mono-label" id="next-action-eyebrow">ACTION REQUIRED</p>
           <h1 id="next-action-title">Review the recovery</h1>
           <p id="next-action-copy">Mettle will keep one consequential action in front of you.</p>
         </div>
         <div class="next-action__control">
-          <button class="button button--orange" id="next-action-button" type="button">Continue</button>
+          <button class="button button--light" id="next-action-button" type="button">Continue</button>
           <span id="next-action-meta">CONTRACTOR CONTROLLED</span>
         </div>
       </section>
 
-      <details class="demo-driver">
-        <summary>
-          <span class="demo-driver__tag" id="driver-tag">SAMPLE</span>
-          <span id="demo-step">0 · OPENING CAMPAIGN</span>
-          <span class="demo-driver__label">Sample controls</span>
-        </summary>
-        <div class="demo-driver__actions" aria-label="Sample campaign controls">
-          <button class="demo-button" id="load-notice-button" type="button" aria-label="Start a new recovery">＋ <span>NEW RECOVERY</span></button>
-          <button class="demo-button" id="reset-button" type="button" title="Reset sample (R)">↺ <span>RESET SAMPLE</span></button>
-          <button class="demo-button demo-button--next" id="advance-button" type="button"><span>Compress background recovery</span><span aria-hidden="true">TIME ▶</span></button>
-        </div>
-      </details>
-
-      <section class="away-briefing" id="away-briefing" aria-labelledby="away-briefing-title" data-workspace-only="recovery" hidden>
-        <div class="away-briefing__intro">
-          <p class="mono-label" id="away-briefing-mode">Background recovery brief</p>
-          <h2 id="away-briefing-title">Mettle worked while you were away</h2>
-          <p id="away-briefing-copy">Only state-grounded work from this recovery appears here.</p>
-        </div>
-        <ol class="away-briefing__list" id="away-briefing-list"></ol>
-        <div class="away-briefing__metric" aria-label="Autonomous actions absorbed">
-          <strong id="away-briefing-actions">0</strong>
-          <span>autonomous actions absorbed</span>
-        </div>
-      </section>
-
       <div id="dashboard" class="dashboard" hidden>
-        <section class="main-column" aria-labelledby="docket-title" data-workspace-panel="recovery">
-          <div class="section-heading">
-            <div><span class="section-index">01</span><h1 id="docket-title">Citation dockets</h1></div>
-            <span class="section-heading__meta">NOTICE-ANCHORED · ZERO PROJECT SETUP</span>
-          </div>
+        <section class="corrections-workspace" aria-labelledby="docket-title" data-workspace-panel="recovery">
+          <header class="workspace-heading">
+            <div>
+              <p class="mono-label">FAILED-INSPECTION RECOVERY</p>
+              <h1 id="docket-title">Corrections</h1>
+            </div>
+            <div class="correction-summary" id="correction-summary" aria-live="polite"></div>
+          </header>
           <div id="citation-list" class="citation-list"></div>
-
-          <section class="absorbed" aria-labelledby="absorbed-title">
-            <p class="mono-label" id="absorbed-title">WHAT METTLE ABSORBED — THIS RECOVERY RUN</p>
-            <dl id="metrics-list" class="metrics-list"></dl>
+          <div id="judgment-list" class="judgment-list workspace-judgments"></div>
+          <details class="away-briefing" id="away-briefing" hidden>
+            <summary>
+              <span id="away-briefing-title">Background activity</span>
+              <span id="away-briefing-copy">Only state-grounded work from this recovery appears here.</span>
+            </summary>
+            <div class="away-briefing__body">
+              <div class="away-briefing__intro">
+                <p class="mono-label" id="away-briefing-mode">Background recovery</p>
+                <strong><span id="away-briefing-actions">0</span> actions handled</strong>
+              </div>
+              <ol class="away-briefing__list" id="away-briefing-list"></ol>
+            </div>
+          </details>
+          <span id="judgment-count" hidden>0</span>
+          <dl id="metrics-list" class="metrics-list" hidden></dl>
+          <section class="recovery-clock" id="recovery-clock" hidden>
+            <div id="clock-track"></div><strong id="clock-title"></strong><p id="clock-copy"></p>
+            <button id="clock-action" type="button">Compress to next checkpoint</button>
           </section>
         </section>
 
-        <aside class="side-column" aria-label="Decisions, packet, and recovery log">
-          <section class="panel judgment-panel" data-workspace-panel="recovery">
-            <div class="panel__header">
-              <div><span class="section-index">02</span><h2>Needs you</h2></div>
-              <span class="count-badge" id="judgment-count">0</span>
+        <section class="packet-workspace" data-workspace-panel="evidence">
+          <header class="workspace-heading workspace-heading--packet">
+            <div>
+              <p class="mono-label">CONTRACTOR-REVIEWED HANDOFF</p>
+              <h1>Reinspection packet</h1>
+              <p>Mettle assembles the evidence. The contractor reviews and releases it.</p>
             </div>
-            <p class="panel__kicker">JUDGMENT INBOX · METTLE INTERRUPTS ONLY WHEN IT MUST</p>
-            <div id="judgment-list" class="judgment-list"></div>
-          </section>
-
-          <section class="panel recovery-clock" id="recovery-clock" data-workspace-panel="recovery" hidden>
-            <div class="panel__header">
-              <div><span class="section-index">03</span><h2>Recovery clock</h2></div>
-              <span class="recovery-clock__mode">AUTONOMOUS</span>
-            </div>
-            <p class="panel__kicker">DEADLINE-AWARE CAMPAIGN · OPEN CITATIONS ONLY</p>
-            <div class="clock-track" id="clock-track" aria-label="Recovery campaign checkpoints"></div>
-            <div class="clock-brief" aria-live="polite">
-              <strong id="clock-title">Waiting for a recovery run</strong>
-              <p id="clock-copy">Mettle will choose the next scheduled checkpoint from the reinspection deadline.</p>
-            </div>
-            <button class="button clock-action" id="clock-action" type="button">Compress to next checkpoint</button>
-            <p class="clock-note">DEMO TIME CONTROL · EVENTBRIDGE ADVANCES THE AUTHENTICATED RUN</p>
-          </section>
-
-          <section class="panel evidence-panel" id="evidence-panel" data-workspace-panel="evidence" hidden>
-            <div class="panel__header">
-              <div><span class="section-index">04</span><h2>Evidence review</h2></div>
-              <span class="evidence-panel__mode">VISIBLE PROOF</span>
-            </div>
-            <form class="photo-evidence" id="photo-evidence-form">
-              <div class="photo-evidence__copy">
-                <p class="panel__kicker">ASSESS A REAL JOB-SITE PHOTO</p>
-                <strong>Notice-anchored visual check</strong>
-                <span>JPEG or PNG · 5 MB max · Mettle checks visible proof, never code compliance</span>
+            <strong id="packet-status" class="packet-stamp">LOCKED</strong>
+          </header>
+          <div class="packet-layout">
+            <section class="packet-primary" aria-labelledby="packet-coverage-title">
+              <div class="packet-section-heading">
+                <div><p class="mono-label">EVIDENCE COVERAGE</p><h2 id="packet-coverage-title">What is ready</h2></div>
+                <strong id="packet-readiness">0 OF 0 READY</strong>
               </div>
-              <label>
-                <span>Citation</span>
-                <select id="photo-citation" aria-label="Citation for uploaded photo"></select>
-              </label>
-              <label class="photo-evidence__file">
-                <span>Photo</span>
-                <input id="photo-file" type="file" accept="image/jpeg,image/png">
-              </label>
-              <button class="button button--orange" id="photo-submit" type="submit" disabled>Assess with Bedrock Vision</button>
-              <p class="photo-evidence__mode" id="photo-mode-note">Start a recovery to assess a real photo. The fixtures below replay recorded synthetic outcomes.</p>
-              <p class="photo-evidence__error" id="photo-error" role="alert" hidden></p>
-            </form>
-            <details class="demo-evidence" id="demo-evidence">
-              <summary>Open synthetic evidence for demo use</summary>
-              <p class="panel__kicker">RELIABLE FIXTURES · NEVER PRESENTED AS JOB-SITE EVIDENCE</p>
-              <div class="evidence-fixtures">
-              <article class="evidence-fixture">
-                <img src="/static/evidence/panel-closeup-insufficient.png" alt="Synthetic close-up of an electrical panel that does not show working clearance">
-                <div><strong>Tight close-up</strong><span>No scale or full working area</span></div>
-                <button class="button button--outline evidence-submit" type="button" data-sample="panel_closeup_insufficient">Assess close-up</button>
-              </article>
-              <article class="evidence-fixture">
-                <img src="/static/evidence/panel-wide-measured.png" alt="Synthetic wide view of an electrical panel with a tape measure showing clearance">
-                <div><strong>Wide + measured</strong><span>Full panel area and visible scale</span></div>
-                <button class="button evidence-submit" type="button" data-sample="panel_wide_measured">Assess wide photo</button>
-              </article>
-              <article class="evidence-fixture">
-                <img src="/static/evidence/framing-plates-complete.png" alt="Synthetic framing wall showing installed protection plates and wall context">
-                <div><strong>Framing plates</strong><span>Close detail + corrected wall context</span></div>
-                <button class="button evidence-submit" type="button" data-citation="2" data-sample="framing_plates_complete">Assess framing photo</button>
-              </article>
-              <article class="evidence-fixture">
-                <img src="/static/evidence/mechanical-access-wide.png" alt="Synthetic wide view of mechanical equipment with clear service access and open panel">
-                <div><strong>Mechanical access</strong><span>Wide clearance + open service panel</span></div>
-                <button class="button evidence-submit" type="button" data-citation="3" data-sample="mechanical_access_wide" data-requires-decision="true">Assess mechanical photo</button>
-              </article>
+              <div id="packet-list" class="packet-list"></div>
+              <div class="packet-preview" id="packet-preview" hidden></div>
+              <div class="packet-judgment" id="packet-judgment"></div>
+              <div class="packet-release">
+                <p id="packet-note">Nothing is released until the contractor approves it.</p>
+                <button class="button button--orange packet-action" id="packet-action" type="button" hidden>Prepare packet for approval</button>
               </div>
-            </details>
-            <div class="evidence-result" id="evidence-result" aria-live="polite" hidden></div>
-          </section>
+            </section>
 
-          <section class="panel packet-panel" data-workspace-panel="evidence">
-            <div class="panel__header">
-              <div><span class="section-index">05</span><h2>Reinspection packet</h2></div>
-              <strong id="packet-status" class="packet-stamp">LOCKED</strong>
-            </div>
-            <div id="packet-list" class="packet-list"></div>
-            <div class="packet-preview" id="packet-preview" hidden></div>
-            <p class="packet-note" id="packet-note">Assembles as evidence is accepted. Nothing reaches the inspector until you approve it.</p>
-            <button class="button packet-action" id="packet-action" type="button" hidden>Prepare packet for approval</button>
-          </section>
+            <section class="evidence-panel" id="evidence-panel" aria-labelledby="evidence-title" hidden>
+              <div class="packet-section-heading">
+                <div><p class="mono-label">ADD OR TEST PROOF</p><h2 id="evidence-title">Visible-evidence check</h2></div>
+                <span class="evidence-panel__mode">NO CODE CERTIFICATION</span>
+              </div>
+              <form class="photo-evidence" id="photo-evidence-form">
+                <div class="photo-evidence__copy">
+                  <strong>Assess a job-site photo against the notice</strong>
+                  <span>JPEG or PNG · 5 MB max · ambiguous proof returns to the contractor</span>
+                </div>
+                <label><span>Correction</span><select id="photo-citation" aria-label="Correction for uploaded photo"></select></label>
+                <label class="photo-evidence__file"><span>Photo</span><input id="photo-file" type="file" accept="image/jpeg,image/png"></label>
+                <button class="button button--orange" id="photo-submit" type="submit" disabled>Assess with Bedrock Vision</button>
+                <p class="photo-evidence__mode" id="photo-mode-note">Start a recovery to assess a real photo.</p>
+                <p class="photo-evidence__error" id="photo-error" role="alert" hidden></p>
+              </form>
+              <details class="demo-evidence" id="demo-evidence">
+                <summary>Open synthetic proof fixtures</summary>
+                <p class="panel__kicker">RECORDED FIXTURES · NEVER PRESENTED AS LIVE JOB-SITE EVIDENCE</p>
+                <div class="evidence-fixtures">
+                  <article class="evidence-fixture"><img src="/static/evidence/panel-closeup-insufficient.png" alt="Synthetic close-up of an electrical panel that does not show working clearance"><div><strong>Tight close-up</strong><span>No scale or full working area</span></div><button class="button button--outline evidence-submit" type="button" data-sample="panel_closeup_insufficient">Assess close-up</button></article>
+                  <article class="evidence-fixture"><img src="/static/evidence/panel-wide-measured.png" alt="Synthetic wide view of an electrical panel with a tape measure showing clearance"><div><strong>Wide + measured</strong><span>Full panel area and visible scale</span></div><button class="button evidence-submit" type="button" data-sample="panel_wide_measured">Assess wide photo</button></article>
+                  <article class="evidence-fixture"><img src="/static/evidence/framing-plates-complete.png" alt="Synthetic framing wall showing installed protection plates and wall context"><div><strong>Framing plates</strong><span>Corrected wall context</span></div><button class="button evidence-submit" type="button" data-citation="2" data-sample="framing_plates_complete">Assess framing photo</button></article>
+                  <article class="evidence-fixture"><img src="/static/evidence/mechanical-access-wide.png" alt="Synthetic wide view of mechanical equipment with clear service access"><div><strong>Mechanical access</strong><span>Wide clearance and service area</span></div><button class="button evidence-submit" type="button" data-citation="3" data-sample="mechanical_access_wide" data-requires-decision="true">Assess mechanical photo</button></article>
+                </div>
+              </details>
+              <div class="evidence-result" id="evidence-result" aria-live="polite" hidden></div>
+            </section>
+          </div>
+        </section>
 
-          <section class="panel log-panel agent-run-panel" data-workspace-panel="activity">
-            <div class="panel__header">
-              <div><span class="section-index">06</span><h2>Strands graph run</h2></div>
-              <span class="agent-run__mode" id="agent-run-mode">SAMPLE TRACE</span>
+        <section class="provenance-workspace" data-workspace-panel="activity">
+          <header class="workspace-heading workspace-heading--provenance">
+            <div>
+              <p class="mono-label">SYSTEM PROVENANCE · READ ONLY</p>
+              <h1>How Mettle worked</h1>
+              <p>Two model-driven Strands agents, deterministic graph operations, background scheduling, and explicit contractor authority—labelled without exposing private reasoning or runtime identifiers.</p>
             </div>
-            <p class="panel__kicker">GRAPHBUILDER NODES · SPECIALIST HANDOFFS · BEFORENODECALL INTERRUPTS</p>
+            <span class="agent-run__mode" id="agent-run-mode">SAMPLE TRACE</span>
+          </header>
+          <div class="provenance-legend" aria-label="Execution role legend">
+            <span><i class="legend-agent"></i>Strands agent · model call</span>
+            <span><i class="legend-policy"></i>Deterministic graph operation</span>
+            <span><i class="legend-human"></i>Human judgment gate</span>
+          </div>
+          <ol class="provenance-steps" id="provenance-steps"></ol>
+          <details class="technical-trace">
+            <summary>Open technical Strands execution trace</summary>
             <div class="agent-run__engine" aria-label="Strands orchestration topology">
-              <span>STRANDS GRAPHBUILDER</span>
-              <code id="agent-run-topology">recovery → deadline_chase</code>
-              <span id="agent-run-hooks">3 HOOK-GATED DECISIONS</span>
+              <span>STRANDS GRAPHBUILDER</span><code id="agent-run-topology">recovery → deadline_chase</code><span id="agent-run-hooks">3 HOOK-GATED DECISIONS</span>
             </div>
-            <div class="agent-run__summary">
-              <strong id="agent-run-summary">Mettle is coordinating the recovery across specialist agents.</strong>
-              <span id="agent-run-detail">Every displayed step is bounded by notice language and recorded without exposing prompts or private payloads.</span>
-            </div>
+            <div class="agent-run__summary"><strong id="agent-run-summary"></strong><span id="agent-run-detail"></span></div>
             <ol class="agent-nodes" id="agent-node-list" aria-label="Agent execution path"></ol>
             <ol id="event-list" class="event-list"></ol>
-          </section>
-
-          <p class="safety-note" data-workspace-panel="activity"><span aria-hidden="true">◆</span>Mettle cites the notice. It never certifies code compliance or contacts the inspector without approval.</p>
-        </aside>
+          </details>
+          <p class="provenance-boundary"><strong>Not shown:</strong> prompts, chain-of-thought, credentials, storage URLs, private payloads, account identifiers, or inspector contact. Mettle shows bounded inputs, structured outputs, and enforceable safety decisions.</p>
+        </section>
       </div>
+
+      <details class="demo-driver">
+        <summary><span class="demo-driver__tag" id="driver-tag">SAMPLE</span><span id="demo-step">0 · OPENING CAMPAIGN</span><span class="demo-driver__label">Demonstration controls</span></summary>
+        <div class="demo-driver__actions" aria-label="Sample campaign controls">
+          <button class="demo-button" id="load-notice-button" type="button" aria-label="Start a new recovery">＋ <span>NEW RECOVERY</span></button>
+          <button class="demo-button" id="reset-button" type="button" title="Reset sample (R)" aria-label="Reset sample">↺ <span>RESET SAMPLE</span></button>
+          <button class="demo-button demo-button--next" id="advance-button" type="button" aria-label="Compress background recovery"><span>Compress background recovery</span><span aria-hidden="true">TIME ▶</span></button>
+        </div>
+      </details>
     </main>
 
     <dialog class="welcome-dialog" id="welcome-dialog" aria-labelledby="welcome-title">

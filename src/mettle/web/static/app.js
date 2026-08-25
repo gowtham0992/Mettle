@@ -47,6 +47,7 @@ const elements = {
   progressLabel: document.querySelector("#progress-label"),
   progressBar: document.querySelector("#progress-bar"),
   asOf: document.querySelector("#as-of-date"),
+  correctionSummary: document.querySelector("#correction-summary"),
   citations: document.querySelector("#citation-list"),
   events: document.querySelector("#event-list"),
   agentRunMode: document.querySelector("#agent-run-mode"),
@@ -74,10 +75,13 @@ const elements = {
   photoError: document.querySelector("#photo-error"),
   metrics: document.querySelector("#metrics-list"),
   packet: document.querySelector("#packet-status"),
+  packetReadiness: document.querySelector("#packet-readiness"),
   packetList: document.querySelector("#packet-list"),
   packetPreview: document.querySelector("#packet-preview"),
+  packetJudgment: document.querySelector("#packet-judgment"),
   packetNote: document.querySelector("#packet-note"),
   packetAction: document.querySelector("#packet-action"),
+  provenanceSteps: document.querySelector("#provenance-steps"),
   demoStep: document.querySelector("#demo-step"),
   driverTag: document.querySelector("#driver-tag"),
   advance: document.querySelector("#advance-button"),
@@ -171,6 +175,10 @@ function setWorkspaceView(view, { updateUrl = false, focusTab = false } = {}) {
     if (active) tab.setAttribute("aria-current", "page");
     else tab.removeAttribute("aria-current");
     if (active && focusTab) tab.focus();
+  }
+  if (elements.nextAction.dataset.actionVisible) {
+    elements.nextAction.hidden = elements.nextAction.dataset.actionVisible !== "true"
+      || elements.nextAction.dataset.actionView !== nextView;
   }
   if (updateUrl) {
     const url = new URL(window.location.href);
@@ -850,9 +858,15 @@ function configureNextAction(data) {
   const isWorkflow = data.source_mode === "workflow";
   const pending = data.judgments.filter((item) => item.status === "pending");
   const openCitation = data.citations.find((item) => item.stage !== "ready");
-  elements.nextAction.hidden = false;
+  const actionView = pending[0]?.kind === "final_packet_approval"
+    || (!openCitation && ["blocked", "awaiting_approval", "approved"].includes(data.packet_status))
+    ? "evidence"
+    : "recovery";
+  elements.nextAction.dataset.actionView = actionView;
+  elements.nextAction.dataset.actionVisible = "true";
+  elements.nextAction.hidden = activeWorkspaceView !== actionView;
   elements.nextAction.classList.toggle("next-action--sample", !isWorkflow);
-  elements.nextActionEyebrow.textContent = isWorkflow ? "YOUR NEXT MOVE" : "SAMPLE CAMPAIGN";
+  elements.nextActionEyebrow.textContent = pending.length ? "ACTION REQUIRED" : "NEXT STEP";
   elements.nextActionMeta.textContent = isWorkflow ? "ONE ACTION · CONTRACTOR CONTROLLED" : "SYNTHETIC DATA · 90 SECONDS";
 
   if (isWorkflow && data.correction_review_required) {
@@ -872,12 +886,13 @@ function configureNextAction(data) {
     } else if (pending.length) {
       elements.nextActionTitle.textContent = "Make the one decision Mettle cannot";
       elements.nextActionCopy.textContent = pending[0].question;
-      elements.nextActionButton.textContent = "Review decision";
-      nextActionHandler = () => openWorkspacePanel("recovery", ".judgment-panel", ".judgment input");
+      elements.nextActionButton.textContent = pending[0].citation_id ? "Go to correction" : "Review decision";
+      nextActionHandler = pending[0].citation_id
+        ? () => openWorkspacePanel("recovery", ".citation--needs-action", ".citation--needs-action .judgment input")
+        : () => openWorkspacePanel("recovery", "#judgment-list", "#judgment-list .judgment input");
     } else {
-      elements.nextActionTitle.textContent = "Compress the background recovery";
-      elements.nextActionCopy.textContent = "Advance the disclosed synthetic clock and watch Mettle handle days of evidence chasing, replanning, and escalation.";
-      elements.nextActionButton.textContent = "Compress time";
+      elements.nextAction.dataset.actionVisible = "false";
+      elements.nextAction.hidden = true;
       nextActionHandler = () => elements.advance.click();
     }
     return;
@@ -887,7 +902,11 @@ function configureNextAction(data) {
     elements.nextActionTitle.textContent = pending[0].kind === "final_packet_approval" ? "Approve the final packet" : "Resolve the blocked decision";
     elements.nextActionCopy.textContent = pending[0].question;
     elements.nextActionButton.textContent = "Review decision";
-    nextActionHandler = () => openWorkspacePanel("recovery", ".judgment-panel", ".judgment input");
+    nextActionHandler = pending[0].kind === "final_packet_approval"
+      ? () => openWorkspacePanel("evidence", "#packet-judgment", "#packet-judgment .judgment input")
+      : pending[0].citation_id
+        ? () => openWorkspacePanel("recovery", ".citation--needs-action", ".citation--needs-action .judgment input")
+        : () => openWorkspacePanel("recovery", "#judgment-list", "#judgment-list .judgment input");
   } else if (openCitation) {
     elements.nextActionTitle.textContent = `Collect proof for C${openCitation.citation_id}`;
     elements.nextActionCopy.textContent = openCitation.stage === "evidence_rejected"
@@ -933,30 +952,93 @@ function conditionFor(data) {
   return ["ON TRACK", "normal"];
 }
 
-function renderCitation(citation) {
-  const card = node("article", "citation");
-  card.append(node("div", "citation__number", `C${citation.citation_id}`));
+const citationEvidenceImages = {
+  ready: {
+    "1": "/static/evidence/panel-wide-measured.png",
+    "2": "/static/evidence/framing-plates-complete.png",
+    "3": "/static/evidence/mechanical-access-wide.png",
+  },
+  evidence_rejected: {
+    "1": "/static/evidence/panel-closeup-insufficient.png",
+    "2": "/static/evidence/framing-closeup-insufficient.png",
+  },
+};
 
-  const body = node("div", "citation__body");
-  body.append(node("p", "citation__code", `${citation.code_reference} · ${titleCase(citation.trade)}`));
-  body.append(node("p", "citation__finding", `“${citation.notice_text}”`));
+function correctionStatus(citation) {
+  return {
+    ready: ["PROOF ACCEPTED", "Proof is ready for packet assembly."],
+    awaiting_evidence: ["AWAITING TRADE", "Mettle is waiting for the requested proof."],
+    evidence_rejected: ["REPLACEMENT REQUESTED", "Mettle requested the one missing visible element."],
+    needs_judgment: ["YOUR DECISION", "Mettle stopped instead of inventing a requirement."],
+  }[citation.stage] || ["OPEN", "This correction remains open."];
+}
 
+function renderCorrectionSummary(data) {
+  const total = data.citations.length;
+  const ready = data.citations.filter((citation) => citation.stage === "ready").length;
+  const chasing = data.citations.filter((citation) => ["awaiting_evidence", "evidence_rejected"].includes(citation.stage)).length;
+  const needsYou = data.judgments.filter((judgment) => judgment.status === "pending" && judgment.kind !== "final_packet_approval").length;
+  elements.correctionSummary.replaceChildren(
+    node("span", "", `${total} corrections`),
+    node("strong", "summary-ready", `${ready} proof accepted`),
+    node("span", "", `${chasing} awaiting trade`),
+    node("strong", needsYou ? "summary-action" : "", `${needsYou} need you`),
+  );
+}
+
+function renderCitation(citation, data) {
+  const judgment = data.judgments.find(
+    (item) => item.status === "pending" && String(item.citation_id || "") === String(citation.citation_id),
+  );
+  const [statusLabel, nextStep] = correctionStatus(citation);
+  const card = node("article", `citation${judgment ? " citation--needs-action" : ""}`);
+  card.id = `correction-${citation.citation_id}`;
+
+  const summary = node("div", "citation__summary");
+  summary.append(node("div", "citation__number", `C${citation.citation_id}`));
+  const identity = node("div", "citation__identity");
+  identity.append(
+    node("p", "citation__code", `${titleCase(citation.trade)} · ${citation.code_reference}`),
+    node("p", "citation__finding", `“${citation.notice_text}”`),
+  );
+  summary.append(identity);
+
+  const operations = node("div", "citation__operations");
+  operations.append(
+    node("strong", "", citation.assignee || "Unassigned · contractor direction required"),
+    node("span", "", nextStep),
+  );
+  summary.append(operations);
+
+  const proof = node("div", "citation__proof");
+  const imagePath = citationEvidenceImages[citation.stage]?.[citation.citation_id];
+  if (imagePath) {
+    const image = document.createElement("img");
+    image.src = imagePath;
+    image.alt = citation.stage === "ready"
+      ? `Accepted synthetic proof for correction ${citation.citation_id}`
+      : `Returned synthetic proof for correction ${citation.citation_id}`;
+    proof.append(image);
+  }
+  proof.append(node("span", `status status--${citation.stage}`, statusLabel));
+  summary.append(proof);
+  card.append(summary);
+
+  const details = node("details", "citation__details");
+  details.append(node("summary", "", "View notice and proof record"));
+  const record = node("div", "citation__record");
   const requirements = node("ul", "citation__requirements");
   for (const requirement of citation.evidence_requirements) requirements.append(node("li", "", requirement));
-  if (requirements.children.length) body.append(requirements);
+  if (!requirements.children.length) requirements.append(node("li", "", "The notice does not define observable proof; contractor instruction is required."));
+  record.append(requirements, node("p", "citation__record-note", citation.evidence_note || nextStep));
+  details.append(record);
+  card.append(details);
 
-  const ownership = citation.assignee || "Waiting for contractor judgment";
-  const note = citation.evidence_note ? ` · ${citation.evidence_note}` : "";
-  body.append(node("p", "citation__meta", `${ownership}${note}`));
-  card.append(body);
-
-  const labels = {
-    ready: "ACCEPTED",
-    awaiting_evidence: "AWAITING EVIDENCE",
-    evidence_rejected: "REJECTED",
-    needs_judgment: "NEEDS YOU",
-  };
-  card.append(node("span", `status status--${citation.stage}`, labels[citation.stage]));
+  if (judgment) {
+    const decision = node("div", "citation__decision");
+    decision.append(renderJudgment(judgment));
+    card.append(decision);
+  }
   return card;
 }
 
@@ -973,17 +1055,17 @@ function renderEvent(event) {
 }
 
 const graphNodeDetails = {
-  intake: ["Intake agent", "Ground correction notice"],
-  plan: ["Recovery planner", "Derive bounded campaign plan"],
+  intake: ["Notice intake boundary", "Ground correction notice"],
+  plan: ["Deterministic planner", "Derive bounded campaign plan"],
   review_gate: ["Contractor gate", "BeforeNodeCall · correction-review"],
-  coordinate: ["Coordination agent", "Route notice-anchored outreach"],
+  coordinate: ["Coordination policy", "Route notice-anchored outreach"],
   judgment_gate: ["Contractor gate", "BeforeNodeCall · contractor-judgment"],
-  coordinate_decision: ["Coordination agent", "Resume with approved boundary"],
-  finish: ["Recovery orchestrator", "Checkpoint recovery graph"],
-  replan_open: ["Recovery planner", "Replan open citations only"],
-  follow_up: ["Coordination agent", "Escalate unresolved trades"],
+  coordinate_decision: ["Coordination policy", "Resume with approved boundary"],
+  finish: ["Deterministic orchestrator", "Checkpoint recovery graph"],
+  replan_open: ["Deterministic planner", "Replan open citations only"],
+  follow_up: ["Coordination policy", "Escalate unresolved trades"],
   deadline_gate: ["Contractor gate", "BeforeNodeCall · deadline-tradeoff"],
-  finish_chase: ["Recovery orchestrator", "Checkpoint deadline chase"],
+  finish_chase: ["Deterministic orchestrator", "Checkpoint deadline chase"],
   ground_requirements: ["Evidence agent", "Bind notice requirements"],
   inspect_visible_evidence: ["Evidence agent", "Inspect pixels with Bedrock"],
   apply_safety_policy: ["Evidence agent", "Route ambiguity to contractor"],
@@ -1072,10 +1154,10 @@ function renderAgentRun(data) {
   const interrupted = steps.filter((step) => step.status === "interrupted").length;
   const completed = steps.filter((step) => step.status === "completed").length;
   elements.agentRunSummary.textContent = interrupted
-    ? `${completed} agent steps completed · ${interrupted} paused for contractor judgment`
+    ? `${completed} graph steps completed · ${interrupted} paused for contractor judgment`
     : Number(data.metrics?.contractor_decisions || 0) > 0
       ? `${completed} execution lanes completed · ${data.metrics.contractor_decisions} professional decisions recorded`
-      : `${completed} agent steps completed · no unnecessary contractor interrupt`;
+      : `${completed} graph steps completed · no unnecessary contractor interrupt`;
   elements.agentNodes.replaceChildren(...steps.map((step) => {
     const item = node("li", `agent-node agent-node--${step.status}`);
     item.append(node("span", "agent-node__sequence", String(step.sequence).padStart(2, "0")));
@@ -1086,6 +1168,119 @@ function renderAgentRun(data) {
     item.append(body, node("span", "agent-node__status", step.status.toUpperCase()));
     return item;
   }));
+}
+
+function provenanceStep({ number, kind, title, role, status, artifacts, open = false }) {
+  const item = node("details", `provenance-step provenance-step--${kind}`);
+  item.open = open;
+  const summary = node("summary", "");
+  summary.append(
+    node("span", "provenance-step__number", String(number).padStart(2, "0")),
+    node("strong", "provenance-step__title", title),
+    node("span", "provenance-step__role", role),
+    node("span", `provenance-step__status provenance-step__status--${status.className}`, status.label),
+  );
+  const artifact = node("dl", "provenance-step__artifact");
+  for (const [label, value] of artifacts) {
+    const field = node("div", "");
+    field.append(node("dt", "", label), node("dd", "", value));
+    artifact.append(field);
+  }
+  item.append(summary, artifact);
+  return item;
+}
+
+function renderProvenance(data) {
+  const isWorkflow = data.source_mode === "workflow";
+  const isAgentCore = isWorkflow && data.execution_target === "agentcore";
+  const events = data.events || [];
+  const evidence = data.evidence || [];
+  const pending = data.judgments.find((judgment) => judgment.status === "pending");
+  const hasEvidence = evidence.length > 0 || events.some((event) => event.kind.startsWith("evidence_"));
+  const hasRerequest = data.citations.some((citation) => citation.stage === "evidence_rejected")
+    || events.some((event) => event.kind === "evidence_rejected");
+  const eventBridgeArmed = data.automation_status === "scheduled";
+  const deadlineRan = Number(data.scenario_step || 0) >= 3 || events.some((event) => event.kind === "deadline_escalation");
+  const decisions = Number(data.metrics?.contractor_decisions || 0);
+  const allReady = data.metrics.citations_total > 0 && data.metrics.citations_ready === data.metrics.citations_total;
+  const done = { className: "completed", label: "Completed" };
+  const recorded = { className: "completed", label: "Recorded sample" };
+  const waiting = { className: "pending", label: "Pending" };
+  const paused = { className: "paused", label: "Paused for contractor" };
+  const modeDone = isWorkflow ? done : recorded;
+  const humanStatus = pending ? paused : decisions > 0 ? done : waiting;
+  const packetStatus = data.packet_status === "approved" ? done
+    : data.packet_status === "awaiting_approval" ? paused
+      : allReady ? waiting : waiting;
+  const intakeCapability = isWorkflow && data.intake_provider === "bedrock"
+    ? `${isAgentCore ? "AgentCore" : "Local runtime"} · Strands Agent · Amazon Nova Micro`
+    : isWorkflow ? "Strands graph · deterministic local intake"
+      : "Recorded sample of the Nova Micro-backed production path";
+  const visionCapability = isWorkflow && hasEvidence
+    ? `${isAgentCore ? "AgentCore" : "Local runtime"} · multimodal Strands Evidence Agent on Nova Lite`
+    : "Recorded evidence result; no model or AWS service called in sample playback";
+
+  const steps = [
+    provenanceStep({ number: 1, kind: "policy", title: "Failed-inspection notice received", role: "Input boundary", status: modeDone, artifacts: [
+      ["Input received", `${data.notice_id} · ${data.property_label}`],
+      ["Structured output", `${data.metrics.citations_total} correction records preserving the authority's language`],
+      ["Safety boundary", "Mettle never contacts the municipality or inspector from notice intake."],
+      ["Next action", "Pass the bounded notice text to intake."],
+    ] }),
+    provenanceStep({ number: 2, kind: "agent", title: "Notice intake extracts bounded corrections", role: data.intake_provider === "bedrock" || !isWorkflow ? "Strands agent · Nova Micro" : "Bounded local intake", status: modeDone, artifacts: [
+      ["Input received", "Redacted correction notice text supplied by the contractor"],
+      ["Responsible", data.intake_provider === "bedrock" ? "Mettle Intake Agent on Amazon Nova Micro" : "Validated local notice parser inside the Strands graph"],
+      ["Structured output", `${data.metrics.citations_total} typed citations with code reference, exact notice text, trade, and ambiguity`],
+      ["AWS / Strands capability", intakeCapability],
+      ["Safety boundary", "Extraction only—no code interpretation, severity ranking, or invented correction."],
+      ["Next action", "Hand typed corrections to deterministic planning policy."],
+    ] }),
+    provenanceStep({ number: 3, kind: "policy", title: "Coordination policy prepares trade outreach", role: "Deterministic policy", status: modeDone, artifacts: [
+      ["Input received", `${data.metrics.citations_total} bounded corrections plus the contractor's roster`],
+      ["Responsible", "Deterministic planning and coordination nodes in Strands GraphBuilder"],
+      ["Structured output", `${data.metrics.messages_handled} recorded outreach or follow-up actions`],
+      ["Safety boundary", "Ambiguous work is held; outreach remains notice-anchored and recipient-bounded."],
+      ["Next action", pending?.kind === "code_interpretation" ? "Hold the ambiguous correction and request contractor judgment." : "Wait for visible proof from open trades."],
+    ] }),
+    provenanceStep({ number: 4, kind: "agent", title: "Evidence agent assesses visible proof", role: "Strands agent · Nova Lite", status: hasEvidence ? modeDone : waiting, open: hasEvidence && !pending, artifacts: [
+      ["Input received", hasEvidence ? "Normalized job-site image plus requirements quoted from its correction" : "No evidence assessment has run yet"],
+      ["Responsible", "Dedicated multimodal Mettle Evidence Agent"],
+      ["Structured output", hasEvidence ? "One validated visible finding per notice requirement" : "Pending trade evidence"],
+      ["AWS / Strands capability", visionCapability],
+      ["Safety boundary", "Reports only visible pixels; never interprets code, hidden work, or compliance."],
+      ["Next action", hasRerequest ? "Return insufficiency to coordination policy for a precise re-request." : "Accept visible sufficiency or route uncertainty to the contractor."],
+    ] }),
+    provenanceStep({ number: 5, kind: "policy", title: "Coordination policy sends a precise re-request", role: "Deterministic policy", status: hasRerequest ? modeDone : waiting, artifacts: [
+      ["Input received", hasRerequest ? "Evidence finding naming the missing visible requirement" : "No rejected proof currently requires a re-request"],
+      ["Responsible", "Deterministic coordination policy"],
+      ["Structured output", hasRerequest ? "A bounded replacement-photo request naming only the missing element" : "Pending"],
+      ["Safety boundary", "No invented requirement and no repeated contact outside the configured campaign cadence."],
+      ["Next action", "Wait for replacement proof; leave accepted corrections out of future follow-ups."],
+    ] }),
+    provenanceStep({ number: 6, kind: "policy", title: "EventBridge wakes the deadline-chase graph", role: "Background scheduler", status: eventBridgeArmed || deadlineRan ? modeDone : waiting, artifacts: [
+      ["Input received", "Versioned workflow reference, deadline checkpoint, and idempotency key"],
+      ["Responsible", isAgentCore ? "Amazon EventBridge Scheduler → private AgentCore worker" : "Recorded deadline-chase checkpoint"],
+      ["Structured output", eventBridgeArmed ? `Next bounded check armed${data.next_check_at ? ` for ${formatTimestamp(data.next_check_at)}` : ""}` : deadlineRan ? "Open-only chase replanned at the deadline checkpoint" : "No checkpoint has fired yet"],
+      ["Safety boundary", "One-time schedule, stale-event rejection, bounded retries, and open corrections only."],
+      ["Next action", "Replan unresolved work and interrupt only if the deadline creates a contractor tradeoff."],
+    ] }),
+    provenanceStep({ number: 7, kind: "human", title: "Strands pauses for professional judgment", role: "BeforeNodeCall gate", status: humanStatus, open: Boolean(pending), artifacts: [
+      ["Input received", pending ? pending.question : `${decisions} contractor decision${decisions === 1 ? "" : "s"} recorded`],
+      ["Responsible", "Licensed contractor—not a model"],
+      ["Structured output", pending ? "Execution is paused until an explicit bounded decision is submitted" : "Validated decision restored to the same graph session"],
+      ["AWS / Strands capability", "Strands BeforeNodeCallEvent interrupt and resume"],
+      ["Safety boundary", "Mettle cannot interpret ambiguous code, choose a schedule tradeoff, or release the packet."],
+      ["Next action", pending ? "Await contractor decision." : "Resume the deterministic recovery graph."],
+    ] }),
+    provenanceStep({ number: 8, kind: "policy", title: "Packet assembly prepares the evidence handoff", role: "Deterministic policy", status: packetStatus, artifacts: [
+      ["Input received", `${data.metrics.citations_ready} of ${data.metrics.citations_total} corrections currently have accepted visible proof`],
+      ["Responsible", "Deterministic ReportLab packet renderer"],
+      ["Structured output", data.packet_status === "approved" ? "Five-page contractor-approved PDF" : data.packet_status === "awaiting_approval" ? "Five-page packet awaiting contractor release" : "Packet remains incomplete and locked"],
+      ["Safety boundary", "No automatic inspector contact, municipality approval claim, or code certification."],
+      ["Next action", data.packet_status === "approved" ? "Download the contractor-approved artifact." : allReady ? "Require final contractor approval." : "Wait for the remaining accepted proof."],
+    ] }),
+  ];
+  elements.provenanceSteps.replaceChildren(...steps);
 }
 
 function decisionPrompt(judgment) {
@@ -1844,8 +2039,12 @@ function renderBackgroundBrief(data) {
   }
   elements.awayBriefing.classList.toggle("away-briefing--armed", brief.armed);
   elements.awayBriefingMode.textContent = brief.mode;
-  elements.awayBriefingTitle.textContent = brief.title;
-  elements.awayBriefingCopy.textContent = brief.copy;
+  elements.awayBriefingTitle.textContent = brief.armed
+    ? "Background recovery is armed"
+    : `${brief.actions} background action${brief.actions === 1 ? "" : "s"} handled`;
+  elements.awayBriefingCopy.textContent = brief.armed
+    ? `Next automatic checkpoint${data.next_check_at ? ` · ${formatTimestamp(data.next_check_at)}` : ""}`
+    : "Open the activity record";
   elements.awayBriefingActions.textContent = String(brief.actions);
   elements.awayBriefingList.replaceChildren(...brief.items.map((item) => {
     const row = node("li", "away-briefing__item");
@@ -1858,12 +2057,22 @@ function renderPacket(data) {
   const rows = data.citations.map((citation) => {
     const row = node("div", "packet-row");
     row.append(node("span", "packet-row__tag", `C${citation.citation_id}`));
-    row.append(node("span", "packet-row__code", citation.code_reference));
+    const copy = node("span", "packet-row__code", `${titleCase(citation.trade)} · ${citation.code_reference}`);
     const ready = citation.stage === "ready";
+    copy.append(node("span", "packet-row__detail", ready
+      ? citation.evidence_note || "Accepted visible proof is included in the packet record."
+      : correctionStatus(citation)[1]));
+    row.append(copy);
     row.append(node("span", `packet-row__state${ready ? " packet-row__state--ready" : ""}`, ready ? "ACCEPTED" : "PENDING"));
     return row;
   });
   elements.packetList.replaceChildren(...rows);
+  elements.packetReadiness.textContent = `${data.metrics.citations_ready} OF ${data.metrics.citations_total} READY`;
+
+  const packetJudgment = data.judgments.find(
+    (judgment) => judgment.status === "pending" && judgment.kind === "final_packet_approval",
+  );
+  elements.packetJudgment.replaceChildren(...(packetJudgment ? [renderJudgment(packetJudgment)] : []));
 
   elements.packet.textContent = data.packet_status === "approved"
     ? "APPROVED"
@@ -1890,6 +2099,8 @@ function renderPacket(data) {
       node("p", "", "Notice language, accepted evidence, recovery history, and the human approval record—assembled into one reviewable artifact."),
       summary,
     );
+  } else {
+    elements.packetPreview.replaceChildren();
   }
 }
 
@@ -1934,6 +2145,7 @@ function renderRecoveryClock(data) {
 
 function render(data) {
   campaign = data;
+  document.body.dataset.sourceMode = data.source_mode;
   elements.loading.hidden = true;
   elements.error.hidden = true;
   elements.dashboard.hidden = false;
@@ -1959,20 +2171,19 @@ function render(data) {
     ? "STANDING DOWN · PACKET APPROVED"
     : criticalRecovery ? "CRITICAL RECOVERY · CHECK-INS EVERY 4H" : "NORMAL FOLLOW-UP · DAILY CHECK-INS";
 
-  elements.citations.replaceChildren(...data.citations.map(renderCitation));
+  renderCorrectionSummary(data);
+  elements.citations.replaceChildren(...data.citations.map((citation) => renderCitation(citation, data)));
   elements.events.replaceChildren(...data.events.map(renderEvent));
   renderAgentRun(data);
+  renderProvenance(data);
 
   const pending = data.judgments.filter((item) => item.status === "pending");
   elements.judgmentCount.textContent = String(pending.length);
-  if (pending.length) {
-    elements.judgments.replaceChildren(...pending.map(renderJudgment));
-  } else {
-    const empty = node("div", "empty-state");
-    empty.append(node("strong", "", "No decisions needed"));
-    empty.append(node("p", "", "METTLE KEEPS WORKING — YOU’LL GET AN SMS WHEN SOMETHING DOES"));
-    elements.judgments.replaceChildren(empty);
-  }
+  const workspaceJudgments = pending.filter(
+    (judgment) => !judgment.citation_id && judgment.kind !== "final_packet_approval",
+  );
+  elements.judgments.replaceChildren(...workspaceJudgments.map(renderJudgment));
+  elements.judgments.hidden = workspaceJudgments.length === 0;
 
   renderMetrics(data.metrics);
   renderPacket(data);

@@ -383,20 +383,21 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Extract on AgentCore" in page.text
     assert "Extract locally" in page.text
     assert "Approve & begin recovery" in page.text
-    assert "Recovery clock" in page.text
-    assert "Strands graph run" in page.text
+    assert "Corrections" in page.text
+    assert "Inspection packet" in page.text
+    assert "How Mettle worked" in page.text
     assert "STRANDS GRAPHBUILDER" in page.text
-    assert "BEFORENODECALL INTERRUPTS" in page.text
+    assert "SYSTEM PROVENANCE · READ ONLY" in page.text
     assert 'id="photo-mode-note"' in page.text
-    assert "Recovery workspace" in page.text
-    assert "Evidence &amp; packet" in page.text
-    assert "Agent activity" in page.text
+    assert "Mettle workspace" in page.text
+    assert "Open work and decisions" in page.text
+    assert "Proof, review, and release" in page.text
+    assert "Evaluator provenance" in page.text
     assert 'data-workspace-view="recovery"' in page.text
     assert 'data-workspace-panel="activity"' in page.text
-    assert "Sample controls" in page.text
-    assert "Background recovery brief" in page.text
+    assert "Demonstration controls" in page.text
+    assert "Background activity" in page.text
     assert 'id="away-briefing"' in page.text
-    assert "GRAPHBUILDER NODES · SPECIALIST HANDOFFS · BEFORENODECALL INTERRUPTS" in page.text
     assert "Compress to next checkpoint" in page.text
     assert "Simulate scheduled check" not in page.text
     assert page.headers["content-security-policy"].startswith("default-src 'self'")
@@ -406,6 +407,9 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert 'elements.noticeDialog.addEventListener("cancel"' in script.text
     assert 'elements.noticeDialog.open && event.key === "Escape"' in script.text
     assert "function renderAgentRun(data)" in script.text
+    assert "function renderCorrectionSummary(data)" in script.text
+    assert "function renderProvenance(data)" in script.text
+    assert "EventBridge wakes the deadline-chase graph" in script.text
     assert "function setWorkspaceView(view" in script.text
     assert "function openWorkspacePanel(view" in script.text
     assert "function buildBackgroundBrief(data)" in script.text
@@ -428,6 +432,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert 'sessionStorage.setItem("mettle_entry_selected", "tour")' in script.text
     assert styles.status_code == 200
     assert ".workspace-panel--view-hidden" in styles.text
+    assert ".citation__summary" in styles.text
+    assert ".provenance-step__artifact" in styles.text
     assert ".dashboard--focused" in styles.text
     assert ".recovery-line" in styles.text
     assert ".tour-mode .dashboard" in styles.text
