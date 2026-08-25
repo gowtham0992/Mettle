@@ -437,6 +437,9 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function tourPhase(data)" in script.text
     assert "function renderJudgeTour(data)" in script.text
     assert "function renderJourney(data)" in script.text
+    assert "function hasApprovedEvidenceBoundary(data, citationId)" in script.text
+    assert "!hasApprovedEvidenceBoundary(data, button.dataset.citation)" in script.text
+    assert 'openCount === 1 ? "correction still needs" : "corrections still need"' in script.text
     assert "async function runSampleUntilPause()" in script.text
     assert "function stageTourClock(days, cadence)" in script.text
     assert "function createPacketFinale(data)" in script.text

@@ -680,6 +680,18 @@ function activePhotoEnabled() {
     && (activeWorkflowTarget === "agentcore" ? agentCoreEnabled : bedrockEnabled);
 }
 
+function hasApprovedEvidenceBoundary(data, citationId) {
+  const citation = data.citations.find(
+    (item) => String(item.citation_id) === String(citationId),
+  );
+  return Boolean(
+    citation
+    && citation.stage !== "needs_judgment"
+    && Array.isArray(citation.evidence_requirements)
+    && citation.evidence_requirements.length,
+  );
+}
+
 function setSetupStep(step) {
   setupStep = Math.max(1, Math.min(4, step));
   elements.setupStepLabel.textContent = `STEP ${setupStep} OF 4`;
@@ -994,8 +1006,9 @@ function configureNextAction(data) {
 function renderJourney(data) {
   const allReady = data.metrics.citations_total > 0
     && data.metrics.citations_ready === data.metrics.citations_total;
+  const openCount = data.metrics.citations_total - data.metrics.citations_ready;
   let activeIndex = 2;
-  let current = `${data.metrics.citations_total - data.metrics.citations_ready} corrections still need proof`;
+  let current = `${openCount} ${openCount === 1 ? "correction still needs" : "corrections still need"} proof`;
   if (data.correction_review_required) {
     activeIndex = 1;
     current = "Confirm assignments and proof before outreach";
@@ -2427,8 +2440,10 @@ function render(data) {
       (event) => event.title === "Contractor decision recorded; graph resumed",
     );
     for (const button of elements.evidenceButtons) {
-      button.disabled = button.dataset.requiresDecision === "true" && !contractorDecisionRecorded;
-      button.title = button.disabled ? "Resolve the mechanical evidence specification first" : "";
+      button.disabled = button.dataset.requiresDecision === "true"
+        && !contractorDecisionRecorded
+        && !hasApprovedEvidenceBoundary(data, button.dataset.citation);
+      button.title = button.disabled ? "Resolve the evidence specification first" : "";
       button.textContent = button.dataset.sample === "panel_closeup_insufficient"
         ? "Assess close-up"
         : button.dataset.sample === "panel_wide_measured"
