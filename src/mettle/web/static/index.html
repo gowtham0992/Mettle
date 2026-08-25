@@ -27,6 +27,10 @@
         <span class="condition__dot"></span>
         <span id="condition-label">READING NOTICE</span>
       </div>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode" title="Switch to light mode">
+        <span class="theme-toggle__icon" aria-hidden="true">☼</span>
+        <span class="theme-toggle__label">Light</span>
+      </button>
       <button class="auth-control" id="auth-button" type="button" hidden>Sign in</button>
       <div class="countdown" aria-live="polite">
         <span class="countdown__number" id="days-remaining">—</span>
@@ -57,70 +61,6 @@
         <div class="skeleton skeleton--wide"></div><div class="skeleton"></div>
       </div>
 
-      <section class="judge-tour" id="judge-tour" aria-labelledby="tour-title" aria-modal="false" hidden>
-        <header class="judge-tour__header">
-          <div>
-            <p class="mono-label">JUDGE GUIDE · SAME REAL PRODUCT</p>
-            <strong id="tour-progress-label">SCENE 1 OF 5</strong>
-          </div>
-          <div class="tour-header-actions">
-            <button class="tour-skip" id="tour-skip" type="button" hidden>Skip animation</button>
-            <button class="tour-exit" id="tour-exit" type="button">Exit guide <span aria-hidden="true">×</span></button>
-          </div>
-        </header>
-
-        <ol class="recovery-line" aria-label="Failed-inspection recovery stages">
-          <li data-tour-stop="notice"><span>01</span><strong>Notice</strong><small>Grounded</small></li>
-          <li data-tour-stop="assigned"><span>02</span><strong>Assigned</strong><small>Coordinated</small></li>
-          <li data-tour-stop="proof"><span>03</span><strong>Proof</strong><small>Verified</small></li>
-          <li data-tour-stop="approved"><span>04</span><strong>Approved</strong><small>Human gate</small></li>
-          <li data-tour-stop="reinspection"><span>05</span><strong>Reinspection</strong><small>Ready</small></li>
-        </ol>
-
-        <aside class="judge-lens" aria-labelledby="judge-lens-title">
-          <div class="judge-lens__title">
-            <span class="judge-lens__marker" aria-hidden="true">◎</span>
-            <div><p class="mono-label">JUDGE BRIEF</p><strong id="judge-lens-title">Why this scene matters</strong></div>
-          </div>
-          <div class="judge-lens__item judge-lens__item--impact">
-            <span>THE PRODUCT CLAIM</span>
-            <strong id="judge-lens-impact">Mettle turns one notice into a bounded recovery campaign.</strong>
-          </div>
-          <div class="judge-lens__item judge-lens__item--agent">
-            <span>AGENT WORK</span>
-            <strong id="judge-lens-agent">Two Strands agents handle extraction and visible-evidence assessment.</strong>
-          </div>
-          <div class="judge-lens__item judge-lens__item--human">
-            <span>HUMAN AUTHORITY</span>
-            <strong id="judge-lens-human">Code interpretation and release remain with the contractor.</strong>
-          </div>
-        </aside>
-
-        <div class="tour-stage">
-          <div class="tour-stage__copy">
-            <p class="mono-label" id="tour-eyebrow">NOTICE IN · RECOVERY OUT</p>
-            <h1 id="tour-title" tabindex="-1">One failed-inspection notice becomes an active recovery.</h1>
-            <p id="tour-copy">Mettle derives the work from the authority’s own language and stops where professional interpretation begins.</p>
-          </div>
-
-          <div class="tour-stage__visual" id="tour-visual" aria-live="polite"></div>
-
-          <aside class="tour-stage__control" aria-labelledby="tour-control-title">
-            <p class="mono-label">YOUR ONE DECISION</p>
-            <strong id="tour-control-title">The agent did not invent a missing requirement.</strong>
-            <p id="tour-control-copy">It prepared the recovery, contacted the unambiguous trades, and reserved one consequential decision for the contractor.</p>
-            <button class="button button--orange tour-action" id="tour-action" type="button">Approve the evidence boundary</button>
-            <button class="button button--outline tour-secondary" id="tour-secondary" type="button" hidden>Inspect the Strands run</button>
-            <span id="tour-action-note">ONE HUMAN DECISION · THEN THE CAMPAIGN RESUMES</span>
-          </aside>
-        </div>
-
-        <footer class="tour-outcome">
-          <p id="tour-outcome-copy"><span aria-hidden="true">◆</span><strong>Same product, staged for evaluation.</strong> Every scene uses the sample campaign’s real endpoints and remains inspectable in the full workspace.</p>
-          <dl id="tour-metrics" aria-label="Recovery outcome so far"></dl>
-        </footer>
-      </section>
-
       <div class="product-workspace" id="product-workspace">
       <nav class="workspace-nav" id="workspace-nav" aria-label="Recovery navigation" hidden>
         <button class="workspace-tab" type="button" data-workspace-tab="recovery" aria-current="page">
@@ -145,6 +85,71 @@
       </nav>
 
       <div class="workspace-content">
+
+      <section class="judge-tour" id="judge-tour" aria-labelledby="tour-title" aria-modal="false" hidden>
+        <header class="judge-tour__header">
+          <div>
+            <p class="mono-label">JUDGE WALKTHROUGH · LIVE PRODUCT</p>
+            <strong id="tour-progress-label">SCENE 1 OF 5</strong>
+          </div>
+          <div class="tour-header-actions">
+            <button class="tour-skip" id="tour-skip" type="button" hidden>Skip wait</button>
+            <button class="tour-exit" id="tour-exit" type="button">Use product freely <span aria-hidden="true">→</span></button>
+          </div>
+        </header>
+
+        <ol class="recovery-line" aria-label="Failed-inspection recovery stages">
+          <li data-tour-stop="notice"><span>01</span><strong>Notice</strong><small>Grounded</small></li>
+          <li data-tour-stop="assigned"><span>02</span><strong>Assigned</strong><small>Coordinated</small></li>
+          <li data-tour-stop="proof"><span>03</span><strong>Proof</strong><small>Verified</small></li>
+          <li data-tour-stop="approved"><span>04</span><strong>Approved</strong><small>Human gate</small></li>
+          <li data-tour-stop="reinspection"><span>05</span><strong>Reinspection</strong><small>Ready</small></li>
+        </ol>
+
+        <div class="judge-guide__grid">
+          <div class="tour-stage__copy">
+            <p class="mono-label" id="tour-eyebrow">NOTICE IN · RECOVERY OUT</p>
+            <h1 id="tour-title" tabindex="-1">One failed-inspection notice becomes an active recovery.</h1>
+            <p id="tour-copy">Mettle derives the work from the authority’s own language and stops where professional interpretation begins.</p>
+          </div>
+
+          <aside class="judge-lens" aria-labelledby="judge-lens-title">
+            <div class="judge-lens__title">
+              <span class="judge-lens__marker" aria-hidden="true">◎</span>
+              <div><p class="mono-label">WHAT TO NOTICE</p><strong id="judge-lens-title">Why this step matters</strong></div>
+            </div>
+            <div class="judge-lens__item judge-lens__item--impact"><span>OUTCOME</span><strong id="judge-lens-impact">Mettle turns one notice into a bounded recovery campaign.</strong></div>
+            <div class="judge-lens__item judge-lens__item--agent"><span>AGENT HANDLED</span><strong id="judge-lens-agent">Two Strands agents handle extraction and visible-evidence assessment.</strong></div>
+            <div class="judge-lens__item judge-lens__item--human"><span>HUMAN KEPT</span><strong id="judge-lens-human">Code interpretation and release remain with the contractor.</strong></div>
+          </aside>
+
+          <aside class="tour-stage__control" aria-labelledby="tour-control-title">
+            <p class="mono-label">DO THIS NEXT</p>
+            <strong id="tour-control-title">The agent did not invent a missing requirement.</strong>
+            <p id="tour-control-copy">It prepared the recovery, contacted the unambiguous trades, and reserved one consequential decision for the contractor.</p>
+            <button class="button button--orange tour-action" id="tour-action" type="button">Approve the evidence boundary</button>
+            <button class="button button--outline tour-secondary" id="tour-secondary" type="button" hidden>Inspect the Strands run</button>
+            <span id="tour-action-note">ONE HUMAN DECISION · THEN THE CAMPAIGN RESUMES</span>
+          </aside>
+        </div>
+
+        <div class="tour-stage__visual" id="tour-visual" aria-live="polite" hidden></div>
+        <footer class="tour-outcome">
+          <p id="tour-outcome-copy"><span aria-hidden="true">◆</span><strong>Same product, staged for evaluation.</strong> Every step drives the real sample workspace below.</p>
+          <dl id="tour-metrics" aria-label="Recovery outcome so far"></dl>
+        </footer>
+      </section>
+
+      <section class="workflow-journey" id="workflow-journey" aria-label="Recovery progress" hidden>
+        <header><p class="mono-label">YOUR RECOVERY PATH</p><strong id="journey-current">Notice received</strong></header>
+        <ol>
+          <li data-journey-stage="notice"><span>01</span><strong>Notice</strong><small>Read and bounded</small></li>
+          <li data-journey-stage="assign"><span>02</span><strong>Assign</strong><small>People and proof</small></li>
+          <li data-journey-stage="proof"><span>03</span><strong>Collect proof</strong><small>Agent follows up</small></li>
+          <li data-journey-stage="approve"><span>04</span><strong>Approve</strong><small>Contractor gate</small></li>
+          <li data-journey-stage="ready"><span>05</span><strong>Reinspect</strong><small>Packet ready</small></li>
+        </ol>
+      </section>
 
       <section class="next-action" id="next-action" aria-labelledby="next-action-title" hidden>
         <div class="next-action__marker" aria-hidden="true">!</div>
@@ -323,8 +328,12 @@
     <dialog class="welcome-dialog" id="welcome-dialog" aria-labelledby="welcome-title">
       <div class="welcome-dialog__brand">
         <img src="/static/mettle-mark.png" alt="" width="54" height="54">
-              <span>METTLE / FAILED-INSPECTION RECOVERY</span>
+        <span>METTLE / FAILED-INSPECTION RECOVERY</span>
         <span class="welcome-dialog__mode">SAMPLE AVAILABLE · LIVE STRANDS BEHIND SIGN-IN</span>
+        <button class="theme-toggle theme-toggle--compact" type="button" data-theme-toggle aria-label="Switch to light mode" title="Switch to light mode">
+          <span class="theme-toggle__icon" aria-hidden="true">☼</span>
+          <span class="theme-toggle__label">Light</span>
+        </button>
       </div>
       <div class="welcome-dialog__grid">
         <div class="welcome-dialog__editorial">
@@ -390,7 +399,13 @@
             <p class="mono-label">NEW RECOVERY · <span id="setup-step-label">STEP 1 OF 4</span></p>
             <h2 id="notice-dialog-title">Start with the failed-inspection report</h2>
           </div>
-          <button class="dialog-close" id="close-notice-button" type="button" aria-label="Exit recovery setup">×</button>
+          <div class="notice-dialog__header-actions">
+            <button class="theme-toggle theme-toggle--compact" type="button" data-theme-toggle aria-label="Switch to light mode" title="Switch to light mode">
+              <span class="theme-toggle__icon" aria-hidden="true">☼</span>
+              <span class="theme-toggle__label">Light</span>
+            </button>
+            <button class="dialog-close" id="close-notice-button" type="button" aria-label="Exit recovery setup">×</button>
+          </div>
         </div>
         <nav class="setup-progress" aria-label="Recovery setup progress">
           <span class="setup-progress__step setup-progress__step--active" data-setup-progress="1">1 · Notice</span>

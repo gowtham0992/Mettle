@@ -28,6 +28,9 @@ const elements = {
   tourOutcomeCopy: document.querySelector("#tour-outcome-copy"),
   demoDriver: document.querySelector(".demo-driver"),
   nextAction: document.querySelector("#next-action"),
+  workflowJourney: document.querySelector("#workflow-journey"),
+  journeyCurrent: document.querySelector("#journey-current"),
+  journeyStages: [...document.querySelectorAll("[data-journey-stage]")],
   nextActionEyebrow: document.querySelector("#next-action-eyebrow"),
   nextActionTitle: document.querySelector("#next-action-title"),
   nextActionCopy: document.querySelector("#next-action-copy"),
@@ -102,6 +105,8 @@ const elements = {
   closeNotice: document.querySelector("#close-notice-button"),
   retry: document.querySelector("#retry-button"),
   toast: document.querySelector("#toast"),
+  themeToggle: document.querySelector("#theme-toggle"),
+  themeToggles: [...document.querySelectorAll("#theme-toggle, [data-theme-toggle]")],
   auth: document.querySelector("#auth-button"),
   home: document.querySelector("#mettle-home"),
   welcomeDialog: document.querySelector("#welcome-dialog"),
@@ -128,6 +133,38 @@ const elements = {
   navNewRecovery: document.querySelector("#nav-new-recovery"),
   navExitSample: document.querySelector("#nav-exit-sample"),
 };
+
+const themePreferenceKey = "mettle_theme";
+const systemTheme = window.matchMedia("(prefers-color-scheme: light)");
+
+function savedTheme() {
+  const value = localStorage.getItem(themePreferenceKey);
+  return value === "light" || value === "dark" ? value : null;
+}
+
+function resolveTheme() {
+  return savedTheme() || (systemTheme.matches ? "light" : "dark");
+}
+
+function applyTheme(theme, { persist = false } = {}) {
+  const nextTheme = theme === "light" ? "light" : "dark";
+  document.documentElement.dataset.theme = nextTheme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute(
+    "content",
+    nextTheme === "light" ? "#f1efe8" : "#191d20",
+  );
+  if (persist) localStorage.setItem(themePreferenceKey, nextTheme);
+  const destination = nextTheme === "dark" ? "light" : "dark";
+  for (const toggle of elements.themeToggles) {
+    toggle.dataset.theme = nextTheme;
+    toggle.setAttribute("aria-label", `Switch to ${destination} mode`);
+    toggle.title = `Switch to ${destination} mode`;
+    toggle.querySelector(".theme-toggle__icon").textContent = destination === "light" ? "☼" : "☾";
+    toggle.querySelector(".theme-toggle__label").textContent = destination === "light" ? "Light" : "Dark";
+  }
+}
+
+applyTheme(resolveTheme());
 
 const stepLabels = [
   "OPENING CAMPAIGN",
@@ -952,6 +989,31 @@ function configureNextAction(data) {
       elements.clockAction.click();
     };
   }
+}
+
+function renderJourney(data) {
+  const allReady = data.metrics.citations_total > 0
+    && data.metrics.citations_ready === data.metrics.citations_total;
+  let activeIndex = 2;
+  let current = `${data.metrics.citations_total - data.metrics.citations_ready} corrections still need proof`;
+  if (data.correction_review_required) {
+    activeIndex = 1;
+    current = "Confirm assignments and proof before outreach";
+  } else if (data.packet_status === "approved") {
+    activeIndex = 4;
+    current = "Approved packet ready for reinspection";
+  } else if (data.packet_status === "awaiting_approval" || allReady) {
+    activeIndex = 3;
+    current = "Proof is complete · contractor approval is next";
+  }
+  elements.workflowJourney.hidden = false;
+  elements.journeyCurrent.textContent = current;
+  elements.journeyStages.forEach((stage, index) => {
+    stage.classList.toggle("is-complete", index < activeIndex);
+    stage.classList.toggle("is-current", index === activeIndex);
+    if (index === activeIndex) stage.setAttribute("aria-current", "step");
+    else stage.removeAttribute("aria-current");
+  });
 }
 
 function conditionFor(data) {
@@ -1954,6 +2016,8 @@ function renderJudgeTour(data) {
   if (!judgeTourActive || data.source_mode === "workflow") return;
   const phase = tourPhase(data);
   const phaseChanged = elements.judgeTour.dataset.phase !== phase.key;
+  const guideView = ["approval", "complete"].includes(phase.key) ? "evidence" : "recovery";
+  if (activeWorkspaceView !== guideView) setWorkspaceView(guideView);
   elements.judgeTour.hidden = false;
   elements.judgeTour.dataset.phase = phase.key;
   document.body.classList.add("tour-mode");
@@ -1995,6 +2059,16 @@ function renderJudgeTour(data) {
     stop.dataset.state = state;
   }
   renderTourVisual(data, phase);
+  for (const target of document.querySelectorAll(".is-guide-target")) target.classList.remove("is-guide-target");
+  const guideTargetSelector = {
+    boundary: ".citation--needs-action",
+    recovery: ".workspace-agent-status",
+    deadline: ".away-briefing",
+    finish: ".citation-list",
+    approval: ".packet-primary",
+    complete: ".packet-preview",
+  }[phase.key];
+  document.querySelector(guideTargetSelector)?.classList.add("is-guide-target");
   const metricValues = phase.key === "boundary"
     ? [
       ["Notice input", "1 PDF"],
@@ -2297,6 +2371,7 @@ function render(data) {
     : criticalRecovery ? "CRITICAL RECOVERY · CHECK-INS EVERY 4H" : "NORMAL FOLLOW-UP · DAILY CHECK-INS";
 
   renderCorrectionSummary(data);
+  renderJourney(data);
   elements.citations.replaceChildren(...data.citations.map((citation) => renderCitation(citation, data)));
   elements.events.replaceChildren(...data.events.map(renderEvent));
   renderAgentRun(data);
@@ -2935,6 +3010,15 @@ document.addEventListener("keydown", (event) => {
 });
 
 elements.retry.addEventListener("click", loadCampaign);
+for (const toggle of elements.themeToggles) {
+  toggle.addEventListener("click", () => {
+    const nextTheme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+    applyTheme(nextTheme, { persist: true });
+  });
+}
+systemTheme.addEventListener("change", () => {
+  if (!savedTheme()) applyTheme(resolveTheme());
+});
 elements.auth.addEventListener("click", async () => {
   if (accessToken) {
     clearAuth();

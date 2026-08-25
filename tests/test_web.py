@@ -378,7 +378,9 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Agent receipt" in page.text
     assert "The browser never owns the agent runtime." in page.text
     assert "Explore mode" not in page.text
-    assert "JUDGE GUIDE · SAME REAL PRODUCT" in page.text
+    assert "JUDGE WALKTHROUGH · LIVE PRODUCT" in page.text
+    assert "YOUR RECOVERY PATH" in page.text
+    assert 'id="workflow-journey"' in page.text
     assert 'id="judge-lens-impact"' in page.text
     assert 'id="judge-tour"' in page.text
     assert 'id="tour-skip"' in page.text
@@ -405,6 +407,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Demonstration controls" in page.text
     assert "Background activity" in page.text
     assert 'id="away-briefing"' in page.text
+    assert 'id="theme-toggle"' in page.text
     assert "Compress to next checkpoint" in page.text
     assert "Simulate scheduled check" not in page.text
     assert page.headers["content-security-policy"].startswith("default-src 'self'")
@@ -428,8 +431,12 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function buildBackgroundBrief(data)" in script.text
     assert "function renderBackgroundBrief(data)" in script.text
     assert "function setJudgeTourActive(active" in script.text
+    assert "function resolveTheme()" in script.text
+    assert "function applyTheme(theme" in script.text
+    assert 'localStorage.setItem(themePreferenceKey, nextTheme)' in script.text
     assert "function tourPhase(data)" in script.text
     assert "function renderJudgeTour(data)" in script.text
+    assert "function renderJourney(data)" in script.text
     assert "async function runSampleUntilPause()" in script.text
     assert "function stageTourClock(days, cadence)" in script.text
     assert "function createPacketFinale(data)" in script.text
@@ -446,27 +453,26 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert styles.status_code == 200
     assert ".workspace-panel--view-hidden" in styles.text
     assert ".citation__summary" in styles.text
-    assert ".provenance-step__artifact" in styles.text
+    assert ".citation--needs-action" in styles.text
+    assert ".packet-row" in styles.text
     assert ".agent-flow__track" in styles.text
-    assert ".judge-lens__item--agent" in styles.text
-    assert "body:not(.tour-mode) .auth-control" in styles.text
-    assert ".tour-mode .auth-control { min-width: 92px; border-color: var(--ink); background: var(--paper); color: var(--ink); }" in styles.text
-    assert ".tour-mode .auth-control:hover { border-color: var(--orange); background: var(--orange); color: var(--ink); }" in styles.text
-    assert ".entry-choice--primary:hover { padding-inline: 16px; border-color: var(--orange); background: #242a2e; }" in styles.text
-    assert ".dashboard--focused" in styles.text
+    assert ".agent-flow__stage" in styles.text
+    assert ".agent-flow__node--human" in styles.text
+    assert ".judge-lens__item" in styles.text
+    assert ".auth-control" in styles.text
+    assert ".theme-toggle" in styles.text
+    assert ':root[data-theme="light"]' in styles.text
+    assert ".entry-choice--primary" in styles.text
+    assert "--orange: #ff5a2f" in styles.text
     assert ".recovery-line" in styles.text
-    assert ".tour-mode .dashboard" in styles.text
     assert ".command-stack { position: sticky" in styles.text
-    assert ".packet-finale" in styles.text
-    assert ".tour-evidence-compare" in styles.text
-    assert ".tour-agent-proof" in styles.text
-    assert ".coordination-timeline" in styles.text
-    assert ".tour-workspace__tabs" in styles.text
-    assert ".entry-choice--primary > .entry-choice__action { color: var(--charcoal); }" in styles.text
-    assert ".entry-choice--primary > span:last-child" not in styles.text
+    assert ".packet-layout" in styles.text
+    assert ".aws-boundary__flow" in styles.text
+    assert ".welcome-dialog__grid" in styles.text
+    assert ".product-workspace" in styles.text
+    assert ".demo-driver { display: none" in styles.text
     assert "function createCoordinationTimeline(data)" in script.text
     assert "function createTourWorkspaceFrame(data, phase, artifacts)" in script.text
-    assert '.judge-tour[data-phase="deadline"] .tour-stage__visual' in styles.text
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"
 
