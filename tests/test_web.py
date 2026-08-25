@@ -443,6 +443,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert ".tour-agent-proof" in styles.text
     assert ".coordination-timeline" in styles.text
     assert ".tour-workspace__tabs" in styles.text
+    assert ".entry-choice--primary > .entry-choice__action { color: var(--charcoal); }" in styles.text
+    assert ".entry-choice--primary > span:last-child" not in styles.text
     assert "function createCoordinationTimeline(data)" in script.text
     assert "function createTourWorkspaceFrame(data, phase, artifacts)" in script.text
     assert '.judge-tour[data-phase="deadline"] .tour-stage__visual' in styles.text
