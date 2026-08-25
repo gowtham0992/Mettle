@@ -708,6 +708,8 @@ h2 { font-size: 13px; font-weight: 900; }
 .tour-mode .job-identity > span:last-child,
 .tour-mode .countdown__copy { color: var(--faint); }
 .tour-mode .condition { border-color: var(--line); color: var(--moss); }
+.tour-mode .auth-control { min-width: 92px; border-color: var(--ink); background: var(--paper); color: var(--ink); }
+.tour-mode .auth-control:hover { border-color: var(--orange); background: var(--orange); color: var(--ink); }
 .tour-mode .countdown__number { color: var(--ink); font-family: var(--serif); font-size: 48px; font-weight: 400; }
 .tour-mode .campaign-strip { min-height: 33px; padding-block: 6px; background: transparent; border-bottom-color: var(--ink); }
 .tour-mode .shell { width: min(1440px, calc(100% - 64px)); padding-top: 26px; }

@@ -445,6 +445,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert ".agent-flow__track" in styles.text
     assert ".judge-lens__item--agent" in styles.text
     assert "body:not(.tour-mode) .auth-control" in styles.text
+    assert ".tour-mode .auth-control { min-width: 92px; border-color: var(--ink); background: var(--paper); color: var(--ink); }" in styles.text
+    assert ".tour-mode .auth-control:hover { border-color: var(--orange); background: var(--orange); color: var(--ink); }" in styles.text
     assert ".entry-choice--primary:hover { padding-inline: 16px; border-color: var(--orange); background: #242a2e; }" in styles.text
     assert ".dashboard--focused" in styles.text
     assert ".recovery-line" in styles.text
