@@ -126,6 +126,23 @@ def _styles() -> dict[str, ParagraphStyle]:
             leading=10,
             textColor=colors.HexColor("#5e635f"),
         ),
+        "detail_label": ParagraphStyle(
+            "MettleDetailLabel",
+            parent=base["Normal"],
+            fontName="Courier-Bold",
+            fontSize=7,
+            leading=9,
+            textColor=colors.HexColor("#6e6a5e"),
+        ),
+        "detail_value": ParagraphStyle(
+            "MettleDetailValue",
+            parent=base["Normal"],
+            fontName="Helvetica",
+            fontSize=8.5,
+            leading=10.5,
+            textColor=colors.HexColor("#23262a"),
+            splitLongWords=True,
+        ),
     }
 
 
@@ -217,21 +234,36 @@ def render_packet_pdf(
         ),
         Spacer(1, 0.08 * inch),
     ]
+    def detail_row(label_a: str, value_a: str, label_b: str, value_b: str) -> list[Paragraph]:
+        return [
+            Paragraph(escape(label_a), styles["detail_label"]),
+            Paragraph(escape(value_a), styles["detail_value"]),
+            Paragraph(escape(label_b), styles["detail_label"]),
+            Paragraph(escape(value_b), styles["detail_value"]),
+        ]
+
     details = [
-        ["NOTICE", escape(notice.notice_id), "PROPERTY", escape(notice.property_label)],
-        ["ISSUED", notice.issued_on.isoformat(), "REINSPECTION", notice.reinspection_due_on.isoformat()],
-        ["CITATIONS", str(packet.citations_total), "READY", str(packet.citations_ready)],
+        detail_row("NOTICE", notice.notice_id, "PROPERTY", notice.property_label),
+        detail_row(
+            "ISSUED",
+            notice.issued_on.isoformat(),
+            "REINSPECTION",
+            notice.reinspection_due_on.isoformat(),
+        ),
+        detail_row(
+            "CITATIONS",
+            str(packet.citations_total),
+            "READY",
+            str(packet.citations_ready),
+        ),
     ]
-    detail_table = Table(details, colWidths=[0.8 * inch, 2.05 * inch, 1.05 * inch, 2.45 * inch])
+    detail_table = Table(
+        details,
+        colWidths=[0.78 * inch, 2.17 * inch, 1.0 * inch, 2.4 * inch],
+    )
     detail_table.setStyle(
         TableStyle(
             [
-                ("FONT", (0, 0), (-1, -1), "Helvetica", 8.5),
-                ("FONT", (0, 0), (0, -1), "Courier-Bold", 7),
-                ("FONT", (2, 0), (2, -1), "Courier-Bold", 7),
-                ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#23262a")),
-                ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#6e6a5e")),
-                ("TEXTCOLOR", (2, 0), (2, -1), colors.HexColor("#6e6a5e")),
                 ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#fbf9f2")),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dad5c4")),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),

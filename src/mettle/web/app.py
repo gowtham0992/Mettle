@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import os
 import re
 import secrets
@@ -100,6 +102,12 @@ class PublicConfigResponse(BaseModel):
 
     cognito_domain: str | None
     cognito_client_id: str | None
+
+
+class EncodedPhotoRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    image_base64: str = Field(min_length=4, max_length=6_700_000)
 
 
 def configured_workflow_registry() -> WorkflowRegistry:
@@ -469,21 +477,40 @@ def create_app(
             int(os.getenv("METTLE_MAX_UPLOAD_BYTES", str(MAX_UPLOAD_BYTES))),
         )
         content_type = request.headers.get("content-type", "").split(";", 1)[0].lower()
-        if content_type not in {"image/jpeg", "image/png"}:
-            raise PhotoUploadError("photo must be uploaded as image/jpeg or image/png")
+        if content_type not in {"image/jpeg", "image/png", "application/json"}:
+            raise PhotoUploadError(
+                "photo must be uploaded as image/jpeg, image/png, or encoded JSON"
+            )
+        body_limit = (
+            4 * ((upload_limit + 2) // 3) + 1024
+            if content_type == "application/json"
+            else upload_limit
+        )
         declared = request.headers.get("content-length")
         if declared is not None:
             try:
-                if int(declared) > upload_limit:
+                if int(declared) > body_limit:
                     raise PhotoUploadError("photo exceeds the configured upload limit")
             except ValueError as exc:
                 raise PhotoUploadError("photo has an invalid content length") from exc
         body = bytearray()
         async for chunk in request.stream():
             body.extend(chunk)
-            if len(body) > upload_limit:
+            if len(body) > body_limit:
                 raise PhotoUploadError("photo exceeds the configured upload limit")
-        return await run_in_threadpool(normalize_photo, bytes(body))
+        raw = bytes(body)
+        if content_type == "application/json":
+            try:
+                payload = EncodedPhotoRequest.model_validate_json(raw)
+            except ValueError as exc:
+                raise PhotoUploadError("photo payload is invalid") from exc
+            try:
+                raw = base64.b64decode(payload.image_base64, validate=True)
+            except (binascii.Error, ValueError) as exc:
+                raise PhotoUploadError("photo encoding is invalid") from exc
+            if len(raw) > upload_limit:
+                raise PhotoUploadError("photo exceeds the configured upload limit")
+        return await run_in_threadpool(normalize_photo, raw)
 
     @app.post("/api/demo/advance", response_model=DemoCampaign)
     async def advance_demo(payload: AdvanceRequest, request: Request) -> DemoCampaign:

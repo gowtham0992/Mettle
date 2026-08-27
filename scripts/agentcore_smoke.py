@@ -15,11 +15,6 @@ from mettle.agentcore_client import AgentCoreInvocationError, invoke_json
 from mettle.photo_upload import normalize_photo
 
 
-EXPECTED_ARN_PREFIX = (
-    "arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/"
-)
-
-
 def _summary(response: dict) -> dict:
     workflow = response.get("workflow", {})
     snapshot = workflow.get("snapshot", {})
@@ -51,14 +46,19 @@ def main() -> int:
         help="exercise T-3 follow-up, replay safety, and the T-2 deadline interrupt",
     )
     args = parser.parse_args()
-    if not args.runtime_arn.startswith(EXPECTED_ARN_PREFIX):
-        parser.error("runtime ARN must be a Mettle runtime in the approved account and region")
+    session = boto3.Session(profile_name=args.profile, region_name=args.region)
+    account_id = session.client("sts").get_caller_identity()["Account"]
+    expected_arn_prefix = (
+        f"arn:aws:bedrock-agentcore:{args.region}:{account_id}:runtime/"
+    )
+    if not args.runtime_arn.startswith(expected_arn_prefix):
+        parser.error(
+            "runtime ARN must belong to the selected AWS profile and approved region"
+        )
 
     notice = Path("examples/notices/failed-rough-in.txt").read_text(encoding="utf-8")
     session_id = f"mettle-smoke-{uuid.uuid4()}"
-    client = boto3.Session(profile_name=args.profile, region_name=args.region).client(
-        "bedrock-agentcore"
-    )
+    client = session.client("bedrock-agentcore")
 
     started = invoke_json(
         client,
@@ -381,7 +381,9 @@ def main() -> int:
     except (KeyError, ValueError) as exc:
         raise AgentCoreInvocationError("packet response was not valid base64") from exc
     reader = PdfReader(BytesIO(pdf))
-    expected_pages = 5 if args.chase else 4
+    # The communication record is intentionally a first-class final page,
+    # even when the smoke run does not add deadline-chase deliveries.
+    expected_pages = 5
     packet_text = "\n".join(page.extract_text() or "" for page in reader.pages)
     if (
         not rendered.get("ok")

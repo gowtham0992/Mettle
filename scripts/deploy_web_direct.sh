@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "$#" -ne 1 ]]; then
-  echo "Usage: $0 <aws-profile>" >&2
+if [[ "$#" -lt 3 || "$#" -gt 4 ]]; then
+  echo "Usage: $0 <aws-profile> <static-bucket> <distribution-id> [site-url]" >&2
   exit 2
 fi
 
 profile="$1"
 region="us-east-1"
 function_name="mettle-web"
-static_bucket="mettleweb-staticbucket-example"
-distribution_id="EXAMPLE123"
-site_url="https://d1ytth8asjpes8.cloudfront.net"
+static_bucket="$2"
+distribution_id="$3"
+site_url="${4:-the configured CloudFront distribution}"
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 artifact="${repo_dir}/build/mettle-web.zip"
 

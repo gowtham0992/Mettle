@@ -48,8 +48,16 @@ release script verifies that assumed-role ARN and refuses root or any other
 identity before building or changing AWS resources:
 
 ```bash
-./scripts/deploy_web_direct.sh mettle-web
+./scripts/deploy_web_direct.sh \
+  mettle-web \
+  <PRIVATE_STATIC_BUCKET> \
+  <PRIVATE_DISTRIBUTION_ID> \
+  <PUBLIC_SITE_URL>
 ```
+
+The resource arguments come from the private deployment environment. Do not
+store account IDs, ARNs, bucket names, distribution IDs, runtime IDs, or object
+versions in this repository.
 
 This path intentionally avoids CloudFormation for ordinary code and static
 asset refreshes. Infrastructure changes still require a separately reviewed

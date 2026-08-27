@@ -1,3 +1,4 @@
+import base64
 from io import BytesIO
 from pathlib import Path
 
@@ -201,6 +202,77 @@ def test_real_photo_upload_is_normalized_assessed_and_idempotent() -> None:
     assert first.json()["evidence"][-1]["status"] == "accepted"
     assert replay.json() == first.json()
     assert len(replay.json()["evidence"]) == 1
+
+
+def test_json_photo_upload_crosses_text_only_edge_and_remains_idempotent() -> None:
+    workflows = WorkflowRegistry(photo_assessor=accept_photo)
+    encoded = base64.b64encode(jpeg_photo()).decode("ascii")
+    with client(workflows=workflows) as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "json_photo_workflow_123"},
+        ).json()
+        workflow_id = created["workflow_id"]
+        approve_review(browser, created, key="json_photo_review_123")
+        headers = {"Idempotency-Key": "json_photo_evidence_123"}
+        first = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/photo?citation_id=1",
+            json={"image_base64": encoded},
+            headers=headers,
+        )
+        replay = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/photo?citation_id=1",
+            json={"image_base64": encoded},
+            headers=headers,
+        )
+
+    assert first.status_code == 200
+    assert first.json()["evidence"][-1]["status"] == "accepted"
+    assert replay.json() == first.json()
+
+
+def test_json_photo_upload_rejects_invalid_base64_before_image_decode() -> None:
+    workflows = WorkflowRegistry(photo_assessor=accept_photo)
+    with client(workflows=workflows) as browser:
+        workflow_id = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "invalid_json_photo_workflow_123"},
+        ).json()["workflow_id"]
+        response = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/photo?citation_id=1",
+            json={"image_base64": "not-valid-%%%"},
+            headers={"Idempotency-Key": "invalid_json_photo_123"},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["error"] == {
+        "code": "invalid_photo",
+        "message": "photo encoding is invalid",
+    }
+
+
+def test_json_photo_upload_enforces_configured_decoded_size_limit(monkeypatch) -> None:
+    monkeypatch.setenv("METTLE_MAX_UPLOAD_BYTES", "100")
+    workflows = WorkflowRegistry(photo_assessor=accept_photo)
+    with client(workflows=workflows) as browser:
+        workflow_id = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "large_json_photo_workflow_123"},
+        ).json()["workflow_id"]
+        response = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/photo?citation_id=1",
+            json={"image_base64": base64.b64encode(b"x" * 101).decode("ascii")},
+            headers={"Idempotency-Key": "large_json_photo_123"},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["error"] == {
+        "code": "invalid_photo",
+        "message": "photo exceeds the configured upload limit",
+    }
 
 
 def test_real_photo_upload_rejects_spoofed_content_and_oversize() -> None:
@@ -440,6 +512,12 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function renderJourney(data)" in script.text
     assert "function hasApprovedEvidenceBoundary(data, citationId)" in script.text
     assert "requestError.code = payload.error?.code" in script.text
+    assert 'sessionStorage.setItem("mettle_post_auth_path"' in script.text
+    assert 'sessionStorage.removeItem("mettle_post_auth_path")' in script.text
+    assert 'response.headers.get("content-type")' in script.text
+    assert 'code = "edge_request_failed"' in script.text
+    assert '"Content-Type": "application/json"' in script.text
+    assert "base64Standard(await file.arrayBuffer())" in script.text
     assert 'error.code === "workflow_not_found"' in script.text
     assert '"Recovery session expired"' in script.text
     assert 'elements.retry.textContent = "Start a new recovery"' in script.text

@@ -7,6 +7,9 @@ const elements = {
   workspaceNav: document.querySelector("#workspace-nav"),
   workspaceTabs: [...document.querySelectorAll("[data-workspace-tab]")],
   workspacePanels: [...document.querySelectorAll("[data-workspace-panel]")],
+  workspaceAgentState: document.querySelector("#workspace-agent-state"),
+  workspaceAgentTitle: document.querySelector("#workspace-agent-title"),
+  workspaceAgentCopy: document.querySelector("#workspace-agent-copy"),
   judgeTour: document.querySelector("#judge-tour"),
   tourStops: [...document.querySelectorAll("[data-tour-stop]")],
   tourProgressLabel: document.querySelector("#tour-progress-label"),
@@ -90,6 +93,7 @@ const elements = {
   packetAction: document.querySelector("#packet-action"),
   agentFlow: document.querySelector("#agent-flow"),
   provenanceSteps: document.querySelector("#provenance-steps"),
+  awsSchedulerProof: document.querySelector("#aws-scheduler-proof"),
   demoStep: document.querySelector("#demo-step"),
   driverTag: document.querySelector("#driver-tag"),
   advance: document.querySelector("#advance-button"),
@@ -188,6 +192,7 @@ let workflowCreateProvider = null;
 let demoRunning = false;
 let authConfig = null;
 let accessToken = sessionStorage.getItem("mettle_access_token");
+const postAuthPathKey = "mettle_post_auth_path";
 let setupStep = 1;
 let setupReturnsToWelcome = false;
 let pendingCorrectionReview = null;
@@ -285,6 +290,16 @@ function base64Url(bytes) {
     .replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
+function base64Standard(bytes) {
+  const view = new Uint8Array(bytes);
+  const chunks = [];
+  const chunkSize = 32_768;
+  for (let offset = 0; offset < view.length; offset += chunkSize) {
+    chunks.push(String.fromCharCode(...view.subarray(offset, offset + chunkSize)));
+  }
+  return btoa(chunks.join(""));
+}
+
 function tokenIsCurrent(token) {
   if (!token) return false;
   try {
@@ -330,6 +345,7 @@ async function beginLogin() {
   const state = base64Url(crypto.getRandomValues(new Uint8Array(24)));
   sessionStorage.setItem("mettle_pkce_verifier", verifier);
   sessionStorage.setItem("mettle_oauth_state", state);
+  sessionStorage.setItem("mettle_post_auth_path", `${window.location.pathname}${window.location.search}${window.location.hash}`);
   const params = new URLSearchParams({
     response_type: "code",
     client_id: authConfig.cognito_client_id,
@@ -370,7 +386,20 @@ async function finishLogin() {
   sessionStorage.setItem("mettle_access_token", accessToken);
   sessionStorage.removeItem("mettle_oauth_state");
   sessionStorage.removeItem("mettle_pkce_verifier");
-  window.history.replaceState({}, "", window.location.pathname);
+  const requestedPath = sessionStorage.getItem(postAuthPathKey);
+  sessionStorage.removeItem("mettle_post_auth_path");
+  let returnPath = window.location.pathname;
+  if (requestedPath) {
+    try {
+      const target = new URL(requestedPath, window.location.origin);
+      if (target.origin === window.location.origin && target.pathname.startsWith("/")) {
+        returnPath = `${target.pathname}${target.search}${target.hash}`;
+      }
+    } catch (_error) {
+      // Invalid saved destinations fail closed to the same-origin root callback.
+    }
+  }
+  window.history.replaceState({}, "", returnPath);
 }
 
 async function initializeAuth() {
@@ -650,6 +679,18 @@ async function request(path, options = {}) {
     ...options,
     headers,
   });
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    const requestError = new Error(
+      response.ok
+        ? "Mettle returned an unexpected response. Please retry."
+        : `The request was blocked before it reached Mettle (HTTP ${response.status}). Please retry.`,
+    );
+    const code = "edge_request_failed";
+    requestError.code = code;
+    requestError.status = response.status;
+    throw requestError;
+  }
   const payload = await response.json();
   if (!response.ok) {
     const requestError = new Error(payload.error?.message || "The campaign request failed.");
@@ -686,6 +727,17 @@ function showError(error) {
   elements.errorMessage.textContent = error.message || "The local API did not respond.";
   elements.retry.textContent = "Retry";
   retryHandler = () => loadCampaign();
+}
+
+function showInlineWorkflowError(error, element) {
+  if (error.code === "workflow_not_found" && activeWorkflowTarget === "agentcore") {
+    if (elements.noticeDialog.open) elements.noticeDialog.close();
+    showError(error);
+    elements.error.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  element.textContent = error.message;
+  element.hidden = false;
 }
 
 function showToast(message) {
@@ -1309,7 +1361,7 @@ function agentFlowNode({ kind, label, title, detail, state }) {
     node("span", "agent-flow__kind", label),
     node("strong", "agent-flow__name", title),
     node("span", "agent-flow__detail", detail),
-    node("span", "agent-flow__state", state === "done" ? "COMPLETED" : state === "paused" ? "PAUSED" : "UP NEXT"),
+    node("span", "agent-flow__state", state === "done" ? "COMPLETED" : state === "paused" ? "PAUSED" : state === "standby" ? "STOOD DOWN" : "UP NEXT"),
   );
   return item;
 }
@@ -1343,6 +1395,7 @@ function renderAgentFlow(data) {
   const allReady = Number(data.metrics?.citations_total || 0) > 0
     && data.metrics.citations_ready === data.metrics.citations_total;
   const packetDone = ["awaiting_approval", "approved"].includes(data.packet_status) || allReady;
+  const campaignComplete = data.packet_status === "approved";
   const intakeLabel = data.source_mode === "workflow" && data.intake_provider !== "bedrock"
     ? "BOUNDED INTAKE"
     : "STRANDS AGENT · NOVA MICRO";
@@ -1365,7 +1418,13 @@ function renderAgentFlow(data) {
       kind: "background",
       nodes: [
         agentFlowNode({ kind: "agent", label: "STRANDS AGENT · NOVA LITE", title: "Visible-evidence agent", detail: "Pixels → bounded findings", state: evidenceRan ? "done" : "waiting" }),
-        agentFlowNode({ kind: "scheduler", label: "AMAZON EVENTBRIDGE", title: "Deadline wake-up", detail: "Resume the checkpointed chase", state: schedulerRan ? "done" : "waiting" }),
+        agentFlowNode({
+          kind: "scheduler",
+          label: "AMAZON EVENTBRIDGE",
+          title: "Deadline wake-up",
+          detail: campaignComplete ? "No open work · checkpoint cancelled" : "Resume the checkpointed chase",
+          state: campaignComplete ? "standby" : schedulerRan ? "done" : "waiting",
+        }),
       ],
     }),
     agentFlowStage({
@@ -1398,6 +1457,7 @@ function renderProvenance(data) {
   const recorded = { className: "completed", label: "Recorded sample" };
   const waiting = { className: "pending", label: "Pending" };
   const paused = { className: "paused", label: "Paused for contractor" };
+  const stoodDown = { className: "completed", label: "Stood down" };
   const modeDone = isWorkflow ? done : recorded;
   const humanStatus = pending ? paused : decisions > 0 ? done : waiting;
   const packetStatus = data.packet_status === "approved" ? done
@@ -1448,12 +1508,12 @@ function renderProvenance(data) {
       ["Safety boundary", "No invented requirement and no repeated contact outside the configured campaign cadence."],
       ["Next action", "Wait for replacement proof; leave accepted corrections out of future follow-ups."],
     ] }),
-    provenanceStep({ number: 6, kind: "policy", title: "EventBridge wakes the deadline-chase graph", role: "Background scheduler", status: eventBridgeArmed || deadlineRan ? modeDone : waiting, artifacts: [
+    provenanceStep({ number: 6, kind: "policy", title: "EventBridge wakes the deadline-chase graph", role: "Background scheduler", status: data.packet_status === "approved" ? stoodDown : eventBridgeArmed || deadlineRan ? modeDone : waiting, artifacts: [
       ["Input received", "Versioned workflow reference, deadline checkpoint, and idempotency key"],
       ["Responsible", isAgentCore ? "Amazon EventBridge Scheduler → private AgentCore worker" : "Recorded deadline-chase checkpoint"],
-      ["Structured output", eventBridgeArmed ? `Next bounded check armed${data.next_check_at ? ` for ${formatTimestamp(data.next_check_at)}` : ""}` : deadlineRan ? "Open-only chase replanned at the deadline checkpoint" : "No checkpoint has fired yet"],
+      ["Structured output", data.packet_status === "approved" ? "Packet approved; no open work remains and no further checkpoint is armed" : eventBridgeArmed ? `Next bounded check armed${data.next_check_at ? ` for ${formatTimestamp(data.next_check_at)}` : ""}` : deadlineRan ? "Open-only chase replanned at the deadline checkpoint" : "No checkpoint has fired yet"],
       ["Safety boundary", "One-time schedule, stale-event rejection, bounded retries, and open corrections only."],
-      ["Next action", "Replan unresolved work and interrupt only if the deadline creates a contractor tradeoff."],
+      ["Next action", data.packet_status === "approved" ? "None—the approved campaign is complete." : "Replan unresolved work and interrupt only if the deadline creates a contractor tradeoff."],
     ] }),
     provenanceStep({ number: 7, kind: "human", title: "Strands pauses for professional judgment", role: "BeforeNodeCall gate", status: humanStatus, open: Boolean(pending), artifacts: [
       ["Input received", pending ? pending.question : `${decisions} contractor decision${decisions === 1 ? "" : "s"} recorded`],
@@ -1466,7 +1526,7 @@ function renderProvenance(data) {
     provenanceStep({ number: 8, kind: "policy", title: "Packet assembly prepares the evidence handoff", role: "Deterministic policy", status: packetStatus, artifacts: [
       ["Input received", `${data.metrics.citations_ready} of ${data.metrics.citations_total} corrections currently have accepted visible proof`],
       ["Responsible", "Deterministic ReportLab packet renderer"],
-      ["Structured output", data.packet_status === "approved" ? "Five-page contractor-approved PDF" : data.packet_status === "awaiting_approval" ? "Five-page packet awaiting contractor release" : "Packet remains incomplete and locked"],
+      ["Structured output", data.packet_status === "approved" ? "Contractor-approved evidence PDF" : data.packet_status === "awaiting_approval" ? "Evidence packet awaiting contractor release" : "Packet remains incomplete and locked"],
       ["Safety boundary", "No automatic inspector contact, municipality approval claim, or code certification."],
       ["Next action", data.packet_status === "approved" ? "Download the contractor-approved artifact." : allReady ? "Require final contractor approval." : "Wait for the remaining accepted proof."],
     ] }),
@@ -1543,9 +1603,14 @@ function renderJudgment(judgment) {
         ? "Final approval recorded. The reinspection PDF is ready to download."
         : "Your decision is logged. Mettle resumed the recovery run.");
     } catch (error) {
-      input.setCustomValidity(error.message);
-      input.reportValidity();
-      input.setCustomValidity("");
+      if (error.code === "workflow_not_found" && activeWorkflowTarget === "agentcore") {
+        showError(error);
+        elements.error.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        input.setCustomValidity(error.message);
+        input.reportValidity();
+        input.setCustomValidity("");
+      }
     } finally {
       setBusy(button, false);
     }
@@ -2411,6 +2476,24 @@ function render(data) {
   elements.cadence.textContent = data.packet_status === "approved"
     ? "STANDING DOWN · PACKET APPROVED"
     : criticalRecovery ? "CRITICAL RECOVERY · CHECK-INS EVERY 4H" : "NORMAL FOLLOW-UP · DAILY CHECK-INS";
+  if (data.packet_status === "approved") {
+    elements.workspaceAgentState.innerHTML = '<i aria-hidden="true"></i> METTLE STOOD DOWN';
+    elements.workspaceAgentTitle.textContent = "Packet approved. Follow-up stopped.";
+    elements.workspaceAgentCopy.textContent = "All citations are closed; no trade remains in the chase.";
+    elements.awsSchedulerProof.textContent = "Stood down · packet approved";
+  } else if (data.source_mode === "workflow" && data.execution_target === "agentcore" && data.automation_status === "scheduled") {
+    elements.workspaceAgentState.innerHTML = '<i aria-hidden="true"></i> METTLE IS WORKING';
+    elements.workspaceAgentTitle.textContent = "Open-only follow-up is armed.";
+    elements.workspaceAgentCopy.textContent = "Closed corrections leave the chase automatically.";
+    elements.awsSchedulerProof.textContent = data.next_check_at
+      ? `Armed · ${formatTimestamp(data.next_check_at)}`
+      : "Armed · versioned checkpoint";
+  } else {
+    elements.workspaceAgentState.innerHTML = '<i aria-hidden="true"></i> METTLE IS READY';
+    elements.workspaceAgentTitle.textContent = "No background checkpoint is active.";
+    elements.workspaceAgentCopy.textContent = "Mettle will arm recovery only after contractor review.";
+    elements.awsSchedulerProof.textContent = "No active checkpoint";
+  }
 
   renderCorrectionSummary(data);
   renderJourney(data);
@@ -2587,10 +2670,10 @@ elements.photoForm.addEventListener("submit", async (event) => {
     const envelope = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/evidence/photo?citation_id=${citation}`, {
       method: "POST",
       headers: {
-        "Content-Type": file.type,
+        "Content-Type": "application/json",
         "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_"),
       },
-      body: file,
+      body: JSON.stringify({ image_base64: base64Standard(await file.arrayBuffer()) }),
     });
     campaign = workflowCampaign(envelope, activeWorkflowTarget);
     render(campaign);
@@ -2602,8 +2685,7 @@ elements.photoForm.addEventListener("submit", async (event) => {
         : "Photo rejected with a specific re-request for the trade.");
     elements.photoForm.reset();
   } catch (error) {
-    elements.photoError.textContent = error.message;
-    elements.photoError.hidden = false;
+    showInlineWorkflowError(error, elements.photoError);
   } finally {
     elements.photoSubmit.disabled = !activePhotoEnabled() || !elements.photoFile.files?.length;
     elements.photoSubmit.setAttribute("aria-busy", "false");
@@ -2890,8 +2972,7 @@ elements.noticeForm.addEventListener("submit", async (event) => {
       elements.noticeDialog.close();
     }
   } catch (error) {
-    elements.workflowError.textContent = error.message;
-    elements.workflowError.hidden = false;
+    showInlineWorkflowError(error, elements.workflowError);
   } finally {
     setBusy(elements.startWorkflow, false);
     elements.startBedrock.disabled = !bedrockEnabled;
@@ -2926,8 +3007,7 @@ elements.approveCorrections.addEventListener("click", async () => {
       ? `Review approved. Amazon SNS accepted ${sent} one-way message${sent === 1 ? "" : "s"}; EventBridge is armed.`
       : `Review approved. Mettle recorded ${envelope.snapshot.deliveries.length} safe outreach action${envelope.snapshot.deliveries.length === 1 ? "" : "s"}; EventBridge is armed.`);
   } catch (error) {
-    elements.workflowError.textContent = error.message;
-    elements.workflowError.hidden = false;
+    showInlineWorkflowError(error, elements.workflowError);
   } finally {
     setBusy(elements.approveCorrections, false);
   }

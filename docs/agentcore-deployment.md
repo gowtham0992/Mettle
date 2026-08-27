@@ -1,259 +1,155 @@
 # AgentCore deployment and rollback
 
-Mettle is prepared for a direct CodeZip deployment in `us-east-1`. Direct
-deployment avoids the broad CloudFormation bootstrap roles created by the
-default CDK workflow. Do not run these commands with the root-backed `mettle`
-profile during normal development.
+Mettle uses direct CodeZip deployment in `us-east-1`. The public repository
+documents the reproducible process while keeping account IDs, runtime IDs,
+bucket names, object-version IDs, session IDs, and workflow IDs out of source.
 
-## Current deployment
+## Current acceptance status
 
-- Runtime: `MettleRecovery-example`
-- ARN: `arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/MettleRecovery-example`
-- Version and status: `12`, `READY`
-- Artifact: `runtime/MettleRecovery-example-arm64.zip`, S3 version
-  `EXAMPLE_OBJECT_VERSION`
+- Runtime: `MettleRecovery` (resource identifier recorded privately)
+- Version and status: `13`, `READY`
+- Artifact: immutable, private, versioned S3 object
 - Artifact SHA-256:
-  `EXAMPLE_ARTIFACT_SHA256`
+  `8a83f7ce876e92565e56ac958ed3cc5877d276fb2192fe383c62122d7e63ab16`
 - Runtime lifecycle: 15-minute idle timeout, 8-hour maximum session
-- Log group: `/aws/bedrock-agentcore/runtimes/MettleRecovery-example-DEFAULT`,
-  14-day retention
+- Log retention: 14 days
 
-The version 12 acceptance workflow `Mo8bhSE6RnAbTnpu` ran Nova Micro notice
-intake, paused with zero deliveries for the contractor's structured correction
-review, resumed the same Strands graph, then ran Nova Lite photo assessment,
-T−3 open-citation replanning, an idempotent
-check replay with no duplicate outreach, the T−2 deadline tradeoff interrupt
-and resume, final packet approval, and PDF integrity verification in one
-AgentCore session. Citation 1 stopped receiving follow-ups after its evidence
-was accepted; only citations 2 and 3 were chased. The final 5,617,827-byte
-five-page packet had SHA-256
-`6a1467aa7c83bd5bf2b574c095ef29b669075fb68e5b32645156c1075208499e`.
+The version 13 acceptance run used synthetic data. It ran Nova Micro notice
+intake, stopped with zero deliveries for contractor review, resumed the same
+Strands graph, accepted three bounded evidence fixtures, required final
+contractor approval, and rendered a five-page packet. The PDF passed
+content-type, page-count, recovery-record, base64, and SHA-256 integrity checks
+with digest
+`2e251570d2f42482aedca4958b801c614c8117dff8c39edfe63426de8c2b4973`.
 
-Versions 10 and 11 failed closed during acceptance because the default
-structured-output path exposed a generic tool schema that Nova Lite did not
-select reliably. Version 12 keeps evidence analysis inside a dedicated Strands
-Agent but forces the single exact Pydantic output tool, so invalid or missing
-structured output cannot advance a citation.
-
-Version 8 never became ready: its package accidentally included the x86_64
-web-Lambda staging tree alongside the ARM64 runtime dependencies. The package
-pruner now removes and rejects `build/`, and version 9 contains ARM64 Linux
-native extensions only.
-
-The immutable version 7 artifact remains available as the latest known-good
-rollback target: `runtime/MettleRecovery-example.zip`, S3 version
-`EXAMPLE_OBJECT_VERSION`, SHA-256
-`EXAMPLE_ARTIFACT_SHA256`.
-
-The first version 7 acceptance attempt proved the full chase loop but exposed a
-stale smoke-test assumption that every packet has exactly four pages. Seven
-communication records correctly flow the packet onto a fifth page. A local
-regression test reproduced that structure before the smoke check was updated
-to verify the expected page count, PDF text, content type, and SHA-256. The
-second paid acceptance then passed end to end.
-
-The immutable version 6 rollback artifact remains
-`runtime/MettleRecovery-example.zip`, S3 version
-`EXAMPLE_OBJECT_VERSION`, SHA-256
-`EXAMPLE_ARTIFACT_SHA256`.
-
-The version 4 vision acceptance workflow `qrbNmKhlhEzAxqVP` ran Nova Micro
-notice intake and one real AgentCore-to-Nova-Lite photo assessment. The photo
-was accepted against its notice-grounded visible requirement, all three
-citations reached ready, contractor approval gated the final packet, and the
-5,616,749-byte four-page PDF passed SHA-256 verification. CloudWatch recorded
-only request/session metadata and timings; it did not log the notice, image,
-model findings, phone numbers, or packet.
-
-The rollback drill then deployed the recorded version 3 artifact as runtime
-version 5, reached `READY`, and completed acceptance workflow
-`okBa3CpGLR9W7d-B`. The exact immutable vision artifact was restored as runtime
-version 6 and reached `READY`. This exercised artifact rollback and restoration
-on the actual demo runtime rather than relying on a paper rollback.
-
-The original version 3 acceptance workflow `gC2tCVUproqzcjpu` ran the entire recovery
-inside one AgentCore session: Nova Micro intake, two initial trade deliveries,
-one contractor judgment, a third delivery after resume, three accepted
-evidence records, packet preparation, final contractor approval, and a
-four-page PDF. The 7,605,783-byte packet passed a SHA-256 integrity check.
-
-The version 2 acceptance workflow `DW8bsBrz77Q4Noa9` established that runtime
-logs contain completion metadata only, without the synthetic notice or
-credentials. The deployer and bootstrap identities intentionally cannot read
-CloudWatch logs, so version 3 post-deploy log inspection was not broadened at
-the expense of least privilege.
-
-The rollback canary `MettleRecoveryCanary-gNWaC24tLN` reached `READY`, was
-deleted, and returned `ResourceNotFound` on verification. Its retained log
-group expires after 14 days. The first artifact failed before Bedrock intake
-because the deployed Python path omitted the repository's `src/` directory;
-the regression-tested entrypoint fix is in version 2, and the broken S3 object
-version was permanently removed.
+Earlier acceptance runs exercised live Nova Lite vision, deadline replanning,
+idempotent replay, stale-event rejection, final approval, packet integrity,
+rollback, and restoration. Their infrastructure and workflow identifiers are
+recorded privately rather than committed.
 
 ## Proven locally
 
 - The strict runtime contract completes `start -> Strands interrupt -> resume
-  -> evidence -> packet preparation -> final approval -> PDF` in one runtime
-  session.
-- Replaying the same start idempotency key does not repeat the Bedrock intake.
+  -> evidence -> packet preparation -> final approval -> PDF` in one session.
+- Replaying the same start idempotency key does not repeat Bedrock intake.
 - `npm ci && npx agentcore validate --json` succeeds from a clean clone.
-- `scripts/prune_agentcore_zip.sh` strips repository-only files after packaging
-  and fails if the zip still contains `.env`, `.aws`, `.git`, design sources,
-  docs, tests, scripts, AgentCore deployment state, or Node dependencies.
-- The Python tests validate the runtime contract and cloud-response decoder.
-- The packaged entrypoint regression test removes the local editable-install
-  path and proves `agentcore_app.py` bootstraps the deployed `src/` layout.
-- AWS Access Analyzer reports zero findings for all checked-in identity
-  policies.
-- IAM simulation allows Nova Micro and Nova Lite and implicitly denies Nova Pro.
+- `scripts/prune_agentcore_zip.sh` strips repository-only files and rejects
+  `.env`, `.aws`, `.git`, design sources, docs, tests, scripts, deployment
+  state, build output, and Node dependencies.
+- The packaged entrypoint regression removes the editable-install path and
+  proves `agentcore_app.py` bootstraps the deployed `src/` layout.
+- AWS Access Analyzer reports zero findings for the checked-in policy shapes.
+- IAM simulation allows Nova Micro and Nova Lite and denies Nova Pro.
 
 ## Intended AWS footprint
 
-The one-time account setup creates only:
+The one-time private account setup creates only:
 
-1. `mettle-agentcore-artifacts-123456789012-us-east-1`, a private, encrypted,
-   versioned S3 bucket with public access blocked;
-2. `MettleAgentCoreRuntime`, trusted by AgentCore only from account
-   `123456789012` in `us-east-1`;
-3. `MettleAgentCoreDeployer`, assumable by the existing bootstrap user for one
-   hour; and
-4. a separate `AssumeMettleAgentCoreDeployer` inline policy on the bootstrap
-   user allowing only that one new role. The existing Bedrock developer policy
-   is left unchanged.
+1. a private, encrypted, versioned S3 artifact bucket with public access
+   blocked;
+2. a runtime execution role scoped to Nova Micro, Nova Lite, logs, traces, and
+   namespaced metrics;
+3. a deployment role scoped to the Mettle runtime and artifact prefix; and
+4. a narrow assume-role policy for the local bootstrap identity.
 
-The deployment then uploads `agentcore/MettleRecovery.zip` below `runtime/`
-and creates one IAM-authorized public-network AgentCore Runtime tagged
-`Project=Mettle`. Public network mode describes outbound runtime networking;
-inbound invocation still requires AWS IAM authorization.
+Public example policies use sample account identifiers. Replace them through a
+private deployment configuration; never commit real account or resource IDs.
 
-The checked-in policies are:
+The runtime uses IAM-authorized inbound invocation. `PUBLIC` network mode
+describes outbound runtime networking and does not make the invocation endpoint
+anonymous.
 
-- `agentcore/iam/runtime-trust.json`
-- `agentcore/iam/runtime-policy.json`
-- `agentcore/iam/deployer-trust.json`
-- `agentcore/iam/deployer-policy.json`
-- `agentcore/iam/bootstrap-deployer-policy.json`
+## Package validation
 
-The execution policy grants model invocation only for
-`amazon.nova-micro-v1:0` and `amazon.nova-lite-v1:0`. It also includes the exact CloudWatch Logs, X-Ray,
-and namespaced metric permissions documented for AgentCore Runtime. It has no
-IAM, S3, configuration-bundle, or wildcard Bedrock model permission.
-
-AgentCore's `CreateAgentRuntime` operation also authorizes the dependent
-`CreateAgentRuntimeEndpoint` action for the future `runtime/*` ARN. AWS does
-not pass the runtime request-tag context to that dependent authorization, so
-this single action must be account-scoped. Runtime creation remains
-`Project=Mettle` request-tag-gated, and get/update/delete/invoke remain
-resource-tag-gated.
-
-Runtime deletion has the symmetric `DeleteAgentRuntimeEndpoint` dependency.
-AWS does not pass resource-tag context to that dependent authorization, so the
-endpoint action uses the account's `runtime/*` ARN. `DeleteAgentRuntime`
-itself remains `Project=Mettle` resource-tag-gated, so the deployer cannot
-initiate deletion of a non-Mettle runtime.
-
-First-use runtime creation also creates an AgentCore-managed workload identity
-under the account's `default` workload identity directory. The deployer can
-create and tag only the exact default directory and identities under it, and
-only with
-`Project=Mettle`; it cannot read identities or obtain workload tokens.
-Rollback can delete only managed identities under that directory carrying the
-same `Project=Mettle` resource tag. AWS also evaluates deletion against the
-untagged parent, so the policy allows the delete action on the one exact
-`default` directory ARN; it does not allow deletion under any other directory.
-
-## Direct runtime request
-
-After packaging and uploading a versioned object, the control-plane request is
-equivalent to:
+Package from the repository root:
 
 ```bash
-aws bedrock-agentcore-control create-agent-runtime \
-  --profile mettle-agentcore \
-  --region us-east-1 \
-  --agent-runtime-name MettleRecovery \
-  --agent-runtime-artifact '{"codeConfiguration":{"code":{"s3":{"bucket":"mettle-agentcore-artifacts-123456789012-us-east-1","prefix":"runtime/MettleRecovery.zip","versionId":"<VERSION_ID>"}},"runtime":"PYTHON_3_12","entryPoint":["agentcore_app.py"]}}' \
-  --role-arn arn:aws:iam::123456789012:role/MettleAgentCoreRuntime \
+npx agentcore package -d . -r MettleRecovery
+bash scripts/prune_agentcore_zip.sh agentcore/MettleRecovery.zip
+```
+
+Before upload, verify:
+
+```bash
+unzip -Z1 agentcore/MettleRecovery.zip | rg \
+  '(^|/)(\.env|\.aws|\.git|node_modules)(/|$)|^(build|docs|tests|scripts|assets)/'
+shasum -a 256 agentcore/MettleRecovery.zip
+```
+
+The first command must print no matches. Native extensions must target ARM64
+Linux for the managed Python 3.12 runtime.
+
+## Direct runtime update
+
+Upload the pruned artifact to a new immutable key in the private versioned
+bucket. Then update the existing runtime with private values supplied outside
+source control:
+
+```bash
+aws bedrock-agentcore-control update-agent-runtime \
+  --agent-runtime-id '<RUNTIME_ID>' \
+  --agent-runtime-artifact '{"codeConfiguration":{"code":{"s3":{"bucket":"<PRIVATE_BUCKET>","prefix":"runtime/<IMMUTABLE_ARTIFACT>.zip","versionId":"<VERSION_ID>"}},"runtime":"PYTHON_3_12","entryPoint":["agentcore_app.py"]}}' \
+  --role-arn 'arn:aws:iam::<AWS_ACCOUNT_ID>:role/MettleAgentCoreRuntime' \
   --network-configuration '{"networkMode":"PUBLIC"}' \
   --protocol-configuration '{"serverProtocol":"HTTP"}' \
   --lifecycle-configuration '{"idleRuntimeSessionTimeout":900,"maxLifetime":28800}' \
-  --tags Project=Mettle
+  --client-token '<UNIQUE_IDEMPOTENCY_TOKEN>' \
+  --region us-east-1
 ```
 
-The actual deployment must use a unique 33-or-more-character client token and
-record the returned runtime ID, ARN, version, artifact version ID, and request
-time in a local ignored file. No notice data belongs in deployment state.
+Use a scoped deployment profile. Do not use root-backed credentials for normal
+updates. Record the returned version, artifact version, digest, and request time
+in a private deployment log.
 
 ## Cloud acceptance check
 
-1. Wait until `GetAgentRuntime` returns `READY`.
-2. Invoke `start` with a fresh runtime session ID and synthetic notice.
-3. Confirm the response is interrupted with exactly one judgment request.
-4. Invoke `resume` with the same runtime session ID and returned workflow and
-   interrupt IDs.
+1. Wait until `GetAgentRuntime` reports `READY`.
+2. Invoke `start` with a new session ID and synthetic notice.
+3. Confirm one structured contractor-review interrupt and zero deliveries.
+4. Submit the review through the same session and verify bounded outreach.
 5. Submit accepted synthetic evidence for all three citations.
-6. Prepare the packet, approve it through the contractor judgment gate, and
-   render the PDF.
-7. Verify the PDF type, SHA-256 digest, recovery communication record, and
-   expected structure (four pages without chase history; five with it).
-8. Confirm the graph completes and that the first outreach was not replayed.
-9. Check CloudWatch logs for the hashed session reference and absence of notice
-   text when using an authorized observability identity.
-10. Verify the execution role cannot invoke a model other than the approved Nova Micro and Nova Lite pair.
+6. Prepare the packet and approve it through the contractor gate.
+7. Render the packet and verify content type, base64, SHA-256, five pages, and
+   the recovery communication record.
+8. Confirm an idempotent replay does not repeat outreach.
+9. Confirm logs contain only safe metadata, not notice text, images, model
+   findings, phone numbers, credentials, or packet content.
 
-The paid end-to-end check is scripted and prints only workflow and packet
-metadata, not the notice or model response:
+The bounded paid smoke test prints workflow and packet metadata only:
 
 ```bash
 uv run python scripts/agentcore_smoke.py \
-  --profile mettle-agentcore \
-  --runtime-arn <RUNTIME_ARN> \
-  --vision \
-  --chase
+  --profile '<SCOPED_PROFILE>' \
+  --runtime-arn '<PRIVATE_RUNTIME_ARN>'
 ```
 
-AgentCore runtime sessions are ephemeral. The default idle timeout here is 15
-minutes and maximum lifetime is 8 hours. The first cloud demo must therefore
-keep `start` and `resume` in the same session; durable campaign recovery across
-session expiry is explicitly out of scope for this slice.
+Add `--vision` to exercise live Nova Lite and `--chase` to exercise the T-3
+follow-up, replay safety, and T-2 deadline interrupt.
 
-## Rollback drill
+AgentCore sessions are ephemeral. This slice uses a 15-minute idle timeout and
+an 8-hour maximum lifetime; start and resume must remain in the same session.
+Durable campaign recovery across runtime-session expiry is intentionally out of
+scope and the UI directs the contractor to start a fresh recovery.
 
-Before leaving the final runtime deployed, create a disposable canary runtime,
-wait for `READY`, delete it, and verify `GetAgentRuntime` no longer returns an
-active resource. This exercises the same rollback path without deleting the
-demo runtime.
+## Rollback
 
-If the final deployment is unhealthy, delete the runtime by its recorded ID,
-verify deletion, and delete the uploaded object version. Do not reuse a failed
-runtime while its state is `CREATING`, `UPDATING`, or `DELETING`.
+Keep the last known-good immutable artifact version. If a new runtime version
+fails acceptance:
+
+1. update the same runtime to the last known-good private object version;
+2. wait for `READY`;
+3. rerun the bounded acceptance check; and
+4. remove the failed object version only after rollback succeeds.
 
 ## Full teardown
 
 After the hackathon:
 
 1. delete the Mettle runtime and verify deletion;
-2. delete every object version and delete marker under the artifact bucket;
-3. delete the artifact bucket;
-4. delete inline policies from `MettleAgentCoreRuntime` and
-   `MettleAgentCoreDeployer`, then delete both roles; and
-5. after every AgentCore Runtime in the account is gone, delete the AWS-owned
-   `AWSServiceRoleForBedrockAgentCoreRuntimeIdentity` service-linked role; and
-6. remove the AgentCore deployer role from the bootstrap user's assume-role
-   policy and local AWS config.
+2. delete all versions and delete markers in the private artifact bucket;
+3. delete the bucket;
+4. remove the scoped policies and deployment/runtime roles; and
+5. remove the local assume-role profile.
 
-CloudWatch log groups may outlive the runtime. List only
-`/aws/bedrock-agentcore/runtimes/` groups associated with the recorded runtime
-before deciding whether to delete them.
-
-## Tooling caveat
-
-The supported `@aws/agentcore` 0.27.0 CLI is pinned as a development-only
-dependency. Its bundled toolchain currently reports three upstream npm audit
-findings: unbounded brace expansion in its CDK copy, a zero-length custom-
-generator loop in Nano ID, and a Windows-only esbuild development-server file-
-read issue. Mettle imports none of these packages, runs no untrusted patterns or
-ID-generator input through this toolchain, and ships none of them in the Python
-runtime or browser bundle. The latest CLI still bundles the affected versions,
-so an override would violate its internal version ranges; upgrade again when
-AWS publishes a patched CLI.
+CloudWatch log groups may outlive the runtime. Resolve the exact private log
+group before deciding whether to delete it.

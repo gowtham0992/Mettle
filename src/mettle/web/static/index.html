@@ -73,9 +73,9 @@
           <span class="workspace-tab__icon" aria-hidden="true">03</span><strong><span class="workspace-label-full">Agent receipt</span><span class="workspace-label-short" aria-hidden="true">Agents</span></strong><small>Inspectable Strands run</small>
         </button>
         <div class="workspace-agent-status" aria-label="Background recovery status">
-          <span><i aria-hidden="true"></i> METTLE IS WORKING</span>
-          <strong>Open-only follow-up is armed.</strong>
-          <small>Closed corrections leave the chase automatically.</small>
+          <span id="workspace-agent-state"><i aria-hidden="true"></i> METTLE IS WORKING</span>
+          <strong id="workspace-agent-title">Open-only follow-up is armed.</strong>
+          <small id="workspace-agent-copy">Closed corrections leave the chase automatically.</small>
           <button type="button" data-open-agent-receipt>View agent receipt →</button>
         </div>
         <div class="workspace-nav__support">
@@ -301,7 +301,7 @@
               </div>
               <dl class="aws-proof">
                 <div><dt>AgentCore</dt><dd>Runtime READY</dd></div>
-                <div><dt>Scheduler</dt><dd>v1 fired · v2 armed</dd></div>
+                <div><dt>Scheduler</dt><dd id="aws-scheduler-proof">Awaiting campaign state</dd></div>
                 <div><dt>DLQ</dt><dd>Empty</dd></div>
                 <div><dt>Alarm</dt><dd>OK</dd></div>
               </dl>

@@ -10,7 +10,6 @@ from typing import Any
 import boto3
 
 
-EXPECTED_ACCOUNT = "123456789012"
 EXPECTED_FUNCTION = "mettle-web"
 NOTICE = Path("examples/notices/failed-rough-in.txt")
 
@@ -20,6 +19,7 @@ def api_event(
     method: str,
     path: str,
     subject: str,
+    account_id: str,
     body: dict[str, Any] | None = None,
     idempotency_key: str | None = None,
 ) -> dict[str, Any]:
@@ -37,7 +37,7 @@ def api_event(
         "rawQueryString": "",
         "headers": headers,
         "requestContext": {
-            "accountId": EXPECTED_ACCOUNT,
+            "accountId": account_id,
             "apiId": "scheduler-smoke",
             "authorizer": {
                 "jwt": {
@@ -116,8 +116,6 @@ def main() -> int:
 
     session = boto3.Session(profile_name=args.profile, region_name=args.region)
     account = session.client("sts").get_caller_identity()["Account"]
-    if account != EXPECTED_ACCOUNT:
-        parser.error("profile must target the approved Mettle AWS account")
 
     lambda_client = session.client("lambda")
     scheduler = session.client("scheduler")
@@ -135,6 +133,7 @@ def main() -> int:
                 method="POST",
                 path="/api/agentcore/workflows",
                 subject=subject,
+                account_id=account,
                 idempotency_key=create_key,
                 body={
                     "notice_text": NOTICE.read_text(encoding="utf-8"),
@@ -157,6 +156,7 @@ def main() -> int:
                 method="POST",
                 path=f"/api/agentcore/workflows/{workflow_id}/review",
                 subject=subject,
+                account_id=account,
                 idempotency_key=review_key,
                 body=review_payload(created),
             ),
@@ -186,6 +186,7 @@ def main() -> int:
                     method="GET",
                     path=f"/api/agentcore/workflows/{workflow_id}",
                     subject=subject,
+                    account_id=account,
                 ),
             )
             automation = current.get("automation") or {}

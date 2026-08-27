@@ -148,8 +148,9 @@ def assess_sample(
     elif missing:
         status = EvidenceStatus.REJECTED
         explanation = (
-            "This photo does not prove the notice requirements. Ask for a wider shot "
-            "that shows the full panel area and a visible tape measure for clearance."
+            "This photo is missing visible proof of: "
+            + "; ".join(missing)
+            + ". Ask the trade for a replacement photo that shows each missing item."
         )
     else:
         status = EvidenceStatus.ACCEPTED

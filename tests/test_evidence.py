@@ -23,7 +23,8 @@ def test_closeup_is_rejected_with_specific_missing_requirements() -> None:
     assert assessment.status is EvidenceStatus.REJECTED
     assert assessment.matched_requirements == []
     assert assessment.missing_requirements == CITATION.evidence_requirements
-    assert "wider shot" in assessment.explanation.lower()
+    assert "wide photo" in assessment.explanation.lower()
+    assert "tape measure" in assessment.explanation.lower()
 
 
 def test_wide_measured_photo_satisfies_notice_anchored_requirements() -> None:
@@ -35,6 +36,31 @@ def test_wide_measured_photo_satisfies_notice_anchored_requirements() -> None:
     assert assessment.status is EvidenceStatus.ACCEPTED
     assert assessment.missing_requirements == []
     assert assessment.matched_requirements == CITATION.evidence_requirements
+
+
+def test_rejection_request_uses_the_actual_missing_mechanical_requirement() -> None:
+    citation = Citation(
+        citation_id="3",
+        code_reference="IMC 304.10",
+        notice_text="Provide clearance and service access.",
+        trade=Trade.MECHANICAL,
+        evidence_requirements=[
+            "Wide photo showing equipment and complete service-access path",
+            "Photo with tape measure showing visible access clearance",
+        ],
+    )
+
+    assessment = assess_sample(
+        citation=citation,
+        sample_id="mechanical_access_wide",
+    )
+
+    assert assessment.status is EvidenceStatus.REJECTED
+    assert assessment.missing_requirements == [
+        "Photo with tape measure showing visible access clearance"
+    ]
+    assert "tape measure" in assessment.explanation.lower()
+    assert "panel area" not in assessment.explanation.lower()
 
 
 def test_unrecognized_requirement_routes_to_manual_review() -> None:
