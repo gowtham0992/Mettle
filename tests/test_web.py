@@ -408,6 +408,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Background activity" in page.text
     assert 'id="away-briefing"' in page.text
     assert 'id="theme-toggle"' in page.text
+    assert 'id="error-title"' in page.text
     assert "Compress to next checkpoint" in page.text
     assert "Simulate scheduled check" not in page.text
     assert page.headers["content-security-policy"].startswith("default-src 'self'")
@@ -438,6 +439,10 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function renderJudgeTour(data)" in script.text
     assert "function renderJourney(data)" in script.text
     assert "function hasApprovedEvidenceBoundary(data, citationId)" in script.text
+    assert "requestError.code = payload.error?.code" in script.text
+    assert 'error.code === "workflow_not_found"' in script.text
+    assert '"Recovery session expired"' in script.text
+    assert 'elements.retry.textContent = "Start a new recovery"' in script.text
     assert "!hasApprovedEvidenceBoundary(data, button.dataset.citation)" in script.text
     assert 'openCount === 1 ? "correction still needs" : "corrections still need"' in script.text
     assert "async function runSampleUntilPause()" in script.text

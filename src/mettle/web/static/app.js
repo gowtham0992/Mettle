@@ -43,6 +43,7 @@ const elements = {
   awayBriefingList: document.querySelector("#away-briefing-list"),
   awayBriefingActions: document.querySelector("#away-briefing-actions"),
   error: document.querySelector("#error-banner"),
+  errorTitle: document.querySelector("#error-title"),
   errorMessage: document.querySelector("#error-message"),
   noticeId: document.querySelector("#notice-id"),
   property: document.querySelector("#property-label"),
@@ -197,6 +198,7 @@ let tourSecondaryHandler = null;
 let animationSkipRequested = false;
 let finishTourDelay = null;
 let tourClockOverride = null;
+let retryHandler = () => loadCampaign();
 const workspaceViews = new Set(["recovery", "evidence", "activity"]);
 let activeWorkspaceView = workspaceViewFromUrl();
 let judgeTourActive = new URLSearchParams(window.location.search).get("tour") === "1"
@@ -649,14 +651,41 @@ async function request(path, options = {}) {
     headers,
   });
   const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error?.message || "The campaign request failed.");
+  if (!response.ok) {
+    const requestError = new Error(payload.error?.message || "The campaign request failed.");
+    requestError.code = payload.error?.code || "campaign_request_failed";
+    requestError.status = response.status;
+    throw requestError;
+  }
   return payload;
+}
+
+function startFreshRecoveryFromError() {
+  activeWorkflowId = null;
+  activeWorkflowTarget = "local";
+  const url = new URL(window.location.href);
+  url.searchParams.delete("workflow");
+  url.searchParams.delete("runtime");
+  url.searchParams.delete("view");
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  elements.error.hidden = true;
+  openRecoverySetup();
 }
 
 function showError(error) {
   elements.loading.hidden = true;
   elements.error.hidden = false;
+  if (error.code === "workflow_not_found" && activeWorkflowTarget === "agentcore") {
+    elements.errorTitle.textContent = "Recovery session expired";
+    elements.errorMessage.textContent = "AgentCore contractor runs are intentionally bounded to eight hours. Start a fresh recovery to continue; the guided sample remains available without AWS spend.";
+    elements.retry.textContent = "Start a new recovery";
+    retryHandler = startFreshRecoveryFromError;
+    return;
+  }
+  elements.errorTitle.textContent = "Campaign connection interrupted";
   elements.errorMessage.textContent = error.message || "The local API did not respond.";
+  elements.retry.textContent = "Retry";
+  retryHandler = () => loadCampaign();
 }
 
 function showToast(message) {
@@ -3024,7 +3053,7 @@ document.addEventListener("keydown", (event) => {
   if (event.key.toLowerCase() === "r") elements.reset.click();
 });
 
-elements.retry.addEventListener("click", loadCampaign);
+elements.retry.addEventListener("click", () => retryHandler());
 for (const toggle of elements.themeToggles) {
   toggle.addEventListener("click", () => {
     const nextTheme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
