@@ -16,6 +16,7 @@ from mettle.workflow_registry import WorkflowRegistry
 
 
 NOTICE = Path("examples/notices/failed-rough-in.txt").read_text(encoding="utf-8")
+DENVER_NOTICE = Path("examples/notices/denver-remodel.txt").read_text(encoding="utf-8")
 WEB_TEMPLATE = Path("infra/web/template.yaml").read_text(encoding="utf-8")
 
 
@@ -447,7 +448,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Start a recovery" in page.text
     assert "Try a sample recovery" in page.text
     assert "Start with my notice" in page.text
-    assert "Agent receipt" in page.text
+    assert "Run receipt" in page.text
+    assert "models interpret language and visible evidence; they never decide deadlines, gates, or what Mettle may claim" in page.text
     assert "The browser never owns the agent runtime." in page.text
     assert "Explore mode" not in page.text
     assert "JUDGE WALKTHROUGH · LIVE PRODUCT" in page.text
@@ -460,11 +462,12 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Same product, staged for evaluation" in page.text
     assert "Failed-inspection recovery stages" in page.text
     assert "Extract on AgentCore" in page.text
+    assert 'id="workflow-date-error"' in page.text
     assert "Extract locally" in page.text
     assert "Approve & begin recovery" in page.text
     assert "Corrections" in page.text
     assert "Evidence & packet" in page.text
-    assert "Inspectable Strands run" in page.text
+    assert "Inspectable Strands control flow" in page.text
     assert "STRANDS GRAPHBUILDER" in page.text
     assert "RUN RECEIPT · SANITIZED · READ ONLY" in page.text
     assert "What runs, what wakes it, where it stops." in page.text
@@ -473,7 +476,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Recovery navigation" in page.text
     assert "What needs attention" in page.text
     assert "Proof, review, and release" in page.text
-    assert "Inspectable Strands run" in page.text
+    assert "Inspectable Strands control flow" in page.text
     assert 'data-workspace-view="recovery"' in page.text
     assert 'data-workspace-panel="activity"' in page.text
     assert "Demonstration controls" in page.text
@@ -514,6 +517,13 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "requestError.code = payload.error?.code" in script.text
     assert 'sessionStorage.setItem("mettle_post_auth_path"' in script.text
     assert 'sessionStorage.removeItem("mettle_post_auth_path")' in script.text
+    assert 'sessionStorage.setItem("mettle_recovery_draft"' in script.text
+    assert 'sessionStorage.removeItem("mettle_recovery_draft")' in script.text
+    assert "function restoreRecoveryDraft()" in script.text
+    assert 'elements.workflowDateError.textContent = "Choose the date Mettle should use for this recovery."' in script.text
+    assert 'elements.startBedrock.hidden = setupStep !== 3 || !bedrockEnabled' in script.text
+    assert 'Start the server with Bedrock enabled' not in page.text
+    assert 'Start the server with Bedrock enabled' not in script.text
     assert 'response.headers.get("content-type")' in script.text
     assert 'code = "edge_request_failed"' in script.text
     assert '"Content-Type": "application/json"' in script.text
@@ -530,6 +540,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function createTourAgentProof(data)" in script.text
     assert 'node("span", "tour-agent-proof__mode", "SAMPLE · STRANDS")' in script.text
     assert 'image: "/static/evidence/framing-closeup-insufficient.png"' in script.text
+    assert '["Trades contacted", "0"]' in script.text
+    assert 'title: "Outreach held before approval"' in script.text
     assert "Send a wider shot that identifies the corrected wall location." in script.text
     assert 'if (!phase.complete) artifacts.push(createTourAgentProof(data));' in script.text
     assert 'viewer.src = "/api/demo/packet/preview.pdf#page=2&toolbar=1&navpanes=0"' in script.text
@@ -586,6 +598,10 @@ def test_cloudfront_forwards_only_the_guided_demo_session_cookie() -> None:
 def test_advance_replay_is_idempotent_at_http_boundary() -> None:
     payload = {"idempotency_key": "replay_key_123"}
     with client() as browser:
+        browser.post(
+            "/api/judgments/route-review/resolve",
+            json={"decision": "Approve routes with a wide mechanical photo"},
+        )
         first = browser.post("/api/demo/advance", json=payload)
         replay = browser.post("/api/demo/advance", json=payload)
 
@@ -601,6 +617,10 @@ def test_guided_demo_state_is_isolated_per_browser_session() -> None:
         assert first_browser.get("/api/campaign").json()["scenario_step"] == 0
         assert second_browser.get("/api/campaign").json()["scenario_step"] == 0
 
+        first_browser.post(
+            "/api/judgments/route-review/resolve",
+            json={"decision": "Approve routes with a wide mechanical photo"},
+        )
         advanced = first_browser.post(
             "/api/demo/advance",
             json={"idempotency_key": "isolated_browser_advance_123"},
@@ -627,7 +647,7 @@ def test_guided_demo_packet_requires_approval_then_downloads_pdf() -> None:
     with client() as browser:
         blocked = browser.get("/api/demo/packet.pdf")
         browser.post(
-            "/api/judgments/code-c3/resolve",
+            "/api/judgments/route-review/resolve",
             json={"decision": "Wide photo showing equipment and measured service clearance"},
         )
         for step in range(3):
@@ -667,7 +687,7 @@ def test_guided_demo_packet_requires_approval_then_downloads_pdf() -> None:
 def test_api_rejects_oversized_decision_and_unknown_fields() -> None:
     with client() as browser:
         oversized = browser.post(
-            "/api/judgments/code-c3/resolve",
+            "/api/judgments/route-review/resolve",
             json={"decision": "x" * 501},
         )
         unknown = browser.post(
@@ -683,11 +703,11 @@ def test_api_rejects_oversized_decision_and_unknown_fields() -> None:
 def test_api_returns_actionable_conflict_for_changed_replay() -> None:
     with client() as browser:
         first = browser.post(
-            "/api/judgments/code-c3/resolve",
+            "/api/judgments/route-review/resolve",
             json={"decision": "Use a wide equipment-clearance photo"},
         )
         conflict = browser.post(
-            "/api/judgments/code-c3/resolve",
+            "/api/judgments/route-review/resolve",
             json={"decision": "Use a different decision"},
         )
 
@@ -715,6 +735,24 @@ def test_workflow_api_runs_real_strands_graph_and_restores_snapshot() -> None:
     assert created.json()["snapshot"]["interrupts"][0]["name"] == "correction-review"
 
 
+def test_workflow_accepts_a_second_municipal_notice_shape_and_pauses_before_outreach() -> None:
+    payload = workflow_payload(notice_text=DENVER_NOTICE)
+    payload["as_of"] = "2026-08-21"
+    with client() as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=payload,
+            headers={"Idempotency-Key": "denver_notice_shape_123"},
+        )
+
+    assert created.status_code == 201
+    snapshot = created.json()["snapshot"]
+    assert snapshot["notice"]["notice_id"] == "2026-RES-00981"
+    assert len(snapshot["notice"]["citations"]) == 2
+    assert snapshot["deliveries"] == []
+    assert snapshot["interrupts"][0]["name"] == "correction-review"
+
+
 def test_workflow_api_returns_actionable_error_for_unsupported_notice() -> None:
     with client() as browser:
         response = browser.post(
@@ -727,7 +765,7 @@ def test_workflow_api_returns_actionable_error_for_unsupported_notice() -> None:
     assert response.json() == {
         "error": {
             "code": "unsupported_notice_format",
-            "message": "The notice format is not supported by local intake. Use the representative example or run live Bedrock intake.",
+            "message": "Mettle could not identify the notice schedule or correction lines. Keep the permit or record ID, inspection date, reinspection deadline, property address, and numbered correction text in the paste.",
         }
     }
 

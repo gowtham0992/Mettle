@@ -349,8 +349,9 @@ def create_app(
                 "error": {
                     "code": "unsupported_notice_format",
                     "message": (
-                        "The notice format is not supported by local intake. "
-                        "Use the representative example or run live Bedrock intake."
+                        "Mettle could not identify the notice schedule or correction lines. "
+                        "Keep the permit or record ID, inspection date, reinspection deadline, "
+                        "property address, and numbered correction text in the paste."
                     ),
                 }
             },

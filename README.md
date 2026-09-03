@@ -75,7 +75,7 @@ Mettle is event-driven work across time, not a prompt-response wrapper. It keeps
 | Campaign orchestration | Two Strands `GraphBuilder` graphs: intake-to-coordination and deadline chase | [`src/mettle/workflow.py`](src/mettle/workflow.py) |
 | Human judgment | Strands hooks interrupt before outreach, at ambiguous requirements, and at the deadline tradeoff | [`src/mettle/workflow.py`](src/mettle/workflow.py) |
 | Visible-evidence assessment | A dedicated multimodal `strands.Agent` on Nova Lite, followed by deterministic accept, re-request, or manual-review policy | [`src/mettle/agents/vision.py`](src/mettle/agents/vision.py) |
-| Inspectable autonomy | Safe Strands graph hooks and evidence-agent traces rendered as a visible Agent Run without exposing prompts or private payloads | [`src/mettle/workflow.py`](src/mettle/workflow.py), [`src/mettle/web/static/app.js`](src/mettle/web/static/app.js) |
+| Inspectable autonomy | Safe Strands graph hooks and evidence-agent traces rendered as a visible Run receipt without exposing prompts or private payloads | [`src/mettle/workflow.py`](src/mettle/workflow.py), [`src/mettle/web/static/app.js`](src/mettle/web/static/app.js) |
 | Managed agent runtime | The same typed workflow operations run behind an Amazon Bedrock AgentCore entrypoint | [`agentcore_app.py`](agentcore_app.py) |
 | Work across time | One-time EventBridge schedules wake the next deadline checkpoint; schedule versions and idempotency keys make stale or replayed events safe | [`src/mettle/automation.py`](src/mettle/automation.py), [`src/mettle/scheduler_runtime.py`](src/mettle/scheduler_runtime.py) |
 | One-way trade updates | Communication records by default; opt-in Amazon SNS delivery is restricted to one pre-approved, hashed demo destination and never accepts inbound messages | [`src/mettle/communication.py`](src/mettle/communication.py) |
@@ -102,12 +102,14 @@ Use Python 3.12 and [`uv`](https://docs.astral.sh/uv/):
 ```bash
 uv sync --extra dev
 uv run mettle ingest examples/notices/failed-rough-in.txt --as-of 2026-08-10
+uv run mettle ingest examples/notices/denver-remodel.txt --as-of 2026-08-21
+uv run mettle ingest examples/notices/uncoded-field-report.txt --as-of 2026-08-21
 uv run mettle serve
 ```
 
 Open [http://127.0.0.1:4310](http://127.0.0.1:4310), then select **Take the guided tour**, **Explore the sample freely**, or **Start a recovery**. The server binds only to the local machine. The included communication adapter records proposed messages but sends nothing externally.
 
-The default path is deterministic, reproducible, and free. It uses the same domain contracts, Strands graphs, interrupts, retry rules, packet gate, and UI as the cloud path without invoking a model.
+The default path is deterministic, reproducible, and free. It accepts several common municipal header, date, and numbering styles. When a numbered correction omits a code reference or observable proof requirement, Mettle preserves the authority's text as a review candidate and asks the contractor instead of inventing either field. It uses the same domain contracts, Strands graphs, interrupts, retry rules, packet gate, and UI as the cloud path without invoking a model.
 
 ### Opt in to live Bedrock intake
 
@@ -187,7 +189,7 @@ docs/                    Architecture, scope, research, and operations
 
 ## Scope
 
-Mettle begins after an inspection fails. It is not a permitting suite, a construction management platform, or an authority on building code. The current hackathon slice handles one project, one representative notice shape, three trades, outbound-only communication, and a compressed deadline clock. Communication records safely by default; an Amazon SNS adapter can deliver only to one pre-approved personal demo number after account enrollment and explicit server-side opt-in.
+Mettle begins after an inspection fails. It is not a permitting suite, a construction management platform, or an authority on building code. The current hackathon slice handles one project at a time, several common pasted-notice shapes, a bounded trade roster with general-contractor fallback, outbound-only communication, and a compressed deadline clock. Communication records safely by default; an Amazon SNS adapter can deliver only to one pre-approved personal demo number after account enrollment and explicit server-side opt-in.
 
 Those constraints preserve the single workflow that matters: **notice in, recovery out**. Production expansion would add jurisdiction-specific notice adapters, consent and opt-out operations for messaging, and durable campaign persistence without changing the authority boundary.
 

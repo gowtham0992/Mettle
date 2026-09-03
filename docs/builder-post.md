@@ -69,11 +69,11 @@ Three native Strands interrupts are product controls rather than decorative appr
 
 Each hook listens for `BeforeNodeCallEvent`, calls `event.interrupt(...)`, and stores the validated response back in invocation state. The contractor's decision resumes the same graph session instead of starting a new prompt exchange.
 
-I also wanted the autonomy to be inspectable without exposing private internals. Safe hooks emit only the graph name, node, specialist, sequence, status, and a bounded description. The Agent Run panel deliberately excludes prompts, chain-of-thought, credentials, runtime identifiers, and notice payloads.
+I also wanted the autonomy to be inspectable without exposing private internals. Safe hooks emit only the graph name, node, specialist, sequence, status, and a bounded description. The Run receipt deliberately excludes prompts, chain-of-thought, credentials, runtime identifiers, and notice payloads.
 
-![Mettle Agent Run](https://raw.githubusercontent.com/gowtham0992/Mettle/main/assets/submission/03-agent-run.png)
+![Mettle Run receipt](https://raw.githubusercontent.com/gowtham0992/Mettle/main/assets/submission/03-agent-run.png)
 
-*The Agent Run shows specialist handoffs and the exact points where Mettle stopped for the contractor.*
+*The Run receipt shows specialist handoffs and the exact points where Mettle stopped for the contractor.*
 
 ## Evidence without pretending to inspect
 
@@ -146,7 +146,7 @@ These failures pushed the implementation in the same direction: models work on b
 
 ## What I deliberately left out
 
-Mettle supports one representative residential notice shape and a small set of trade categories. Messaging is one-way and recorded by default. An opt-in Amazon SNS adapter can send only to one hashed, pre-approved personal demo number; it is not an inbound trade channel and is not a substitute for contractor consent or opt-out operations. The public sample compresses days into ninety seconds. EventBridge Scheduler advances that accelerated run, but there is no durable AgentCore Memory integration for a real multi-day campaign. Mettle never contacts an inspector and never claims code compliance autonomously.
+Mettle accepts several common pasted-notice shapes—alternate municipal headers, common date formats, numbered findings, and correction-section bullets—and preserves unfamiliar but clearly listed findings as review candidates instead of inventing a code reference or proof requirement. It still uses a small, bounded trade roster rather than pretending to understand every jurisdiction or specialty. Messaging is one-way and recorded by default. An opt-in Amazon SNS adapter can send only to one hashed, pre-approved personal demo number; it is not an inbound trade channel and is not a substitute for contractor consent or opt-out operations. The public sample compresses days into ninety seconds. EventBridge Scheduler advances that accelerated run, but there is no durable AgentCore Memory integration for a real multi-day campaign. Mettle never contacts an inspector and never claims code compliance autonomously.
 
 Those are product boundaries, not footnotes. A small contractor does not need another chatbot that can discuss an inspection. They need the repetitive recovery work handled, the consequential decisions surfaced, and a trustworthy record at the end.
 
@@ -154,7 +154,7 @@ Those are product boundaries, not footnotes. A small contractor does not need an
 
 - **Live guided demo:** [d1ytth8asjpes8.cloudfront.net](https://d1ytth8asjpes8.cloudfront.net)—synthetic data, no AWS account required
 - **Source and setup:** [github.com/gowtham0992/Mettle](https://github.com/gowtham0992/Mettle)—MIT licensed, public, and verified from an anonymous clone
-- **Verification:** 119 tests run without AWS credentials or model spend; `npx agentcore validate --json` succeeds from a clean install
+- **Verification:** the offline Python and infrastructure suites run without AWS credentials or model spend; `npx agentcore validate --json` succeeds from a clean install
 - **Hackathon track:** Professional Agents
 
 **Notice in. Reinspection ready. Mettle handles the chase. The contractor decides.**

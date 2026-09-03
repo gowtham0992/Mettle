@@ -36,7 +36,7 @@ Outbound messaging, object storage, model providers, scheduling, and packet rend
 
 The evidence lab keeps a trusted catalog of synthetic photo fixtures as a reliable fallback and also accepts real JPEG/PNG uploads. The server caps the raw body, decodes and bounds pixels, removes metadata, and re-encodes to JPEG before invoking a dedicated multimodal Strands Evidence Agent on Nova Lite. The model adapter deliberately uses non-streaming Converse so the runtime does not need a broader streaming permission for this bounded assessment. The agent returns one validated finding per notice requirement; deterministic policy derives accepted, rejected, or manual-review status and never asks the model to infer code compliance. Idempotency fingerprints include the normalized image bytes so retries cannot repeat model spend.
 
-Strands `BeforeNodeCallEvent` and `AfterNodeCallEvent` hooks record a safe execution trace containing only graph name, node, specialist, sequence, and status. Evidence assessments add the same high-level trace around requirement grounding, multimodal inspection, and policy application. The command center renders this as the Agent Run panel; prompts, notice contents, model reasoning, credentials, and private runtime identifiers are intentionally excluded.
+Strands `BeforeNodeCallEvent` and `AfterNodeCallEvent` hooks record a safe execution trace containing only graph name, node, specialist, sequence, and status. Evidence assessments add the same high-level trace around requirement grounding, multimodal inspection, and policy application. The command center renders this as the Run receipt; prompts, notice contents, model reasoning, credentials, and private runtime identifiers are intentionally excluded.
 
 Packet generation begins only when the latest evidence for every citation is accepted. A separate final approval record blocks PDF download until the contractor approves the assembled packet. ReportLab renders the notice, evidence requirements, trusted fixture or normalized uploaded images, safety boundary, and communication record from validated server state; client-provided paths or filenames never reach the renderer.
 
@@ -139,7 +139,7 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 3. **Deadline chase loop:** replan open citations, record scheduled follow-ups with replay safety, stop on accepted evidence, and interrupt at the T−2 tradeoff. **Complete locally and through the deployed AgentCore-compatible contract.**
 4. **Evidence assessment:** compare trusted fixtures or normalized real photos to notice-anchored requirements and produce a specific re-request or judgment interrupt. **Local fixture adapter and dedicated Strands Evidence Agent on Bedrock complete; its model adapter forces one validated evidence-decision tool rather than accepting free-form output.**
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
-6. **Demo interface and packet:** show the recovery timeline, inspectable Agent Run, and citation-to-evidence PDF. **Complete.**
+6. **Demo interface and packet:** show the recovery timeline, inspectable Run receipt, and citation-to-evidence PDF. **Complete.**
 7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,
    package it as CodeZip, and define least-privilege deployment and rollback.
    **Complete: runtime version 12 is deployed, immutable-artifact rollback was

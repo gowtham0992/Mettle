@@ -120,6 +120,79 @@ Items requiring correction
     )
 
 
+def test_parse_notice_accepts_common_municipal_headers_and_written_dates() -> None:
+    notice = parse_notice(
+        """
+CITY AND COUNTY OF DENVER
+INSPECTION CORRECTION REPORT
+Permit No. 2026-RES-00981
+Date of Inspection: August 20, 2026
+Project Address: 4400 Example Avenue, Denver, CO
+Re-inspection Date: Aug 28, 2026
+
+CORRECTIONS REQUIRED
+Item 1: IRC R311.7.8.4 Handrail returns shall terminate at the wall at the basement stair.
+Item 2: NEC 110.26 Maintain required working clearance at the electrical service equipment.
+"""
+    )
+
+    assert notice.notice_id == "2026-RES-00981"
+    assert notice.issued_on == date(2026, 8, 20)
+    assert notice.reinspection_due_on == date(2026, 8, 28)
+    assert notice.property_label == "4400 Example Avenue, Denver, CO"
+    assert [citation.trade for citation in notice.citations] == [
+        Trade.GENERAL,
+        Trade.ELECTRICAL,
+    ]
+
+
+def test_parse_notice_turns_uncoded_numbered_findings_into_grounded_review_candidates() -> None:
+    notice = parse_notice(
+        """
+Record ID: BLD-4421
+Inspection performed: 8/20/26
+Correction deadline: 8/28/26
+Location: 18 Example Court
+
+Outstanding corrections
+1) Handrail ends must return to the wall at the basement stair.
+2) Seal the exterior wall penetration shown in the inspection photo.
+"""
+    )
+
+    first = notice.citations[0]
+    assert first.code_reference == "Not stated in notice"
+    assert first.notice_text == (
+        "Handrail ends must return to the wall at the basement stair."
+    )
+    assert first.evidence_requirements == []
+    assert "code reference" in (first.ambiguity_reason or "")
+    assert "observable evidence requirements" in (first.ambiguity_reason or "")
+
+
+def test_parse_notice_accepts_bulleted_corrections_and_hash_headers() -> None:
+    notice = parse_notice(
+        """
+Permit #: BP-77
+Date: 09/01/2026
+Correct by: 09/09/2026
+Address: 22 Example Lane
+
+Deficiencies
+- IPC 305.4 Support exposed piping at the required intervals.
+- Replace the missing guard at the landing before reinspection.
+"""
+    )
+
+    assert notice.notice_id == "BP-77"
+    assert len(notice.citations) == 2
+    assert notice.citations[0].code_reference == "IPC 305.4"
+    assert notice.citations[1].code_reference == "Not stated in notice"
+    assert notice.citations[1].notice_text == (
+        "Replace the missing guard at the landing before reinspection."
+    )
+
+
 @pytest.mark.parametrize(
     ("text", "message"),
     [

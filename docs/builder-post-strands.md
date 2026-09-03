@@ -92,7 +92,7 @@ This fail-closed path came from a real deployment failure. Earlier AgentCore run
 
 ## Making multi-agent work inspectable
 
-An architecture diagram can claim anything, so Mettle exposes a bounded **Agent Run** inside the product. Safe hooks emit the graph name, node, specialist, sequence, and status. A judge can see intake hand off to planning, the graph pause for correction review, coordination resume, and the evidence specialist run.
+An architecture diagram can claim anything, so Mettle exposes a bounded **Run receipt** inside the product. Safe hooks emit the graph name, node, specialist, sequence, and status. A judge can see intake hand off to planning, the graph pause for correction review, coordination resume, and the evidence specialist run.
 
 The trace deliberately excludes prompts, model reasoning, credentials, runtime identifiers, and notice payloads. Inspectability should not become a data leak.
 
@@ -102,9 +102,9 @@ The public product labels execution modes instead of blending them:
 - `SAMPLE CAMPAIGN · SYNTHETIC DATA` compresses the complete multi-day journey without model spend.
 - the authenticated cloud path runs the typed workflow on Amazon Bedrock AgentCore Runtime with Nova-backed intake and evidence assessment.
 
-![Mettle Agent Run](https://raw.githubusercontent.com/gowtham0992/Mettle/main/assets/submission/03-agent-run.png)
+![Mettle Run receipt](https://raw.githubusercontent.com/gowtham0992/Mettle/main/assets/submission/03-agent-run.png)
 
-*The Agent Run exposes specialist handoffs and the exact point where professional judgment interrupted execution.*
+*The Run receipt exposes specialist handoffs and the exact point where professional judgment interrupted execution.*
 
 ## What I learned
 
@@ -117,14 +117,14 @@ The strongest human-in-the-loop design is not “a human can edit the answer.”
 
 Strands made those boundaries executable. Its graphs gave each responsibility a visible place, and native interrupts let the contractor resume the same workflow instead of starting a new chat.
 
-Mettle is intentionally narrow: one representative residential notice shape, three trades, visible-evidence sufficiency rather than compliance, and no inbound SMS interpretation. That narrowness is what lets the complete workflow be real.
+Mettle is intentionally narrow: several common pasted-notice shapes, a bounded trade roster, visible-evidence sufficiency rather than compliance, and no inbound SMS interpretation. Unfamiliar numbered findings become grounded contractor-review candidates instead of fabricated code or proof requirements. That narrowness is what lets the complete workflow be real.
 
 ## Try Mettle
 
 - **Public guided demo:** [d1ytth8asjpes8.cloudfront.net](https://d1ytth8asjpes8.cloudfront.net)
 - **MIT-licensed source:** [github.com/gowtham0992/Mettle](https://github.com/gowtham0992/Mettle)
 - **Architecture:** [Mettle product architecture](https://raw.githubusercontent.com/gowtham0992/Mettle/main/assets/architecture/mettle-product-architecture.png)
-- **Verification:** all 119 tests run without AWS credentials or model spend
+- **Verification:** all 135 tests run without AWS credentials or model spend
 
 **Mettle handles the chase. The contractor decides.**
 

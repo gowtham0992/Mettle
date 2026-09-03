@@ -1,6 +1,6 @@
 # Mettle demo script
 
-Target length: **4:35**. Hard limit: **5:00**.
+Target length: **4:25**. Hard limit: **5:00**.
 
 Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, notifications, AWS account identifiers, and every developer console. Use a fresh private window for the public demo. Keep the architecture PNG, one generated packet, and two sanitized AWS proof stills open in separate tabs before recording. Never wait for a live scheduler on camera; show the verified execution record and label the timeline compression.
 
@@ -12,21 +12,21 @@ Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, not
 
 > A small residential contractor fails an inspection. Now they have to translate a municipal notice into work for several trades, chase the right proof over text, watch the reinspection date, and rebuild the evidence trail by hand. One missed correction can mean another fee and another week of delay. Mettle turns that notice into a recovery campaign—and leaves every professional judgment with the contractor.
 
-## 0:28–1:42 — Prove the real Strands workflow first
+## 0:28–1:13 — Prove notice-first intake and the real Strands gate
 
-**On screen:** Select **Start a recovery**. Paste the included synthetic notice, continue through **People**, and choose the free local extraction button. Show the setup status changing to `LIVE · STRANDS`.
-
-**Narration:**
-
-> This is the real Strands workflow, not the guided playback. Mettle starts from the document the contractor already has—there is no project template or manually authored punch list. The intake graph converts the notice into typed citations while preserving its wording. Before a single outreach record is created, a native Strands interrupt pauses the graph so the contractor can confirm who owns each correction.
-
-**On screen:** Approve correction routing. Open **Agent Run** and point to intake, plan, review gate, coordination, and the completed handoff. Briefly show the recovery clock and correction cards.
+**On screen:** Select **Start a recovery**. Paste `examples/notices/denver-remodel.txt`—not the notice used by the tour—continue through **People**, and choose the free local extraction button. Show the setup status changing to `LIVE · STRANDS`, the grounded correction candidates, and the zero-outreach review gate.
 
 **Narration:**
 
-> Once approved, deterministic policy coordinates only the open corrections. The Agent Run makes that boundary inspectable: a model-backed intake specialist handles unstructured language; policy nodes own dates, retries, and permissions; the contractor owns authority. Idempotency keys prevent a retry from repeating outreach or model spend.
+> This notice has a different jurisdiction, header style, date format, and trade mix from the sample. Mettle starts from the document the contractor already has—there is no project template or manually authored punch list. Local intake preserves each correction as a grounded candidate; uncertainty becomes contractor review, not a fabricated code or proof requirement. Before a single outreach record is created, a native Strands interrupt pauses the graph so the contractor can confirm every route.
 
-## 1:42–3:12 — Show the complete product journey
+**On screen:** Point to `0 messages`, approve correction routing, then show the recorded outreach count change. Open **Run receipt** only long enough to show the model/policy/human legend.
+
+**Narration:**
+
+> The decision changes what the graph is allowed to do: only after approval does coordination begin. In the authenticated cloud path, Nova Micro handles unstructured notice language. Deterministic policy—not a model—owns dates, retries, gates, and permissible claims. The contractor owns professional authority.
+
+## 1:13–2:43 — Show the complete product journey
 
 **On screen:** Return home and select **Take the 90-second tour**. Keep the `GUIDED EVALUATOR PATH · SYNTHETIC DATA` label visible. Follow the recovery line through the staged campaign.
 
@@ -46,7 +46,7 @@ Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, not
 
 > As the deadline approaches, the chase changes cadence and considers only unresolved citations. At T-minus-two, Mettle does not silently gamble with the schedule. A second native interrupt asks the contractor whether to keep the date or reschedule.
 
-## 3:12–3:55 — Human authority and final artifact
+## 2:43–3:25 — Human authority and final artifact
 
 **On screen:** Finish the background recovery, approve the packet at the final gate, select **Inspect the Strands agent run**, then open **Evidence & packet** to download it.
 
@@ -54,21 +54,21 @@ Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, not
 
 > The ambiguous mechanical requirement was the tour’s first hard boundary: the contractor defined the visible proof before recovery began. After every citation has accepted evidence, Mettle assembles this traceable packet—but download stays blocked until final contractor approval. The result maps each notice citation to its trade, evidence, timeline, and consent record.
 
-## 3:55–4:28 — Architecture and deployed autonomy proof
+## 3:25–4:10 — Prove unattended cloud work, then explain the architecture
 
-**On screen:** Show `assets/architecture/mettle-product-architecture.png` first and trace the campaign loop and its three human judgment gates. Switch briefly to `assets/architecture/mettle-aws-architecture.png`, then show two sanitized proof stills: the AgentCore runtime in `READY`, followed by the EventBridge/CloudWatch acceptance record showing schedule version 1 firing the private worker and schedule version 2 being armed. Crop all account identifiers and keep only hashed workflow references visible.
+**On screen:** Show a short pre-recorded sequence with two visible wall-clock timestamps: an authenticated AgentCore recovery with a checkpoint armed, the browser closed, then the later EventBridge/CloudWatch acceptance record showing the private worker fired and the next checkpoint was armed. Show the waiting contractor judgment in Mettle. Then show `assets/architecture/mettle-product-architecture.png` with its three gates and `assets/architecture/mettle-aws-architecture.png` just long enough to connect EventBridge to AgentCore. Crop all account identifiers and keep only hashed workflow references visible.
 
 **Narration:**
 
-> Mettle separates authority three ways. Amazon Nova models handle notice language and visible evidence. Deterministic Python controls state, deadlines, retries, and permissions. The licensed contractor decides interpretation, schedule tradeoffs, and release. The same typed workflow runs on Bedrock AgentCore Runtime. In our deployed acceptance run, EventBridge woke the private worker, advanced the campaign, and armed its next checkpoint with an empty dead-letter queue—without a browser staying open.
+> Nobody touched the dashboard between these timestamps. EventBridge woke the private worker, AgentCore resumed the same typed Strands workflow, open-only policy advanced the chase, and Mettle stopped at a judgment it was not allowed to make. That is bounded authority: Nova models handle notice language and visible evidence; deterministic Python controls state, deadlines, retries, gates, and permissible claims; the licensed contractor decides interpretation, schedule tradeoffs, and release.
 
-## 4:28–4:35 — Close
+## 4:10–4:25 — Close
 
 **On screen:** Return to the approved command center with the result visible.
 
 **Narration:**
 
-> Notice in. Reinspection ready. Mettle handles the chase; the contractor decides.
+> Fifteen actions absorbed. Three decisions kept. Mettle ran the recovery while the contractor worked another job—and stopped, every time, at the line where a license matters. Notice in. Reinspection packet out. The contractor decides.
 
 ## Recording checklist
 
@@ -76,8 +76,10 @@ Record at 1440×900 or 1920×1080 with browser zoom at 100%. Hide bookmarks, not
 - [ ] Say the problem, target user, and why it matters in the first 28 seconds.
 - [ ] Show `LIVE · STRANDS` before the synthetic sample.
 - [ ] Keep the sample disclosure visible when describing compressed evidence and time.
+- [ ] Show zero outreach before route approval, then the changed outreach count after approval.
 - [ ] Show one native interrupt, one evidence re-request, the deadline gate, and final approval.
 - [ ] Show the architecture diagram long enough to read `Strands` and `AgentCore Runtime`.
 - [ ] Show sanitized `READY` and scheduler-execution proof; hide the account ID, ARNs, usernames, emails, session identifiers, and raw notice content.
-- [ ] Describe the scheduler proof as a recorded deployed acceptance run, not as a live event occurring during the video.
+- [ ] Show two readable wall-clock timestamps around the recorded scheduler run and state that the browser was closed.
+- [ ] Describe the scheduler proof as a recorded deployed acceptance run, not as a live event occurring during the final narration.
 - [ ] Upload publicly or unlisted to YouTube or Vimeo and test the URL while signed out.

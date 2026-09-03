@@ -103,6 +103,7 @@ const elements = {
   noticeForm: document.querySelector("#notice-form"),
   noticeText: document.querySelector("#notice-text"),
   workflowAsOf: document.querySelector("#workflow-as-of"),
+  workflowDateError: document.querySelector("#workflow-date-error"),
   workflowError: document.querySelector("#workflow-form-error"),
   startWorkflow: document.querySelector("#start-workflow-button"),
   startBedrock: document.querySelector("#start-bedrock-button"),
@@ -193,8 +194,10 @@ let demoRunning = false;
 let authConfig = null;
 let accessToken = sessionStorage.getItem("mettle_access_token");
 const postAuthPathKey = "mettle_post_auth_path";
+const recoveryDraftKey = "mettle_recovery_draft";
 let setupStep = 1;
 let setupReturnsToWelcome = false;
+let recoveryDraftRestored = false;
 let pendingCorrectionReview = null;
 let correctionReviewKey = null;
 let nextActionHandler = null;
@@ -208,6 +211,13 @@ const workspaceViews = new Set(["recovery", "evidence", "activity"]);
 let activeWorkspaceView = workspaceViewFromUrl();
 let judgeTourActive = new URLSearchParams(window.location.search).get("tour") === "1"
   || sessionStorage.getItem("mettle_entry_selected") === "tour";
+
+if (!elements.workflowAsOf.value) {
+  const now = new Date();
+  const localToday = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+    .toISOString().slice(0, 10);
+  elements.workflowAsOf.value = localToday;
+}
 
 function workspaceViewFromUrl() {
   const requested = new URLSearchParams(window.location.search).get("view");
@@ -346,6 +356,7 @@ async function beginLogin() {
   sessionStorage.setItem("mettle_pkce_verifier", verifier);
   sessionStorage.setItem("mettle_oauth_state", state);
   sessionStorage.setItem("mettle_post_auth_path", `${window.location.pathname}${window.location.search}${window.location.hash}`);
+  if (elements.noticeDialog.open) saveRecoveryDraft();
   const params = new URLSearchParams({
     response_type: "code",
     client_id: authConfig.cognito_client_id,
@@ -356,6 +367,50 @@ async function beginLogin() {
     code_challenge: challenge,
   });
   window.location.assign(`${authConfig.cognito_domain}/oauth2/authorize?${params}`);
+}
+
+function saveRecoveryDraft() {
+  const contacts = {};
+  for (const nameInput of elements.contactNames) {
+    const trade = nameInput.dataset.contactName;
+    contacts[trade] = {
+      name: nameInput.value,
+      phone: elements.contactPhones.find((item) => item.dataset.contactPhone === trade)?.value || "",
+    };
+  }
+  sessionStorage.setItem("mettle_recovery_draft", JSON.stringify({
+    notice_text: elements.noticeText.value,
+    as_of: elements.workflowAsOf.value,
+    primary_name: elements.primaryContactName.value,
+    primary_phone: elements.primaryContactPhone.value,
+    contacts,
+    setup_step: setupStep,
+  }));
+}
+
+function restoreRecoveryDraft() {
+  const encoded = sessionStorage.getItem(recoveryDraftKey);
+  if (!encoded) return false;
+  sessionStorage.removeItem("mettle_recovery_draft");
+  try {
+    const draft = JSON.parse(encoded);
+    if (!draft || typeof draft !== "object") return false;
+    if (typeof draft.notice_text === "string") elements.noticeText.value = draft.notice_text.slice(0, 100000);
+    if (typeof draft.as_of === "string") elements.workflowAsOf.value = draft.as_of;
+    if (typeof draft.primary_name === "string") elements.primaryContactName.value = draft.primary_name.slice(0, 120);
+    if (typeof draft.primary_phone === "string") elements.primaryContactPhone.value = draft.primary_phone.slice(0, 32);
+    for (const nameInput of elements.contactNames) {
+      const saved = draft.contacts?.[nameInput.dataset.contactName];
+      if (!saved || typeof saved !== "object") continue;
+      if (typeof saved.name === "string") nameInput.value = saved.name.slice(0, 120);
+      const phoneInput = elements.contactPhones.find((item) => item.dataset.contactPhone === nameInput.dataset.contactName);
+      if (phoneInput && typeof saved.phone === "string") phoneInput.value = saved.phone.slice(0, 32);
+    }
+    setSetupStep(Number.isInteger(draft.setup_step) ? draft.setup_step : 3);
+    return true;
+  } catch (_error) {
+    return false;
+  }
 }
 
 async function finishLogin() {
@@ -400,6 +455,7 @@ async function finishLogin() {
     }
   }
   window.history.replaceState({}, "", returnPath);
+  recoveryDraftRestored = restoreRecoveryDraft();
 }
 
 async function initializeAuth() {
@@ -785,8 +841,8 @@ function setSetupStep(step) {
   elements.setupBack.hidden = setupStep === 1 || setupStep === 4;
   elements.setupNext.hidden = setupStep >= 3;
   elements.startWorkflow.hidden = setupStep !== 3;
-  elements.startBedrock.hidden = setupStep !== 3;
-  elements.startAgentCore.hidden = setupStep !== 3;
+  elements.startBedrock.hidden = setupStep !== 3 || !bedrockEnabled;
+  elements.startAgentCore.hidden = setupStep !== 3 || !agentCoreEnabled;
   elements.approveCorrections.hidden = setupStep !== 4;
   elements.setupFooterNote.textContent = setupStep === 1
     ? "REPORT FIRST · NO PROJECT SETUP"
@@ -802,6 +858,7 @@ function setSetupStep(step) {
 
 function validateSetupStep() {
   elements.workflowError.hidden = true;
+  elements.workflowDateError.hidden = true;
   if (setupStep === 1) {
     if (!elements.noticeText.value.trim()) {
       elements.noticeText.setCustomValidity("Paste the failed-inspection report or comments.");
@@ -810,9 +867,14 @@ function validateSetupStep() {
       return false;
     }
     if (!elements.workflowAsOf.value) {
+      elements.workflowDateError.textContent = "Choose the date Mettle should use for this recovery.";
+      elements.workflowDateError.hidden = false;
+      elements.workflowAsOf.setAttribute("aria-invalid", "true");
+      elements.workflowAsOf.focus();
       elements.workflowAsOf.reportValidity();
       return false;
     }
+    elements.workflowAsOf.removeAttribute("aria-invalid");
   }
   if (setupStep === 2) {
     const name = elements.primaryContactName.value.trim();
@@ -1143,10 +1205,11 @@ function renderCorrectionSummary(data) {
   const ready = data.citations.filter((citation) => citation.stage === "ready").length;
   const chasing = data.citations.filter((citation) => ["awaiting_evidence", "evidence_rejected"].includes(citation.stage)).length;
   const needsYou = data.judgments.filter((judgment) => judgment.status === "pending" && judgment.kind !== "final_packet_approval").length;
+  const preOutreach = data.metrics.messages_handled === 0 && pendingJudgment(data, "route-review");
   elements.correctionSummary.replaceChildren(
     node("span", "", `${total} corrections`),
     node("strong", "summary-ready", `${ready} proof accepted`),
-    node("span", "", `${chasing} awaiting trade`),
+    node("span", "", preOutreach ? `${total} routes held` : `${chasing} awaiting trade`),
     node("strong", needsYou ? "summary-action" : "", `${needsYou} need you`),
   );
 }
@@ -1155,7 +1218,10 @@ function renderCitation(citation, data) {
   const judgment = data.judgments.find(
     (item) => item.status === "pending" && String(item.citation_id || "") === String(citation.citation_id),
   );
-  const [statusLabel, nextStep] = correctionStatus(citation);
+  const preOutreach = data.metrics.messages_handled === 0 && pendingJudgment(data, "route-review");
+  const [statusLabel, nextStep] = preOutreach
+    ? ["ROUTE HELD", "Awaiting contractor approval before outreach."]
+    : correctionStatus(citation);
   const card = node("article", `citation${judgment ? " citation--needs-action" : ""}`);
   card.id = `correction-${citation.citation_id}`;
 
@@ -1170,7 +1236,7 @@ function renderCitation(citation, data) {
 
   const operations = node("div", "citation__operations");
   operations.append(
-    node("strong", "", citation.assignee || "Unassigned · contractor direction required"),
+    node("strong", "", preOutreach ? "Proposed route · not contacted" : citation.assignee || "Unassigned · contractor direction required"),
     node("span", "", nextStep),
   );
   summary.append(operations);
@@ -1185,7 +1251,7 @@ function renderCitation(citation, data) {
       : `Returned synthetic proof for correction ${citation.citation_id}`;
     proof.append(image);
   }
-  proof.append(node("span", `status status--${citation.stage}`, statusLabel));
+  proof.append(node("span", `status status--${preOutreach ? "needs_judgment" : citation.stage}`, statusLabel));
   summary.append(proof);
   card.append(summary);
 
@@ -1233,7 +1299,7 @@ const graphNodeDetails = {
   finish_chase: ["Deterministic orchestrator", "Checkpoint deadline chase"],
   ground_requirements: ["Evidence agent", "Bind notice requirements"],
   inspect_visible_evidence: ["Evidence agent", "Inspect pixels with Bedrock"],
-  apply_safety_policy: ["Evidence agent", "Route ambiguity to contractor"],
+  apply_safety_policy: ["Evidence safety policy", "Deterministically route ambiguity to contractor"],
 };
 
 const recordedEvidenceAssessments = {
@@ -1295,7 +1361,7 @@ function sampleAgentRun(data) {
   return visibleNodes.map((nodeId, index) => {
     const graph = chaseNodes.includes(nodeId) ? "deadline_chase" : "recovery";
     let status = "completed";
-    if (pending?.judgment_id === "code-c3" && nodeId === "judgment_gate") status = "interrupted";
+    if (pending?.judgment_id === "route-review" && nodeId === "judgment_gate") status = "interrupted";
     if (pending?.judgment_id === "deadline-choice" && nodeId === "deadline_gate") status = "interrupted";
     return graphNodeDetail({ sequence: index + 1, graph, node_id: nodeId, status });
   });
@@ -1679,16 +1745,16 @@ function tourPhase(data) {
       action: "resolve-deadline",
     };
   }
-  if (pendingJudgment(data, "code-c3")) {
+  if (pendingJudgment(data, "route-review")) {
     return {
       key: "boundary", scene: 1, stopIndex: 0,
       eyebrow: "FOR THE CONTRACTOR HANDED A DISAPPROVED ROUGH-IN",
       title: "The notice is the only input.",
-      copy: "Mettle derives the work from the authority’s exact language, sends the unambiguous requests, and stops where professional interpretation begins.",
-      controlTitle: "The agent did not invent a missing evidence requirement.",
-      controlCopy: "It prepared the recovery and contacted two trades, then reserved the ambiguous mechanical requirement for the contractor.",
-      actionLabel: "Approve the evidence boundary",
-      actionNote: "ONE HUMAN DECISION · THEN THE CAMPAIGN RESUMES",
+      copy: "Mettle derives a proposed recovery from the authority’s exact language, then stops before a single trade is contacted.",
+      controlTitle: "Zero outreach until the contractor approves every route.",
+      controlCopy: "The graph prepared assignees and proof requests, held the ambiguous mechanical boundary, and paused with zero messages recorded.",
+      actionLabel: "Approve routes & begin recovery",
+      actionNote: "CONTRACTOR DECISION · OUTREACH STARTS AFTER APPROVAL",
       action: "resolve-code",
     };
   }
@@ -2024,13 +2090,13 @@ function renderTourVisual(data, phase) {
         status: "SOURCE",
         tone: "emphasis",
       }),
-      node("div", "tour-transition", "Intake + coordination agents"),
+      node("div", "tour-transition", "Intake agent → deterministic route policy → contractor gate"),
       tourArtifact({
-        index: "2×",
-        title: "Unambiguous trade requests sent",
-        detail: "Electrical and framing received notice-anchored proof requests without project setup.",
-        status: "ASSIGNED",
-        tone: "ready",
+        index: "0×",
+        title: "Outreach held before approval",
+        detail: "Three proposed routes are ready for review; no trade has been contacted and no message has been recorded.",
+        status: "HELD",
+        tone: "blocked",
       }),
       citationTourArtifact(data.citations.find((citation) => citation.citation_id === "3")),
     );
@@ -2088,9 +2154,9 @@ async function resolveTourJudgment(judgmentId, decision, successMessage) {
 
 const judgeLensByPhase = {
   boundary: {
-    impact: "Zero-configuration intake: the failed-inspection notice becomes the recovery plan.",
-    agent: "The Nova Micro intake agent extracts three bounded citations; deterministic coordination sends only the two unambiguous requests.",
-    human: "Mettle refuses to invent proof for mechanical access and asks the contractor to define the boundary.",
+    impact: "Zero-configuration intake: the failed-inspection notice becomes a reviewable recovery plan.",
+    agent: "The Nova Micro intake agent extracts bounded citations; deterministic policy prepares routes but records zero outreach.",
+    human: "The contractor approves every assignee and proof request, including the mechanical boundary Mettle refuses to invent.",
   },
   recovery: {
     impact: "This is background autonomy, not a chat response: the campaign continues while the contractor is away.",
@@ -2179,7 +2245,7 @@ function renderJudgeTour(data) {
   const metricValues = phase.key === "boundary"
     ? [
       ["Notice input", "1 PDF"],
-      ["Trades contacted", "2"],
+      ["Trades contacted", "0"],
       ["Agent actions", data.metrics.automated_actions],
       ["Waiting on you", "1"],
     ]
@@ -2197,9 +2263,9 @@ function renderJudgeTour(data) {
   tourSecondaryHandler = phase.complete ? inspectAgentRun : null;
   tourActionHandler = phase.action === "resolve-code"
     ? () => resolveTourJudgment(
-      "code-c3",
+      "route-review",
       "Wide photo showing the equipment and measured service clearance",
-      "Evidence boundary approved. Mettle resumed the recovery.",
+      "Routes approved. Mettle released the notice-anchored outreach and resumed the recovery.",
     )
       : phase.action === "resolve-deadline"
       ? resolveDeadlineAndContinue
@@ -2641,14 +2707,13 @@ async function loadCapabilities() {
     bedrockEnabled = false;
     agentCoreEnabled = false;
   }
-  elements.startBedrock.disabled = !bedrockEnabled;
-  elements.startBedrock.title = bedrockEnabled
-    ? "Run notice intake on Amazon Nova Micro; this consumes AWS credit"
-    : "Start the server with Bedrock enabled to use live intake";
-  elements.startAgentCore.disabled = !agentCoreEnabled;
-  elements.startAgentCore.title = agentCoreEnabled
+  elements.startBedrock.disabled = false;
+  elements.startBedrock.title = "Run notice intake on Amazon Nova Micro; this consumes AWS credit";
+  elements.startAgentCore.disabled = false;
+  elements.startAgentCore.title = accessToken
     ? "Run the Strands graph on the deployed AgentCore runtime; this consumes AWS credit"
-    : "Start the server with AgentCore enabled to use the deployed runtime";
+    : "Sign in with the provided judge account to run the deployed AgentCore workflow";
+  setSetupStep(setupStep);
 }
 
 elements.photoFile.addEventListener("change", () => {
@@ -2898,6 +2963,11 @@ elements.setupNext.addEventListener("click", () => {
   pane?.querySelector("input, textarea, button")?.focus();
 });
 
+elements.workflowAsOf.addEventListener("input", () => {
+  elements.workflowDateError.hidden = true;
+  elements.workflowAsOf.removeAttribute("aria-invalid");
+});
+
 elements.setupBack.addEventListener("click", () => {
   setSetupStep(setupStep - 1);
   const pane = elements.setupPanes.find((item) => Number(item.dataset.setupPane) === setupStep);
@@ -2958,6 +3028,7 @@ elements.noticeForm.addEventListener("submit", async (event) => {
     const workflowView = workflowCampaign(envelope, executionTarget);
     render(workflowView);
     sessionStorage.setItem("mettle_entry_selected", "recovery");
+    sessionStorage.removeItem("mettle_recovery_draft");
     workflowCreateKey = null;
     workflowCreateProvider = null;
     if (workflowView.correction_review_required) {
@@ -3154,6 +3225,15 @@ elements.auth.addEventListener("click", async () => {
 initializeAuth().then(async () => {
   await loadCapabilities();
   await loadCampaign();
+  if (recoveryDraftRestored) {
+    setupReturnsToWelcome = false;
+    if (elements.welcomeDialog.open) elements.welcomeDialog.close();
+    if (!elements.noticeDialog.open) elements.noticeDialog.showModal();
+    window.setTimeout(() => {
+      const pane = elements.setupPanes.find((item) => Number(item.dataset.setupPane) === setupStep);
+      pane?.querySelector("input, textarea, button")?.focus();
+    }, 0);
+  }
 });
 
 window.setInterval(async () => {

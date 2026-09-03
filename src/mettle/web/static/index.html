@@ -70,13 +70,13 @@
           <span class="workspace-tab__icon" aria-hidden="true">02</span><strong>Evidence & packet</strong><small>Proof, review, and release</small>
         </button>
         <button class="workspace-tab workspace-tab--provenance" type="button" data-workspace-tab="activity" aria-label="How Mettle worked">
-          <span class="workspace-tab__icon" aria-hidden="true">03</span><strong><span class="workspace-label-full">Agent receipt</span><span class="workspace-label-short" aria-hidden="true">Agents</span></strong><small>Inspectable Strands run</small>
+          <span class="workspace-tab__icon" aria-hidden="true">03</span><strong><span class="workspace-label-full">Run receipt</span><span class="workspace-label-short" aria-hidden="true">Run</span></strong><small>Inspectable Strands control flow</small>
         </button>
         <div class="workspace-agent-status" aria-label="Background recovery status">
           <span id="workspace-agent-state"><i aria-hidden="true"></i> METTLE IS WORKING</span>
           <strong id="workspace-agent-title">Open-only follow-up is armed.</strong>
           <small id="workspace-agent-copy">Closed corrections leave the chase automatically.</small>
-          <button type="button" data-open-agent-receipt>View agent receipt →</button>
+          <button type="button" data-open-agent-receipt>View run receipt →</button>
         </div>
         <div class="workspace-nav__support">
           <button type="button" id="nav-new-recovery">＋ New recovery</button>
@@ -265,6 +265,7 @@
               <div><p class="mono-label">ORCHESTRATION AT A GLANCE</p><h2 id="agent-flow-title">What runs, what wakes it, where it stops.</h2></div>
               <p>Model work is dark. Deterministic control is light. Contractor authority is orange.</p>
             </header>
+            <p class="agent-flow__thesis"><strong>Bounded authority:</strong> models interpret language and visible evidence; they never decide deadlines, gates, or what Mettle may claim.</p>
             <div class="agent-flow__track" id="agent-flow" aria-label="Mettle agent orchestration flow"></div>
           </section>
           <div class="provenance-legend" aria-label="Execution role legend">
@@ -435,7 +436,8 @@ Inspection comments:
           <div class="run-settings">
             <label class="field">
               <span>WORKING DATE</span>
-              <input id="workflow-as-of" name="as_of" type="date" value="2026-08-10" required>
+              <input id="workflow-as-of" name="as_of" type="date" required aria-describedby="workflow-date-error">
+              <small class="field-error" id="workflow-date-error" role="alert" hidden></small>
             </label>
             <div class="setup-guidance">
               <strong>Include the report’s permit, address, inspection date, deadline, and numbered comments.</strong>
@@ -480,11 +482,11 @@ Inspection comments:
           <div class="notice-dialog__actions">
             <button class="button button--orange" id="setup-next-button" type="button">Next · add people</button>
             <button class="button" id="start-workflow-button" type="submit" value="local" hidden>Extract locally</button>
-            <button class="button button--outline" id="start-bedrock-button" type="submit" value="bedrock" disabled hidden title="Start the server with Bedrock enabled to use live intake">
+            <button class="button button--outline" id="start-bedrock-button" type="submit" value="bedrock" hidden>
               Ground with Bedrock
               <small>NOVA MICRO · USES AWS CREDIT</small>
             </button>
-            <button class="button button--orange" id="start-agentcore-button" type="submit" value="agentcore" disabled hidden title="Start the server with AgentCore enabled to use the deployed runtime">
+            <button class="button button--orange" id="start-agentcore-button" type="submit" value="agentcore" hidden>
               Extract on AgentCore
               <small>DEPLOYED STRANDS · USES AWS CREDIT</small>
             </button>

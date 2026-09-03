@@ -113,7 +113,7 @@ Those constraints do not weaken the demonstrated architecture. They define exact
 - **Public guided demo:** [d1ytth8asjpes8.cloudfront.net](https://d1ytth8asjpes8.cloudfront.net)
 - **MIT-licensed source:** [github.com/gowtham0992/Mettle](https://github.com/gowtham0992/Mettle)
 - **Deployment acceptance:** [`scripts/web_scheduler_smoke.py`](https://github.com/gowtham0992/Mettle/blob/main/scripts/web_scheduler_smoke.py)
-- **Verification:** all 119 tests run without AWS credentials or model spend
+- **Verification:** all 135 tests run without AWS credentials or model spend
 
 **The contractor closes the browser. Mettle keeps the recovery clock.**
 

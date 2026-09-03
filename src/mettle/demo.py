@@ -192,6 +192,9 @@ class DemoStore:
                 return self._snapshot_unlocked()
             self._seen_keys.add(idempotency_key)
 
+            if self._pending("route-review"):
+                return self._snapshot_unlocked()
+
             handlers = (
                 self._accept_electrical_evidence,
                 self._reject_framing_evidence,
@@ -298,28 +301,40 @@ class DemoStore:
                 )
             )
 
-            if judgment_id == "code-c3":
-                citation = self._citation("3")
-                citation.stage = CitationStage.AWAITING_EVIDENCE
-                citation.trade = Trade.MECHANICAL
-                citation.assignee = "Alex Kim · Alpine Mechanical"
-                citation.evidence_requirements = [decision]
+            if judgment_id == "route-review":
+                assignees = {
+                    "1": "Mike Alvarez · Brightline Electric",
+                    "2": "Jen Ortiz · Front Range Framing",
+                    "3": "Alex Kim · Alpine Mechanical",
+                }
+                for citation in self._citations:
+                    citation.assignee = assignees[citation.citation_id]
+                mechanical = self._citation("3")
+                mechanical.stage = CitationStage.AWAITING_EVIDENCE
+                mechanical.trade = Trade.MECHANICAL
+                mechanical.evidence_requirements = [decision]
+                self._messages_handled += 3
+                self._automated_actions += 2
+                self._events.append(
+                    self._event(
+                        event_id="assignments-sent",
+                        kind="message_sent",
+                        title="Approved trade requests released",
+                        detail="Three notice-anchored requests were recorded only after contractor approval.",
+                        actor="Coordination policy",
+                    )
+                )
             elif judgment_id == "final-approval":
                 self._packet_status = "approved"
             return self._snapshot_unlocked()
 
     def _reset_unlocked(self) -> None:
         notice = parse_notice(REPRESENTATIVE_NOTICE_TEXT)
-        assignees = {
-            "1": "Mike Alvarez · Brightline Electric",
-            "2": "Jen Ortiz · Front Range Framing",
-            "3": None,
-        }
         self._notice = notice
         self._as_of = date(2026, 8, 10)
         self._step = 0
-        self._messages_handled = 2
-        self._automated_actions = 4
+        self._messages_handled = 0
+        self._automated_actions = 2
         self._contractor_decisions = 0
         self._packet_status = "blocked"
         self._seen_keys = set()
@@ -330,7 +345,7 @@ class DemoStore:
                 code_reference=item.code_reference,
                 notice_text=item.notice_text,
                 trade=item.trade,
-                assignee=assignees[item.citation_id],
+                assignee=None,
                 evidence_requirements=item.evidence_requirements,
                 stage=(
                     CitationStage.NEEDS_JUDGMENT
@@ -350,24 +365,16 @@ class DemoStore:
                 actor="Intake agent",
             )
         )
-        self._events.append(
-            self._event(
-                event_id="assignments-sent",
-                kind="message_sent",
-                title="Trade requests sent without project setup",
-                detail="Electrical and framing requests delivered over simulated SMS.",
-                actor="Coordination agent",
-            )
-        )
         self._judgments = [
             DemoJudgment(
-                judgment_id="code-c3",
-                kind="code_interpretation",
-                citation_id="3",
-                question="What evidence should the mechanical trade provide for citation 3?",
+                judgment_id="route-review",
+                kind="correction_review",
+                citation_id=None,
+                question="Approve every correction route before Mettle contacts a trade?",
                 reason=(
-                    "The notice requires service access but does not state an observable "
-                    "evidence requirement. Mettle will not invent one."
+                    "Mettle prepared three notice-anchored routes but records zero outreach "
+                    "until the contractor approves them. The mechanical proof boundary is "
+                    "included in this decision because the notice does not define it."
                 ),
             )
         ]

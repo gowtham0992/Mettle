@@ -12,18 +12,18 @@ class NoticeParseError(ValueError):
 
 _HEADER_PATTERNS = {
     "notice_id": (
-        r"(?im)^(?:NOTICE ID|PERMIT|PERMIT NUMBER)\s*[:#]\s*(.+?)\s*$",
+        r"(?im)^(?:NOTICE ID|RECORD ID|PERMIT\s+(?:NO\.?|NUMBER)|PERMIT)(?:\s*(?:#\s*:?|:)\s*|\s+)(.+?)\s*$",
         r"(?im)^CORRECTION NOTICE\s*#\s*(.+?)\s*$",
     ),
     "issued_on": (
-        r"(?im)^(?:ISSUED|DATE ISSUED|INSPECTION DATE)\s*:\s*(.+?)\s*$",
+        r"(?im)^(?:DATE OF INSPECTION|INSPECTION PERFORMED|INSPECTION DATE|DATE ISSUED|ISSUED|DATE)(?:\s*(?:#\s*:?|:)\s*|\s+)(.+?)\s*$",
     ),
     "reinspection_due_on": (
-        r"(?im)^(?:REINSPECTION DEADLINE|REINSPECTION TARGET|REINSPECTION DUE|REINSPECTION REQUIRED BY)\s*:\s*(.+?)\s*$",
-        r"(?i)corrections must be completed before reinspection on\s+([0-9/-]+)",
+        r"(?im)^(?:RE[- ]?INSPECTION (?:REQUIRED BY|DEADLINE|TARGET|DATE|DUE)|CORRECTION DEADLINE|CORRECT BY)(?:\s*(?:#\s*:?|:)\s*|\s+)(.+?)\s*$",
+        r"(?i)corrections must be completed before reinspection on\s+([^\n.]+)",
     ),
     "property_label": (
-        r"(?im)^(?:PROPERTY|SITE|JOB ADDRESS)\s*:\s*(.+?)\s*$",
+        r"(?im)^(?:PROJECT ADDRESS|PROPERTY ADDRESS|JOB ADDRESS|PROPERTY|LOCATION|ADDRESS|SITE)(?:\s*(?:#\s*:?|:)\s*|\s+)(.+?)\s*$",
     ),
 }
 
@@ -76,9 +76,18 @@ def _parse_labeled_notice(normalized: str) -> InspectionNotice:
 def _parse_numbered_notice(normalized: str) -> InspectionNotice:
     header = _extract_header(normalized)
     blocks = re.findall(
-        r"(?ms)^\s*(\d{1,2})[.)]\s+(.+?)(?=^\s*\d{1,2}[.)]\s+|\Z)",
+        r"(?ms)^\s*(?:ITEM\s+|#|\()?([0-9]{1,2})\)?[.):\-]\s+(.+?)(?=^\s*(?:ITEM\s+|#|\()?[0-9]{1,2}\)?[.):\-]\s+|\Z)",
         normalized,
+        flags=re.IGNORECASE,
     )
+    if not blocks:
+        section = re.search(
+            r"(?ims)^(?:CORRECTIONS(?: REQUIRED)?|INSPECTION COMMENTS|VIOLATIONS|DEFICIENCIES|ITEMS REQUIRING CORRECTION|OUTSTANDING CORRECTIONS)\s*:?[ \t]*\n(.+)$",
+            normalized,
+        )
+        if section:
+            bullet_items = re.findall(r"(?m)^\s*[-*•]\s+(.+?)\s*$", section.group(1))
+            blocks = [(str(index), item) for index, item in enumerate(bullet_items, start=1)]
     if not blocks:
         raise NoticeParseError("notice contains no numbered correction items")
 
@@ -87,9 +96,19 @@ def _parse_numbered_notice(normalized: str) -> InspectionNotice:
         item = " ".join(raw_item.split())
         code_match = _CODE_PATTERN.search(item)
         if code_match is None:
-            raise NoticeParseError(
-                f"correction {citation_id} does not contain a supported code reference"
+            if len(item) < 12:
+                raise NoticeParseError(f"correction {citation_id} has no usable finding text")
+            citations.append(
+                _citation(
+                    citation_id=citation_id,
+                    code_reference="Not stated in notice",
+                    notice_text=item.strip(" []:;—–-\t"),
+                    trade=_trade_from_code_and_text("", item),
+                    evidence_requirements=[],
+                    additional_ambiguity="the notice does not state a code reference",
+                )
             )
+            continue
         code_reference = f"{code_match.group(1).upper()} {code_match.group(2).upper()}"
         notice_text = (
             item[: code_match.start()] + item[code_match.end() :]
@@ -135,12 +154,21 @@ def _build_notice(header: dict[str, str], citations: list[Citation]) -> Inspecti
 
 
 def _parse_date(value: str) -> date:
-    for format_string in ("%Y-%m-%d", "%m/%d/%Y"):
+    cleaned = re.sub(r"\s+", " ", value.strip().rstrip("."))
+    for format_string in (
+        "%Y-%m-%d",
+        "%m/%d/%Y",
+        "%m/%d/%y",
+        "%B %d, %Y",
+        "%b %d, %Y",
+        "%B %d %Y",
+        "%b %d %Y",
+    ):
         try:
-            return datetime.strptime(value.strip().rstrip("."), format_string).date()
+            return datetime.strptime(cleaned, format_string).date()
         except ValueError:
             continue
-    raise NoticeParseError("notice dates must use YYYY-MM-DD or MM/DD/YYYY")
+    raise NoticeParseError("notice contains a date Mettle could not read")
 
 
 def _parse_labeled_citation(citation_id: str, body: str) -> Citation:
@@ -192,8 +220,9 @@ def _citation(
     notice_text: str,
     trade: Trade,
     evidence_requirements: list[str],
+    additional_ambiguity: str | None = None,
 ) -> Citation:
-    ambiguity_reasons: list[str] = []
+    ambiguity_reasons: list[str] = [additional_ambiguity] if additional_ambiguity else []
     if trade is Trade.UNKNOWN:
         ambiguity_reasons.append("the notice does not identify a recognized trade")
     if not evidence_requirements:
@@ -209,7 +238,7 @@ def _citation(
 
 
 def _trade_from_code_and_text(code_reference: str, notice_text: str) -> Trade:
-    family = code_reference.split(maxsplit=1)[0]
+    family = code_reference.split(maxsplit=1)[0] if code_reference.strip() else ""
     if family == "NEC":
         return Trade.ELECTRICAL
     if family == "IMC":

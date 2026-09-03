@@ -3,18 +3,24 @@ import pytest
 from mettle.demo import CitationStage, DemoConflict, DemoStore, GateStatus, Priority
 
 
-def test_demo_opening_events_have_distinct_chronology() -> None:
+def approve_routes(store: DemoStore) -> None:
+    store.resolve_judgment(
+        "route-review",
+        decision="Wide photo showing equipment and measured service clearance",
+    )
+
+
+def test_demo_opening_state_has_zero_outreach_before_contractor_approval() -> None:
     campaign = DemoStore().snapshot()
 
-    assert campaign.events[0].happened_at > campaign.events[1].happened_at
+    assert campaign.metrics.messages_handled == 0
+    assert all(citation.assignee is None for citation in campaign.citations)
+    assert not any(event.kind == "message_sent" for event in campaign.events)
 
 
 def test_demo_full_journey_preserves_distinct_event_timestamps() -> None:
     store = DemoStore()
-    store.resolve_judgment(
-        "code-c3",
-        decision="Wide photo showing equipment and measured service clearance",
-    )
+    approve_routes(store)
     for step in range(3):
         store.advance(idempotency_key=f"timestamp-before-deadline-{step}")
     store.resolve_judgment(
@@ -29,10 +35,13 @@ def test_demo_full_journey_preserves_distinct_event_timestamps() -> None:
     timestamps = [event.happened_at for event in campaign.events]
     assert len(timestamps) == len(set(timestamps))
     assert timestamps == sorted(timestamps, reverse=True)
+    assert campaign.metrics.automated_actions == 15
+    assert campaign.metrics.contractor_decisions == 3
 
 
 def test_demo_rejects_insufficient_evidence_then_accepts_replacement() -> None:
     store = DemoStore()
+    approve_routes(store)
 
     store.advance(idempotency_key="step-one")
     rejected = store.advance(idempotency_key="step-two")
@@ -54,6 +63,7 @@ def test_demo_rejects_insufficient_evidence_then_accepts_replacement() -> None:
 
 def test_demo_replay_has_a_single_effect() -> None:
     store = DemoStore()
+    approve_routes(store)
 
     first = store.advance(idempotency_key="same-event")
     replay = store.advance(idempotency_key="same-event")
@@ -67,6 +77,7 @@ def test_demo_replay_has_a_single_effect() -> None:
 
 def test_demo_escalates_and_interrupts_near_deadline() -> None:
     store = DemoStore()
+    approve_routes(store)
     store.advance(idempotency_key="one")
     store.advance(idempotency_key="two")
     campaign = store.advance(idempotency_key="three")
@@ -82,34 +93,33 @@ def test_demo_escalates_and_interrupts_near_deadline() -> None:
         "deadline-choice",
         decision="Keep the current reinspection target and continue critical recovery",
     )
-    assert resumed.metrics.contractor_decisions == 1
+    assert resumed.metrics.contractor_decisions == 2
 
 
 def test_resolving_code_gate_resumes_only_the_affected_citation() -> None:
     store = DemoStore()
 
     campaign = store.resolve_judgment(
-        "code-c3",
+        "route-review",
         decision="Wide photo showing the equipment and measured service clearance",
     )
     mechanical = next(item for item in campaign.citations if item.citation_id == "3")
-    gate = next(item for item in campaign.judgments if item.judgment_id == "code-c3")
+    gate = next(item for item in campaign.judgments if item.judgment_id == "route-review")
 
     assert mechanical.stage is CitationStage.AWAITING_EVIDENCE
     assert mechanical.assignee == "Alex Kim · Alpine Mechanical"
+    assert campaign.metrics.messages_handled == 3
+    assert any(item.kind == "message_sent" for item in campaign.events)
     assert gate.status is GateStatus.RESOLVED
     assert campaign.metrics.contractor_decisions == 1
 
     with pytest.raises(DemoConflict, match="already resolved differently"):
-        store.resolve_judgment("code-c3", decision="A conflicting second decision")
+        store.resolve_judgment("route-review", decision="A conflicting second decision")
 
 
 def test_final_packet_gate_appears_only_after_all_citations_are_ready() -> None:
     store = DemoStore()
-    store.resolve_judgment(
-        "code-c3",
-        decision="Wide photo showing equipment and measured service clearance",
-    )
+    approve_routes(store)
 
     for step in range(3):
         store.advance(idempotency_key=f"event-{step}")
@@ -132,20 +142,10 @@ def test_final_packet_gate_appears_only_after_all_citations_are_ready() -> None:
     assert any(item.judgment_id == "final-approval" for item in packet.judgments)
 
 
-def test_mechanical_evidence_event_waits_for_contractor_judgment() -> None:
+def test_demo_cannot_advance_before_route_approval() -> None:
     store = DemoStore()
 
-    for step in range(4):
-        campaign = store.advance(idempotency_key=f"blocked-{step}")
+    campaign = store.advance(idempotency_key="blocked-before-route-approval")
 
-    assert campaign.scenario_step == 3
-    store.resolve_judgment(
-        "deadline-choice",
-        decision="Keep the current reinspection target and continue critical recovery",
-    )
-    store.advance(idempotency_key="framing-after-deadline")
-    campaign = store.advance(idempotency_key="blocked-on-code")
-    assert campaign.scenario_step == 4
-    mechanical = next(item for item in campaign.citations if item.citation_id == "3")
-    assert mechanical.stage is CitationStage.NEEDS_JUDGMENT
-    assert not any(item.judgment_id == "final-approval" for item in campaign.judgments)
+    assert campaign.scenario_step == 0
+    assert campaign.metrics.messages_handled == 0

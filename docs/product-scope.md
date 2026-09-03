@@ -37,7 +37,7 @@ A contractor will delegate the recovery campaign if the system anchors every act
 - native mobile applications;
 - a general-purpose punch-list system;
 - production SMS sending before an explicit live-demo safety review; and
-- more than one representative notice format in the first demo.
+- jurisdiction-specific OCR and layout adapters beyond tolerant pasted-text intake.
 
 ## Demo success
 
