@@ -124,7 +124,7 @@ Mettle is intentionally narrow: several common pasted-notice shapes, a bounded t
 - **Public guided demo:** [d1ytth8asjpes8.cloudfront.net](https://d1ytth8asjpes8.cloudfront.net)
 - **MIT-licensed source:** [github.com/gowtham0992/Mettle](https://github.com/gowtham0992/Mettle)
 - **Architecture:** [Mettle product architecture](https://raw.githubusercontent.com/gowtham0992/Mettle/main/assets/architecture/mettle-product-architecture.png)
-- **Verification:** all 135 tests run without AWS credentials or model spend
+- **Verification:** all 137 tests run without AWS credentials or model spend
 
 **Mettle handles the chase. The contractor decides.**
 

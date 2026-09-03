@@ -7,20 +7,22 @@ bucket names, object-version IDs, session IDs, and workflow IDs out of source.
 ## Current acceptance status
 
 - Runtime: `MettleRecovery` (resource identifier recorded privately)
-- Version and status: `13`, `READY`
+- Version and status: `14`, `READY`
 - Artifact: immutable, private, versioned S3 object
 - Artifact SHA-256:
-  `8a83f7ce876e92565e56ac958ed3cc5877d276fb2192fe383c62122d7e63ab16`
+  `678d29880f360684e6701b1f6c825514f87bcb5a3905ea65bdd17578f13f886c`
 - Runtime lifecycle: 15-minute idle timeout, 8-hour maximum session
 - Log retention: 14 days
 
-The version 13 acceptance run used synthetic data. It ran Nova Micro notice
+The version 14 acceptance run used synthetic data. It ran Nova Micro notice
 intake, stopped with zero deliveries for contractor review, resumed the same
-Strands graph, accepted three bounded evidence fixtures, required final
-contractor approval, and rendered a five-page packet. The PDF passed
+Strands graph, and exercised Nova Lite in both directions: an unrelated logo
+image was rejected before requirement matching, while a relevant measured-panel
+photo was accepted. The run then accepted the remaining bounded evidence
+fixtures, required final contractor approval, and rendered a five-page packet. The PDF passed
 content-type, page-count, recovery-record, base64, and SHA-256 integrity checks
 with digest
-`2e251570d2f42482aedca4958b801c614c8117dff8c39edfe63426de8c2b4973`.
+`47d786edbd286bbf0c384a6bfed163480d81fa8cd834b7dcf5cdca1720387b7e`.
 
 Earlier acceptance runs exercised live Nova Lite vision, deadline replanning,
 idempotent replay, stale-event rejection, final approval, packet integrity,

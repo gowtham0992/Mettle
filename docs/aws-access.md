@@ -29,9 +29,10 @@ The local trust chain is intentionally narrow:
 - `mettle-bootstrap` stores the only long-lived access key. Its IAM user can
   only call `sts:AssumeRole` for `MettleHackathonDeveloper`.
 - `mettle-dev` assumes that role for at most one hour.
-- The role can call `bedrock:InvokeModel` and
-  `bedrock:InvokeModelWithResponseStream` only for Amazon Nova Micro and Nova Lite in
-  `us-east-1`.
+- The local development role can invoke Amazon Nova Micro for bounded text
+  intake in `us-east-1`. Live Nova Lite photo assessment runs only inside the
+  separately scoped AgentCore runtime role; the local role deliberately cannot
+  invoke it.
 - The root account has MFA enabled and no root access keys.
 
 AWS profile files are local machine configuration. They are not part of this
