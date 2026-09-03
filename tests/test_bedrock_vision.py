@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 import mettle.agents.vision as vision_module
 
@@ -30,11 +32,23 @@ def _finding(requirement: str, verdict: str, observation: str):
     return {"requirement": requirement, "verdict": verdict, "observation": observation}
 
 
-def _run_agent(findings, capture=None):
+def _run_agent(
+    findings,
+    capture=None,
+    *,
+    image_relevance="relevant",
+    image_summary="The cited job-site subject and work area are visible.",
+):
     def assessor(**kwargs):
         if capture is not None:
             capture.update(kwargs)
-        return VisibleEvidenceFindings.model_validate({"findings": findings})
+        return VisibleEvidenceFindings.model_validate(
+            {
+                "image_relevance": image_relevance,
+                "image_summary": image_summary,
+                "findings": findings,
+            }
+        )
     return assessor
 
 
@@ -58,7 +72,60 @@ def test_vision_accepts_only_when_every_notice_requirement_is_visibly_shown() ->
     assert result.matched_requirements == CITATION.evidence_requirements
     assert captured["image"] == b"safe-jpeg"
     assert captured["model"] is model
+    assert "Authority text:" in captured["prompt"]
+    assert "not_relevant" in captured["prompt"]
     assert result.agent_run[1].step == "Inspect visible evidence"
+
+
+def test_vision_rejects_unrelated_image_even_if_requirement_findings_claim_shown() -> None:
+    findings = [
+        _finding(CITATION.evidence_requirements[0], "shown", "A rectangular object is visible."),
+        _finding(CITATION.evidence_requirements[1], "shown", "A long narrow object is visible."),
+    ]
+
+    def unrelated_assessor(**_kwargs):
+        return SimpleNamespace(
+            image_relevance="not_relevant",
+            image_summary="A vacation landscape with no electrical panel or job-site work area.",
+            findings=_run_agent(findings)().findings,
+        )
+
+    result = assess_photo_with_bedrock(
+        citation=CITATION,
+        image=b"normalized-unrelated-jpeg",
+        assessment_id="evidence-unrelated",
+        model_factory=lambda _settings: object(),
+        agent_assessor=unrelated_assessor,
+    )
+
+    assert result.status is EvidenceStatus.REJECTED
+    assert result.matched_requirements == []
+    assert result.missing_requirements == CITATION.evidence_requirements
+    assert "unrelated" in result.explanation.lower()
+
+
+def test_vision_routes_uncertain_scene_identity_to_contractor_review() -> None:
+    findings = [
+        _finding(CITATION.evidence_requirements[0], "uncertain", "The image is tightly cropped."),
+        _finding(CITATION.evidence_requirements[1], "uncertain", "No readable scale is visible."),
+    ]
+
+    result = assess_photo_with_bedrock(
+        citation=CITATION,
+        image=b"normalized-ambiguous-jpeg",
+        assessment_id="evidence-ambiguous-scene",
+        model_factory=lambda _settings: object(),
+        agent_assessor=_run_agent(
+            findings,
+            image_relevance="uncertain",
+            image_summary="A cropped surface that cannot be tied to the cited panel area.",
+        ),
+    )
+
+    assert result.status is EvidenceStatus.MANUAL_REVIEW
+    assert result.matched_requirements == []
+    assert result.missing_requirements == CITATION.evidence_requirements
+    assert "contractor review" in result.explanation.lower()
 
 
 def test_vision_rejects_with_specific_rerequest_when_an_item_is_not_shown() -> None:
@@ -144,6 +211,8 @@ def test_evidence_agent_receives_multimodal_prompt_and_structured_contract(monke
             captured["output_model"] = output_model
             captured["prompt"] = prompt
             return VisibleEvidenceFindings.model_validate({
+                "image_relevance": "relevant",
+                "image_summary": "The electrical panel and surrounding work area are visible.",
                 "findings": [
                     _finding(CITATION.evidence_requirements[0], "shown", "Visible."),
                     _finding(CITATION.evidence_requirements[1], "shown", "Visible."),
@@ -161,4 +230,5 @@ def test_evidence_agent_receives_multimodal_prompt_and_structured_contract(monke
     assert captured["agent"]["model"] == "bounded-model"
     assert captured["output_model"] is VisibleEvidenceFindings
     assert captured["prompt"][0]["image"]["source"]["bytes"] == b"normalized-jpeg"
+    assert result.image_relevance == "relevant"
     assert result.findings[0].verdict == "shown"

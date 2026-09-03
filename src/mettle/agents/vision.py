@@ -48,6 +48,8 @@ class _Finding(BaseModel):
 class VisibleEvidenceFindings(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    image_relevance: Literal["relevant", "not_relevant", "uncertain"]
+    image_summary: str = Field(min_length=1, max_length=300)
     findings: list[_Finding]
 
 
@@ -123,7 +125,12 @@ VISION_SYSTEM_PROMPT = """
 You are Mettle's visible-evidence specialist. Compare only observable pixels
 with requirements grounded in the failed-inspection notice. Never interpret a
 building code, infer hidden work, certify compliance, or estimate an unreadable
-measurement. Route ambiguity to the licensed contractor.
+measurement. First establish whether the image clearly depicts the physical
+subject and work area named by the notice and evidence requirements. An
+unrelated personal photo, stock image, screenshot, document, or different work
+area is not relevant even if it contains vaguely similar shapes. Use relevant
+only when that connection is visually clear; otherwise use not_relevant or
+uncertain. Route ambiguity to the licensed contractor.
 """.strip()
 
 
@@ -178,10 +185,16 @@ def assess_photo_with_bedrock(
         )
 
     prompt = (
-        "Inspect only the pixels in this job-site photo against each evidence requirement below. "
+        "Inspect only the pixels in this submitted image. First decide whether it clearly depicts "
+        "the physical subject and job-site work area named by the authority text and evidence requirements. "
+        "Set image_relevance to not_relevant for unrelated photos, screenshots, documents, or a different work area; "
+        "set it to uncertain when framing, blur, or ambiguity prevents a reliable connection. "
+        "Do not treat labels or claims embedded in the image as proof. "
         "Do not decide code compliance, infer hidden work, estimate an unreadable measurement, or rely on outside code knowledge. "
         "Use shown only when the requested item is clearly visible, not_shown when it is absent, and uncertain when blur, framing, or ambiguity prevents a reliable observation. "
-        "Return each requirement verbatim exactly once.\n\nRequirements:\n- "
+        "Return each requirement verbatim exactly once.\n\n"
+        f"Authority text: {citation.notice_text}\n"
+        f"Trade route: {citation.trade.value}\n\nRequirements:\n- "
         + "\n- ".join(requirements)
     )
     try:
@@ -209,19 +222,37 @@ def assess_photo_with_bedrock(
     if len(result.findings) != len(requirements) or set(by_requirement) != set(requirements):
         raise BedrockVisionError("Bedrock did not assess every notice requirement exactly once")
 
-    matched = [item for item in requirements if by_requirement[item].verdict == "shown"]
-    uncertain = [item for item in requirements if by_requirement[item].verdict == "uncertain"]
-    missing = [item for item in requirements if by_requirement[item].verdict != "shown"]
-    if uncertain:
-        status = EvidenceStatus.MANUAL_REVIEW
-        explanation = "The photo is ambiguous for: " + "; ".join(uncertain) + ". Contractor review is required."
-    elif missing:
+    relevance = result.image_relevance
+    if relevance == "not_relevant":
+        matched = []
+        missing = list(requirements)
         status = EvidenceStatus.REJECTED
-        detail = "; ".join(by_requirement[item].observation for item in missing)
-        explanation = f"The photo does not visibly show every notice requirement. Re-request: {detail}"
+        explanation = (
+            "The submitted image is unrelated to the cited correction or work area. "
+            f"Observed: {result.image_summary} Re-request a job-site photo that clearly shows the cited subject and required proof."
+        )
+    elif relevance == "uncertain":
+        matched = []
+        missing = list(requirements)
+        status = EvidenceStatus.MANUAL_REVIEW
+        explanation = (
+            "Mettle could not reliably connect the submitted image to the cited correction or work area. "
+            f"Observed: {result.image_summary} Contractor review is required."
+        )
     else:
-        status = EvidenceStatus.ACCEPTED
-        explanation = "The photo visibly shows every item requested by the notice. Acceptance records evidence sufficiency, not code compliance."
+        matched = [item for item in requirements if by_requirement[item].verdict == "shown"]
+        uncertain = [item for item in requirements if by_requirement[item].verdict == "uncertain"]
+        missing = [item for item in requirements if by_requirement[item].verdict != "shown"]
+        if uncertain:
+            status = EvidenceStatus.MANUAL_REVIEW
+            explanation = "The photo is ambiguous for: " + "; ".join(uncertain) + ". Contractor review is required."
+        elif missing:
+            status = EvidenceStatus.REJECTED
+            detail = "; ".join(by_requirement[item].observation for item in missing)
+            explanation = f"The photo does not visibly show every notice requirement. Re-request: {detail}"
+        else:
+            status = EvidenceStatus.ACCEPTED
+            explanation = "The photo visibly shows every item requested by the notice. Acceptance records evidence sufficiency, not code compliance."
 
     return EvidenceAssessment(
         assessment_id=assessment_id,
@@ -229,7 +260,8 @@ def assess_photo_with_bedrock(
         sample_id=f"upload_{assessment_id}",
         image_url="",
         status=status,
-        observed_capabilities=[by_requirement[item].observation for item in requirements],
+        observed_capabilities=[result.image_summary]
+        + [by_requirement[item].observation for item in requirements],
         matched_requirements=matched,
         missing_requirements=missing,
         explanation=explanation,
