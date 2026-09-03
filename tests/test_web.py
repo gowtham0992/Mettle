@@ -438,11 +438,13 @@ def test_reinspection_packet_with_chase_history_has_stable_structure() -> None:
 def test_dashboard_and_campaign_api_load() -> None:
     with client() as browser:
         page = browser.get("/")
+        evidence_flow = browser.get("/static/evidence-flow.js")
         script = browser.get("/static/app.js")
         styles = browser.get("/static/styles.css")
         campaign = browser.get("/api/campaign")
 
     assert page.status_code == 200
+    assert evidence_flow.status_code == 200
     assert "Recovery command center" in page.text
     assert "Start with the failed-inspection report" in page.text
     assert "Start a recovery" in page.text
@@ -514,6 +516,10 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function renderJudgeTour(data)" in script.text
     assert "function renderJourney(data)" in script.text
     assert "function hasApprovedEvidenceBoundary(data, citationId)" in script.text
+    assert '<script src="/static/evidence-flow.js" defer></script>' in page.text
+    assert "selectEvidenceCitation(data.citations, elements.photoCitation.value)" in script.text
+    assert 'elements.photoFile.value = "";' in script.text
+    assert "elements.photoForm.reset()" not in script.text
     assert "requestError.code = payload.error?.code" in script.text
     assert 'sessionStorage.setItem("mettle_post_auth_path"' in script.text
     assert 'sessionStorage.removeItem("mettle_post_auth_path")' in script.text

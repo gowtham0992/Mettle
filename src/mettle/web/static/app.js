@@ -1,3 +1,5 @@
+const { evidenceOptionLabel, selectEvidenceCitation } = globalThis.MettleEvidenceFlow;
+
 const elements = {
   main: document.querySelector("#main"),
   band: document.querySelector(".command-band"),
@@ -1334,7 +1336,7 @@ function renderEvidenceAssessment(assessment) {
   elements.evidenceResult.hidden = false;
   elements.evidenceResult.className = `evidence-result evidence-result--${assessment.status}`;
   elements.evidenceResult.replaceChildren(
-    node("strong", "", assessment.label || assessment.status.replaceAll("_", " ")),
+    node("strong", "", `${assessment.label || assessment.status.replaceAll("_", " ")} · C${assessment.citation_id}`),
     node("span", "", assessment.explanation),
   );
 }
@@ -2585,9 +2587,9 @@ function render(data) {
   elements.recoveryClock.hidden = !isWorkflow;
   elements.driverTag.textContent = isWorkflow ? "RECOVERY" : "SAMPLE";
   if (isWorkflow) renderRecoveryClock(data);
-  const selectedCitation = elements.photoCitation.value;
+  const selectedCitation = selectEvidenceCitation(data.citations, elements.photoCitation.value);
   elements.photoCitation.replaceChildren(...data.citations.map((citation) => {
-    const option = node("option", "", `C${citation.citation_id} · ${citation.trade}`);
+    const option = node("option", "", evidenceOptionLabel(citation));
     option.value = citation.citation_id;
     return option;
   }));
@@ -2721,6 +2723,12 @@ elements.photoFile.addEventListener("change", () => {
   elements.photoSubmit.disabled = !activePhotoEnabled() || !elements.photoFile.files?.length;
 });
 
+elements.photoCitation.addEventListener("change", () => {
+  elements.photoFile.value = "";
+  elements.photoError.hidden = true;
+  elements.photoSubmit.disabled = true;
+});
+
 elements.photoForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!activeWorkflowId || !elements.photoFile.files?.length || !activePhotoEnabled()) return;
@@ -2748,7 +2756,7 @@ elements.photoForm.addEventListener("submit", async (event) => {
       : result.status === "manual_review"
         ? "The image is ambiguous. Mettle reserved the decision for you."
         : "Photo rejected with a specific re-request for the trade.");
-    elements.photoForm.reset();
+    elements.photoFile.value = "";
   } catch (error) {
     showInlineWorkflowError(error, elements.photoError);
   } finally {
