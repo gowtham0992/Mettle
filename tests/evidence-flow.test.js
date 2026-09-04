@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const {
   evidenceOptionLabel,
+  normalizedPhone,
   noticeDeadline,
   noticeInspectionDate,
   recoveryDateError,
@@ -43,4 +44,11 @@ test("rejects a working date on or after the reinspection deadline", () => {
   assert.equal(recoveryDateError(notice, "2026-09-13"), "");
   assert.match(recoveryDateError(notice, "2026-09-14"), /must be before/);
   assert.match(recoveryDateError(notice, "2026-09-15"), /must be before/);
+});
+
+test("normalizes the phone formats a US contractor is likely to type", () => {
+  assert.equal(normalizedPhone("(303) 555-0100"), "+13035550100");
+  assert.equal(normalizedPhone("303-555-0100"), "+13035550100");
+  assert.equal(normalizedPhone("1 303 555 0100"), "+13035550100");
+  assert.equal(normalizedPhone("+44 20 7946 0958"), "+442079460958");
 });

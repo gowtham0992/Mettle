@@ -42,6 +42,11 @@ from mettle.request_identity import (
     set_principal,
 )
 from mettle.notice_parser import NoticeParseError
+from mettle.notice_upload import (
+    MAX_NOTICE_BYTES,
+    NoticeUploadError,
+    extract_notice_text,
+)
 from mettle.workflow_registry import (
     ApprovePacketRequest,
     CreateWorkflowRequest,
@@ -109,6 +114,19 @@ class EncodedPhotoRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     image_base64: str = Field(min_length=4, max_length=6_700_000)
+
+
+class EncodedNoticeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    filename: str = Field(min_length=5, max_length=180)
+    file_base64: str = Field(min_length=4, max_length=6_700_000)
+
+
+class NoticeTextResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str
 
 
 def configured_workflow_registry() -> WorkflowRegistry:
@@ -386,6 +404,13 @@ def create_app(
             content={"error": {"code": "invalid_photo", "message": str(exc)}},
         )
 
+    @app.exception_handler(NoticeUploadError)
+    async def notice_upload_error(_request: Request, exc: NoticeUploadError):
+        return JSONResponse(
+            status_code=422,
+            content={"error": {"code": "invalid_notice_file", "message": str(exc)}},
+        )
+
     @app.exception_handler(AgentCoreGatewayError)
     async def agentcore_gateway_error(_request: Request, exc: AgentCoreGatewayError):
         return JSONResponse(
@@ -472,6 +497,21 @@ def create_app(
     @app.get("/api/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.post("/api/notices/text", response_model=NoticeTextResponse)
+    async def notice_text(payload: EncodedNoticeRequest) -> NoticeTextResponse:
+        try:
+            raw = base64.b64decode(payload.file_base64, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise NoticeUploadError("The report file encoding is invalid.") from exc
+        if len(raw) > MAX_NOTICE_BYTES:
+            raise NoticeUploadError("The report must be 5 MB or smaller.")
+        text = await run_in_threadpool(
+            extract_notice_text,
+            raw,
+            filename=payload.filename,
+        )
+        return NoticeTextResponse(text=text)
 
     async def read_photo(request: Request) -> bytes:
         upload_limit = min(

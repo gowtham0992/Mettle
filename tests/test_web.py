@@ -592,8 +592,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "Start with the failed-inspection report" in page.text
     assert "Start a recovery" in page.text
     assert "Try a sample recovery" in page.text
-    assert "Start with my notice" in page.text
-    assert "Run receipt" in page.text
+    assert "Start a secure recovery" in page.text
+    assert "What Mettle handled" in page.text
     assert "models interpret language and visible evidence; they never decide deadlines, gates, or what Mettle may claim" in page.text
     assert "The browser never owns the agent runtime." in page.text
     assert "Explore mode" not in page.text
@@ -606,11 +606,11 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert 'id="tour-secondary"' in page.text
     assert "Same product, staged for evaluation" in page.text
     assert "Failed-inspection recovery stages" in page.text
-    assert "Extract on AgentCore" in page.text
+    assert 'id="start-agentcore-button"' in page.text
     assert 'id="workflow-date-error"' in page.text
-    assert "Extract locally" in page.text
-    assert "Approve & begin recovery" in page.text
-    assert "Corrections" in page.text
+    assert 'id="start-workflow-button"' in page.text
+    assert "Approve & start follow-up" in page.text
+    assert "4 · Review" in page.text
     assert "Evidence & packet" in page.text
     assert "Inspectable Strands control flow" in page.text
     assert "STRANDS GRAPHBUILDER" in page.text
@@ -669,8 +669,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert 'sessionStorage.setItem("mettle_recovery_draft"' in script.text
     assert 'sessionStorage.removeItem("mettle_recovery_draft")' in script.text
     assert "function restoreRecoveryDraft()" in script.text
-    assert 'elements.workflowDateError.textContent = "Choose the date Mettle should use for this recovery."' in script.text
-    assert 'elements.startBedrock.hidden = setupStep !== 3 || !bedrockEnabled' in script.text
+    assert "function recoveryWorkingDate()" in script.text
+    assert "elements.startBedrock.hidden = true" in script.text
     assert 'Start the server with Bedrock enabled' not in page.text
     assert 'Start the server with Bedrock enabled' not in script.text
     assert 'response.headers.get("content-type")' in script.text
@@ -726,6 +726,18 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "function createTourWorkspaceFrame(data, phase, artifacts)" in script.text
     assert campaign.status_code == 200
     assert campaign.json()["notice_id"] == "CR-2026-0417"
+
+
+def test_contractor_can_import_a_text_notice_without_persisting_the_file() -> None:
+    encoded = base64.b64encode(NOTICE.encode("utf-8")).decode("ascii")
+    with client() as browser:
+        response = browser.post(
+            "/api/notices/text",
+            json={"filename": "redacted-notice.txt", "file_base64": encoded},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"text": NOTICE.strip()}
 
 
 def test_cloudfront_forwards_only_the_guided_demo_session_cookie() -> None:

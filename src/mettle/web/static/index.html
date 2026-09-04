@@ -71,13 +71,13 @@
           <span class="workspace-tab__icon" aria-hidden="true">02</span><strong>Evidence & packet</strong><small>Proof, review, and release</small>
         </button>
         <button class="workspace-tab workspace-tab--provenance" type="button" data-workspace-tab="activity" aria-label="How Mettle worked">
-          <span class="workspace-tab__icon" aria-hidden="true">03</span><strong><span class="workspace-label-full">Run receipt</span><span class="workspace-label-short" aria-hidden="true">Run</span></strong><small>Inspectable Strands control flow</small>
+          <span class="workspace-tab__icon" aria-hidden="true">03</span><strong><span class="workspace-label-full">Activity</span><span class="workspace-label-short" aria-hidden="true">Activity</span></strong><small>What Mettle handled</small>
         </button>
         <div class="workspace-agent-status" aria-label="Background recovery status">
           <span id="workspace-agent-state"><i aria-hidden="true"></i> METTLE IS WORKING</span>
           <strong id="workspace-agent-title">Open-only follow-up is armed.</strong>
           <small id="workspace-agent-copy">Closed corrections leave the chase automatically.</small>
-          <button type="button" data-open-agent-receipt>View run receipt →</button>
+          <button type="button" data-open-agent-receipt>View activity →</button>
         </div>
         <div class="workspace-nav__support">
           <button type="button" id="nav-new-recovery">＋ New recovery</button>
@@ -331,7 +331,7 @@
       <div class="welcome-dialog__brand">
         <img src="/static/mettle-mark.png" alt="" width="54" height="54">
         <span>METTLE / FAILED-INSPECTION RECOVERY</span>
-        <span class="welcome-dialog__mode">SAMPLE AVAILABLE · LIVE STRANDS BEHIND SIGN-IN</span>
+        <span class="welcome-dialog__mode">SAMPLE READY · SECURE RECOVERY REQUIRES SIGN-IN</span>
         <button class="theme-toggle theme-toggle--compact" type="button" data-theme-toggle aria-label="Switch to light mode" title="Switch to light mode">
           <span class="theme-toggle__icon" aria-hidden="true">☼</span>
           <span class="theme-toggle__label">Light</span>
@@ -354,9 +354,10 @@
             </button>
             <button class="entry-choice" id="start-recovery-entry" type="button">
               <span class="entry-choice__index">02</span>
-              <strong>Start with my notice</strong>
-              <span>Paste a redacted correction report, add the responsible trades, and start the same recovery workspace.</span>
-              <span class="entry-choice__action entry-choice__action--quiet">CONTINUE →</span>
+              <span class="entry-choice__badge">FOR CONTRACTORS</span>
+              <strong>Start a secure recovery</strong>
+              <span>Add a redacted correction report and the people responsible. Mettle saves your setup if sign-in is needed.</span>
+              <span class="entry-choice__action entry-choice__action--quiet" id="recovery-entry-action">START →</span>
             </button>
             <button id="try-sample-entry" type="button" hidden>Open sample workspace</button>
             <button class="entry-choice entry-choice--resume" id="resume-current-entry" type="button" hidden>
@@ -410,70 +411,73 @@
           </div>
         </div>
         <nav class="setup-progress" aria-label="Recovery setup progress">
-          <span class="setup-progress__step setup-progress__step--active" data-setup-progress="1">1 · Notice</span>
-          <span class="setup-progress__step" data-setup-progress="2">2 · People</span>
-          <span class="setup-progress__step" data-setup-progress="3">3 · Extract</span>
-          <span class="setup-progress__step" data-setup-progress="4">4 · Corrections</span>
+          <span class="setup-progress__step setup-progress__step--active" data-setup-progress="1">1 · Report</span>
+          <span class="setup-progress__step" data-setup-progress="2">2 · Contacts</span>
+          <span class="setup-progress__step" data-setup-progress="3">3 · Start</span>
+          <span class="setup-progress__step" data-setup-progress="4">4 · Review</span>
         </nav>
 
         <section class="setup-pane" data-setup-pane="1">
-          <p class="notice-dialog__intro">Paste the report text or inspection comments. Mettle anchors every task to the authority’s words and asks when the report is ambiguous.</p>
+          <p class="notice-dialog__intro">Paste the correction report or its inspection comments. Mettle keeps the inspector’s wording attached to every task and asks instead of guessing.</p>
+          <div class="notice-import">
+            <label class="notice-import__button">
+              <span>Choose a PDF or text report</span>
+              <input id="notice-file" type="file" accept="application/pdf,text/plain,.pdf,.txt">
+            </label>
+            <div><strong id="notice-file-status">No file selected</strong><span>5 MB max · selectable text required · file is not stored</span></div>
+          </div>
+          <p class="notice-import__divider"><span>or paste the report text</span></p>
           <label class="field field--notice">
-            <span>FAILED-INSPECTION REPORT · PLAIN TEXT</span>
-            <textarea id="notice-text" name="notice_text" required maxlength="100000" spellcheck="false">DOUGLAS COUNTY BUILDING DIVISION
-INSPECTION CORRECTION NOTICE
-Permit: CR-2026-0417
-Inspection: Residential rough-in
-Result: DISAPPROVED
-Inspection date: 08/07/2026
-Property: 100 Demo Way, Castle Pines, CO
-Corrections must be completed before reinspection on 08/17/2026.
-
-Inspection comments:
-1. NEC 110.26 — Maintain the required working clearance in front of the service panel.
-2. IRC R602.6 — Protect bored framing members where the edge distance is less than required.
-3. IMC 304.10 — Provide clearance and service access at the installed mechanical equipment.</textarea>
+            <span>FAILED-INSPECTION REPORT · REDACTED TEXT</span>
+            <textarea id="notice-text" name="notice_text" required maxlength="100000" spellcheck="false" placeholder="Paste the permit number, job address, inspection date, reinspection deadline, and numbered correction comments."></textarea>
           </label>
           <div class="run-settings">
-            <label class="field">
-              <span>WORKING DATE</span>
-              <input id="workflow-as-of" name="as_of" type="date" required aria-describedby="workflow-date-error">
-              <small class="field-error" id="workflow-date-error" role="alert" hidden></small>
-            </label>
+            <input id="workflow-as-of" name="as_of" type="hidden">
             <div class="setup-guidance">
-              <strong>Include the report’s permit, address, inspection date, deadline, and numbered comments.</strong>
-              <span>For this public prototype, replace identifying details with synthetic values.</span>
+              <strong>Include the permit, job address, inspection date, deadline, and numbered comments.</strong>
+              <span>This is a public prototype. Remove client names and use a redacted address before continuing.</span>
+              <small class="field-error" id="workflow-date-error" role="alert" hidden></small>
             </div>
           </div>
         </section>
 
         <section class="setup-pane" data-setup-pane="2" hidden>
-          <p class="notice-dialog__intro">Give Mettle one accountable contact. Add trade contacts when you have them; unassigned items stay with the primary contractor until you decide.</p>
+          <p class="notice-dialog__intro">Add the person running this recovery. If you skip the optional trade contacts, Mettle keeps those corrections with the primary contractor.</p>
           <div class="contact-grid">
             <label class="field contact-card contact-card--primary">
               <span>PRIMARY CONTRACTOR · REQUIRED</span>
-              <input id="primary-contact-name" name="primary_name" autocomplete="name" maxlength="120" placeholder="Your name" required>
-              <input id="primary-contact-phone" name="primary_phone" autocomplete="tel" inputmode="tel" placeholder="+1 303 555 0100" required>
+              <input id="primary-contact-name" name="primary_name" autocomplete="name" maxlength="120" placeholder="Your name" aria-label="Primary contractor name" required>
+              <input id="primary-contact-phone" name="primary_phone" autocomplete="tel" inputmode="tel" placeholder="(303) 555-0100" aria-label="Primary contractor phone" required>
             </label>
-            <label class="field contact-card"><span>ELECTRICAL · OPTIONAL</span><input data-contact-name="electrical" maxlength="120" placeholder="Contact name"><input data-contact-phone="electrical" inputmode="tel" placeholder="+1 303 555 0101"></label>
-            <label class="field contact-card"><span>FRAMING · OPTIONAL</span><input data-contact-name="framing" maxlength="120" placeholder="Contact name"><input data-contact-phone="framing" inputmode="tel" placeholder="+1 303 555 0102"></label>
-            <label class="field contact-card"><span>MECHANICAL · OPTIONAL</span><input data-contact-name="mechanical" maxlength="120" placeholder="Contact name"><input data-contact-phone="mechanical" inputmode="tel" placeholder="+1 303 555 0103"></label>
-            <label class="field contact-card"><span>PLUMBING · OPTIONAL</span><input data-contact-name="plumbing" maxlength="120" placeholder="Contact name"><input data-contact-phone="plumbing" inputmode="tel" placeholder="+1 303 555 0104"></label>
+            <details class="trade-contacts" id="trade-contacts">
+              <summary>Add trade contacts <span>Optional</span></summary>
+              <p>Only add people you are authorized to contact about this job. Missing trades stay with the primary contractor.</p>
+              <div class="trade-contact-grid">
+                <label class="field contact-card"><span>ELECTRICAL</span><input data-contact-name="electrical" maxlength="120" placeholder="Contact name" aria-label="Electrical contact name"><input data-contact-phone="electrical" inputmode="tel" placeholder="(303) 555-0101" aria-label="Electrical contact phone"></label>
+                <label class="field contact-card"><span>FRAMING</span><input data-contact-name="framing" maxlength="120" placeholder="Contact name" aria-label="Framing contact name"><input data-contact-phone="framing" inputmode="tel" placeholder="(303) 555-0102" aria-label="Framing contact phone"></label>
+                <label class="field contact-card"><span>MECHANICAL</span><input data-contact-name="mechanical" maxlength="120" placeholder="Contact name" aria-label="Mechanical contact name"><input data-contact-phone="mechanical" inputmode="tel" placeholder="(303) 555-0103" aria-label="Mechanical contact phone"></label>
+                <label class="field contact-card"><span>PLUMBING</span><input data-contact-name="plumbing" maxlength="120" placeholder="Contact name" aria-label="Plumbing contact name"><input data-contact-phone="plumbing" inputmode="tel" placeholder="(303) 555-0104" aria-label="Plumbing contact phone"></label>
+              </div>
+            </details>
           </div>
         </section>
 
         <section class="setup-pane" data-setup-pane="3" hidden>
-          <p class="notice-dialog__intro">Choose how Mettle should extract the notice. The Strands workflow will stop before outreach so you can review every correction.</p>
+          <p class="notice-dialog__intro">Mettle is ready to turn the report into a correction list. It will stop for your review before any outreach begins.</p>
           <div class="launch-review">
             <div><span>INPUT</span><strong id="review-notice-summary">Report ready</strong><small>Authority language remains attached to every citation.</small></div>
             <div><span>PEOPLE</span><strong id="review-contact-summary">Primary contractor ready</strong><small>Missing trade contacts route to the primary contractor.</small></div>
-            <div><span>SAFETY</span><strong>Extraction stops at review</strong><small>Zero outreach is recorded until you approve the correction routes.</small></div>
+            <div><span>YOUR CONTROL</span><strong>Nothing sends yet</strong><small>You will confirm every assignee and proof request on the next screen.</small></div>
           </div>
         </section>
 
         <section class="setup-pane" data-setup-pane="4" hidden>
-          <p class="notice-dialog__intro">Confirm who owns each correction, what closes it, and exactly what proof Mettle should request. Authority language remains read-only.</p>
+          <p class="notice-dialog__intro">Confirm who owns each correction and what the photo must show. Mettle keeps the original report wording read-only.</p>
           <div class="correction-review" id="correction-review-list" aria-live="polite"></div>
+          <label class="outreach-consent">
+            <input id="outreach-consent" type="checkbox">
+            <span><strong>I’m authorized to send job-related messages to these contacts.</strong> Approval starts the one-way follow-up shown above; Mettle never contacts the inspector.</span>
+          </label>
         </section>
 
         <p class="form-error" id="workflow-form-error" role="alert" hidden></p>
@@ -482,18 +486,15 @@ Inspection comments:
           <span id="setup-footer-note">REPORT FIRST · NO PROJECT SETUP</span>
           <div class="notice-dialog__actions">
             <button class="button button--orange" id="setup-next-button" type="button">Next · add people</button>
-            <button class="button" id="start-workflow-button" type="submit" value="local" hidden>Extract locally</button>
-            <button class="button button--outline" id="start-bedrock-button" type="submit" value="bedrock" hidden>
-              Ground with Bedrock
-              <small>NOVA MICRO · USES AWS CREDIT</small>
-            </button>
+            <button class="button button--orange" id="start-workflow-button" type="submit" value="local" hidden>Build my correction list</button>
+            <button class="button button--outline" id="start-bedrock-button" type="submit" value="bedrock" hidden>Build my correction list</button>
             <button class="button button--orange" id="start-agentcore-button" type="submit" value="agentcore" hidden>
-              Extract on AgentCore
-              <small>DEPLOYED STRANDS · USES AWS CREDIT</small>
+              <span id="secure-start-label">Build my correction list</span>
+              <small id="secure-start-note">SECURE SIGN-IN MAY OPEN · YOUR SETUP IS SAVED</small>
             </button>
             <button class="button button--orange" id="approve-corrections-button" type="button" hidden>
-              Approve & begin recovery
-              <small>CONTRACTOR CONTROLLED</small>
+              Approve & start follow-up
+              <small>STARTS THE ONE-WAY REQUESTS SHOWN ABOVE</small>
             </button>
           </div>
         </div>

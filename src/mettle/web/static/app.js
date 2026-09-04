@@ -1,5 +1,6 @@
 const {
   evidenceOptionLabel,
+  normalizedPhone,
   recoveryDateError,
   selectEvidenceCitation,
 } = globalThis.MettleEvidenceFlow;
@@ -108,6 +109,8 @@ const elements = {
   noticeDialog: document.querySelector("#notice-dialog"),
   noticeForm: document.querySelector("#notice-form"),
   noticeText: document.querySelector("#notice-text"),
+  noticeFile: document.querySelector("#notice-file"),
+  noticeFileStatus: document.querySelector("#notice-file-status"),
   workflowAsOf: document.querySelector("#workflow-as-of"),
   workflowDateError: document.querySelector("#workflow-date-error"),
   workflowError: document.querySelector("#workflow-form-error"),
@@ -125,6 +128,7 @@ const elements = {
   welcomeTitle: document.querySelector("#welcome-title"),
   startTourEntry: document.querySelector("#start-tour-entry"),
   startRecoveryEntry: document.querySelector("#start-recovery-entry"),
+  recoveryEntryAction: document.querySelector("#recovery-entry-action"),
   trySampleEntry: document.querySelector("#try-sample-entry"),
   resumeCurrentEntry: document.querySelector("#resume-current-entry"),
   setupStepLabel: document.querySelector("#setup-step-label"),
@@ -141,6 +145,8 @@ const elements = {
   reviewContactSummary: document.querySelector("#review-contact-summary"),
   correctionReviewList: document.querySelector("#correction-review-list"),
   approveCorrections: document.querySelector("#approve-corrections-button"),
+  outreachConsent: document.querySelector("#outreach-consent"),
+  tradeContacts: document.querySelector("#trade-contacts"),
   agentReceiptButtons: [...document.querySelectorAll("[data-open-agent-receipt]")],
   navNewRecovery: document.querySelector("#nav-new-recovery"),
   navExitSample: document.querySelector("#nav-exit-sample"),
@@ -218,10 +224,17 @@ let activeWorkspaceView = workspaceViewFromUrl();
 let judgeTourActive = new URLSearchParams(window.location.search).get("tour") === "1"
   || sessionStorage.getItem("mettle_entry_selected") === "tour";
 
-if (!elements.workflowAsOf.value) {
+function currentLocalDate() {
   const now = new Date();
-  const localToday = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
-    .toISOString().slice(0, 10);
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+}
+
+function recoveryWorkingDate() {
+  return elements.workflowAsOf.value || currentLocalDate();
+}
+
+if (!elements.workflowAsOf.value) {
+  const localToday = currentLocalDate();
   elements.workflowAsOf.value = localToday;
   const relativeDate = (offset) => {
     const value = new Date(`${localToday}T12:00:00`);
@@ -358,6 +371,9 @@ function updateAuthControl() {
   elements.auth.title = accessToken
     ? "Signed in · live AgentCore recoveries use this same workspace"
     : "Sign in to unlock the authenticated AgentCore recovery path";
+  if (elements.recoveryEntryAction) {
+    elements.recoveryEntryAction.textContent = accessToken ? "START →" : "START · SIGN IN LATER →";
+  }
 }
 
 async function beginLogin() {
@@ -394,7 +410,7 @@ function saveRecoveryDraft() {
   }
   sessionStorage.setItem("mettle_recovery_draft", JSON.stringify({
     notice_text: elements.noticeText.value,
-    as_of: elements.workflowAsOf.value,
+    as_of: recoveryWorkingDate(),
     primary_name: elements.primaryContactName.value,
     primary_phone: elements.primaryContactPhone.value,
     contacts,
@@ -420,6 +436,7 @@ function restoreRecoveryDraft() {
       const phoneInput = elements.contactPhones.find((item) => item.dataset.contactPhone === nameInput.dataset.contactName);
       if (phoneInput && typeof saved.phone === "string") phoneInput.value = saved.phone.slice(0, 32);
     }
+    elements.tradeContacts.open = elements.contactNames.some((input) => input.value.trim());
     setSetupStep(Number.isInteger(draft.setup_step) ? draft.setup_step : 3);
     return true;
   } catch (_error) {
@@ -840,10 +857,6 @@ function setBusy(button, busy) {
   button.setAttribute("aria-busy", String(busy));
 }
 
-function normalizedPhone(value) {
-  return value.trim().replace(/[\s().-]/g, "");
-}
-
 function activePhotoEnabled() {
   return Boolean(activeWorkflowId)
     && (activeWorkflowTarget === "agentcore" ? agentCoreEnabled : bedrockEnabled);
@@ -872,19 +885,19 @@ function setSetupStep(step) {
   }
   elements.setupBack.hidden = setupStep === 1 || setupStep === 4;
   elements.setupNext.hidden = setupStep >= 3;
-  elements.startWorkflow.hidden = setupStep !== 3;
-  elements.startBedrock.hidden = setupStep !== 3 || !bedrockEnabled;
+  elements.startWorkflow.hidden = setupStep !== 3 || agentCoreEnabled;
+  elements.startBedrock.hidden = true;
   elements.startAgentCore.hidden = setupStep !== 3 || !agentCoreEnabled;
   elements.approveCorrections.hidden = setupStep !== 4;
   elements.setupFooterNote.textContent = setupStep === 1
     ? "REPORT FIRST · NO PROJECT SETUP"
-    : setupStep === 2 ? "SUBS USE THEIR PHONE · NO NEW ACCOUNT"
-      : setupStep === 3 ? "EXTRACT ONLY · ZERO OUTREACH BEFORE REVIEW" : "YOU APPROVE · METTLE COORDINATES";
-  elements.setupNext.textContent = setupStep === 1 ? "Next · add people" : "Next · review launch";
+    : setupStep === 2 ? "ADD ONLY THE PEOPLE NEEDED FOR THIS JOB"
+      : setupStep === 3 ? "NOTHING SENDS BEFORE YOUR REVIEW" : "YOU APPROVE · METTLE FOLLOWS UP";
+  elements.setupNext.textContent = setupStep === 1 ? "Next · add contacts" : "Next · check setup";
   const heading = setupStep === 1
     ? "Start with the failed-inspection report"
-    : setupStep === 2 ? "Who owns the corrections?"
-      : setupStep === 3 ? "Extract the correction docket" : "Review every correction before outreach";
+    : setupStep === 2 ? "Who should Mettle contact?"
+      : setupStep === 3 ? "Ready to build the recovery" : "Review every correction before outreach";
   document.querySelector("#notice-dialog-title").textContent = heading;
 }
 
@@ -898,26 +911,18 @@ function validateSetupStep() {
       elements.noticeText.setCustomValidity("");
       return false;
     }
-    if (!elements.workflowAsOf.value) {
-      elements.workflowDateError.textContent = "Choose the date Mettle should use for this recovery.";
-      elements.workflowDateError.hidden = false;
-      elements.workflowAsOf.setAttribute("aria-invalid", "true");
-      elements.workflowAsOf.focus();
-      elements.workflowAsOf.reportValidity();
-      return false;
-    }
     const dateError = recoveryDateError(
       elements.noticeText.value,
-      elements.workflowAsOf.value,
+      recoveryWorkingDate(),
     );
     if (dateError) {
-      elements.workflowDateError.textContent = dateError;
+      elements.workflowDateError.textContent = `${dateError} Check the inspection and reinspection dates in the pasted report.`;
       elements.workflowDateError.hidden = false;
-      elements.workflowAsOf.setAttribute("aria-invalid", "true");
-      elements.workflowAsOf.focus();
+      elements.noticeText.setAttribute("aria-invalid", "true");
+      elements.noticeText.focus();
       return false;
     }
-    elements.workflowAsOf.removeAttribute("aria-invalid");
+    elements.noticeText.removeAttribute("aria-invalid");
   }
   if (setupStep === 2) {
     const name = elements.primaryContactName.value.trim();
@@ -927,7 +932,7 @@ function validateSetupStep() {
       return false;
     }
     if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
-      elements.primaryContactPhone.setCustomValidity("Use an international phone number such as +13035550100.");
+      elements.primaryContactPhone.setCustomValidity("Enter a US phone number such as (303) 555-0100, or include the country code.");
       elements.primaryContactPhone.reportValidity();
       elements.primaryContactPhone.setCustomValidity("");
       return false;
@@ -945,7 +950,7 @@ function validateSetupStep() {
         return false;
       }
       if (tradePhone && !/^\+[1-9]\d{7,14}$/.test(tradePhone)) {
-        phoneInput.setCustomValidity("Use an international phone number such as +13035550101.");
+        phoneInput.setCustomValidity("Enter a US phone number such as (303) 555-0101, or include the country code.");
         phoneInput.reportValidity();
         phoneInput.setCustomValidity("");
         return false;
@@ -963,6 +968,12 @@ function validateSetupStep() {
         return false;
       }
     }
+    if (!elements.outreachConsent.checked) {
+      elements.outreachConsent.setCustomValidity("Confirm that you are authorized to contact the people shown above.");
+      elements.outreachConsent.reportValidity();
+      elements.outreachConsent.setCustomValidity("");
+      return false;
+    }
   }
   return true;
 }
@@ -976,11 +987,6 @@ function renderCorrectionReview(data) {
     mechanical: "Mechanical",
     plumbing: "Plumbing",
     general: "General contractor",
-  };
-  const routeLabels = {
-    photo_evidence: "Photo evidence",
-    document_evidence: "Document or letter",
-    physical_reinspection: "Physical reinspection",
   };
   const cards = data.review_citations.map((citation) => {
     const card = node("article", "correction-review__card");
@@ -1003,16 +1009,23 @@ function renderCorrectionReview(data) {
     }
     tradeLabel.append(tradeSelect);
 
-    const routeLabel = node("label", "", "CLOSURE ROUTE");
-    const routeSelect = node("select");
+    const recipient = node("div", "correction-review__recipient");
+    const updateRecipient = () => {
+      const match = buildRoster().find((contact) => contact.trade === tradeSelect.value);
+      recipient.replaceChildren(
+        node("span", "", "MESSAGE GOES TO"),
+        node("strong", "", `${match?.name || "Primary contractor"} · ${maskedPhone(match?.phone)}`),
+      );
+    };
+    tradeSelect.addEventListener("change", updateRecipient);
+    updateRecipient();
+
+    const routeLabel = node("div", "correction-review__route");
+    routeLabel.append(node("span", "", "PROOF METHOD"), node("strong", "", "Job-site photo"), node("small", "", "Mettle checks only what is visibly shown; it does not certify code compliance."));
+    const routeSelect = node("input");
+    routeSelect.type = "hidden";
     routeSelect.dataset.reviewRoute = "";
-    routeSelect.setAttribute("aria-label", `Closure route for citation ${citation.citation_id}`);
-    for (const [value, label] of Object.entries(routeLabels)) {
-      const option = node("option", "", label);
-      option.value = value;
-      option.selected = value === (citation.closure_route || "photo_evidence");
-      routeSelect.append(option);
-    }
+    routeSelect.value = "photo_evidence";
     routeLabel.append(routeSelect);
 
     const proofLabel = node("label", "", "WHAT MUST COME BACK · ONE REQUIREMENT PER LINE");
@@ -1024,7 +1037,7 @@ function renderCorrectionReview(data) {
     proof.setAttribute("aria-label", `Required proof for citation ${citation.citation_id}`);
     proof.value = (citation.evidence_requirements || []).join("\n");
     proofLabel.append(proof);
-    fields.append(tradeLabel, routeLabel, proofLabel);
+    fields.append(tradeLabel, recipient, routeLabel, proofLabel);
     card.append(fields);
     return card;
   });
@@ -1067,7 +1080,7 @@ function buildRoster() {
 function updateLaunchReview() {
   const reportLines = elements.noticeText.value.split("\n").filter((line) => line.trim()).length;
   const namedTrades = elements.contactNames.filter((item) => item.value.trim()).length;
-  elements.reviewNoticeSummary.textContent = `${reportLines} report lines · ${formatDate(elements.workflowAsOf.value)}`;
+  elements.reviewNoticeSummary.textContent = `${reportLines} report lines · ${formatDate(recoveryWorkingDate())}`;
   elements.reviewContactSummary.textContent = `${elements.primaryContactName.value.trim()} + ${namedTrades} trade contact${namedTrades === 1 ? "" : "s"}`;
 }
 
@@ -1077,6 +1090,18 @@ function openRecoverySetup({ returnToWelcome = false } = {}) {
   setSetupStep(1);
   elements.noticeDialog.showModal();
   window.setTimeout(() => elements.noticeText.focus(), 0);
+}
+
+function resetRecoverySetup() {
+  elements.noticeForm.reset();
+  elements.workflowAsOf.value = currentLocalDate();
+  elements.noticeText.value = "";
+  elements.noticeFileStatus.textContent = "No file selected";
+  elements.tradeContacts.open = false;
+  elements.outreachConsent.checked = false;
+  pendingCorrectionReview = null;
+  workflowCreateKey = null;
+  workflowCreateProvider = null;
 }
 
 function openWelcomeChooser() {
@@ -1155,11 +1180,10 @@ function configureNextAction(data) {
     elements.nextActionTitle.textContent = `Collect proof for C${openCitation.citation_id}`;
     elements.nextActionCopy.textContent = openCitation.stage === "evidence_rejected"
       ? "The last photo did not visibly show everything requested. Review the feedback and replace it."
-      : "Choose the citation and add the photo or document the contractor expects to use for closure.";
-    elements.nextActionButton.textContent = activePhotoEnabled() ? "Add evidence" : "Open evidence options";
+      : "Choose the correction and add the job-site photo you expect to use for closure.";
+    elements.nextActionButton.textContent = activePhotoEnabled() ? "Add a photo" : "Review evidence status";
     nextActionHandler = () => {
       elements.photoCitation.value = openCitation.citation_id;
-      if (!activePhotoEnabled()) elements.demoEvidence.open = true;
       openWorkspacePanel("evidence", "#evidence-panel", "#photo-file");
     };
   } else if (data.packet_status === "blocked") {
@@ -1179,13 +1203,10 @@ function configureNextAction(data) {
       elements.packetAction.click();
     };
   } else {
-    elements.nextActionTitle.textContent = "Preview the next autonomous checkpoint";
-    elements.nextActionCopy.textContent = "Compress the waiting period; Mettle will replan only open citations and adjust follow-up intensity against the deadline.";
-    elements.nextActionButton.textContent = "Compress to checkpoint";
-    nextActionHandler = () => {
-      setWorkspaceView("recovery", { updateUrl: true });
-      elements.clockAction.click();
-    };
+    elements.nextActionTitle.textContent = "Recovery is running in the background";
+    elements.nextActionCopy.textContent = "Mettle will follow up on open corrections and return when your decision is needed.";
+    elements.nextActionButton.textContent = "View activity";
+    nextActionHandler = () => setWorkspaceView("activity", { updateUrl: true });
   }
 }
 
@@ -1237,7 +1258,7 @@ const citationEvidenceImages = {
 function correctionStatus(citation) {
   return {
     ready: ["PROOF ACCEPTED", "Proof is ready for packet assembly."],
-    awaiting_evidence: ["AWAITING TRADE", "Mettle is waiting for the requested proof."],
+    awaiting_evidence: ["AWAITING PROOF", "Mettle is waiting for the requested proof."],
     evidence_rejected: ["REPLACEMENT REQUESTED", "Mettle requested the one missing visible element."],
     needs_judgment: ["YOUR DECISION", "Mettle stopped instead of inventing a requirement."],
   }[citation.stage] || ["OPEN", "This correction remains open."];
@@ -1252,7 +1273,7 @@ function renderCorrectionSummary(data) {
   elements.correctionSummary.replaceChildren(
     node("span", "", `${total} corrections`),
     node("strong", "summary-ready", `${ready} proof accepted`),
-    node("span", "", preOutreach ? `${total} routes held` : `${chasing} awaiting trade`),
+    node("span", "", preOutreach ? `${total} routes held` : `${chasing} awaiting proof`),
     node("strong", needsYou ? "summary-action" : "", `${needsYou} need you`),
   );
 }
@@ -2586,23 +2607,26 @@ function renderRecoveryClock(data) {
     elements.clockTitle.textContent = `${open} open citation${open === 1 ? "" : "s"} · waiting for your decision`;
     elements.clockCopy.textContent = "The campaign is paused at a Strands judgment gate. Resolve it above before the next scheduled check.";
   } else if (autonomous) {
-    elements.clockTitle.textContent = `EventBridge armed · ${formatTimestamp(data.next_check_at)}`;
-    elements.clockCopy.textContent = `${open} open citation${open === 1 ? "" : "s"}. ${data.accelerated_demo_clock ? "ACCELERATED DEMO CLOCK · " : ""}Mettle will wake without this page, replan only open work, and run the Strands chase graph.`;
+    elements.clockTitle.textContent = `Next automatic check · ${formatTimestamp(data.next_check_at)}`;
+    elements.clockCopy.textContent = `${open} open correction${open === 1 ? "" : "s"}. Mettle will continue working even when this page is closed.`;
   } else if (expired) {
     elements.clockTitle.textContent = `${open} open citation${open === 1 ? "" : "s"} · deadline reached`;
     elements.clockCopy.textContent = "No later campaign checkpoint exists. Mettle will not invent outreach beyond the configured reinspection deadline.";
   } else {
     const nextDays = daysBetween(next.date, data.deadline_on);
-    const behavior = nextDays <= 2 ? "critical four-hour follow-up and a contractor tradeoff gate" : "deadline-aware follow-up to each open trade";
+    const behavior = nextDays <= 2 ? "frequent follow-up and ask you before changing the plan" : "deadline-aware follow-up to each open trade";
     elements.clockTitle.textContent = `Next: ${next.label} · ${formatDate(next.date)}`;
     elements.clockCopy.textContent = `${open} open citation${open === 1 ? "" : "s"}. Mettle will replan only those citations, then run ${behavior}.`;
   }
   elements.clockAction.disabled = autonomous || closed || waiting || expired || data.packet_status !== "blocked";
   elements.clockAction.textContent = autonomous ? "EventBridge armed" : waiting ? "Resolve decision to continue" : closed ? "Campaign stood down" : expired ? "Deadline reached" : "Compress to next checkpoint";
+  elements.clockAction.hidden = data.source_mode === "workflow";
 }
 
 function render(data) {
   campaign = data;
+  const isWorkflow = data.source_mode === "workflow";
+  const isAgentCore = isWorkflow && data.execution_target === "agentcore";
   document.body.dataset.sourceMode = data.source_mode;
   elements.loading.hidden = true;
   elements.error.hidden = true;
@@ -2610,6 +2634,8 @@ function render(data) {
   elements.workspaceNav.hidden = false;
   setWorkspaceView(activeWorkspaceView);
   elements.noticeId.textContent = data.notice_id;
+  elements.workspaceNav.dataset.noticeId = data.notice_id;
+  elements.navExitSample.hidden = isWorkflow;
   elements.property.textContent = data.property_label;
   const displayedDays = tourClockOverride ?? data.days_remaining;
   elements.days.textContent = String(Math.max(displayedDays, 0));
@@ -2665,9 +2691,9 @@ function render(data) {
   renderMetrics(data.metrics);
   renderPacket(data);
   renderJudgeTour(data);
-  const isWorkflow = data.source_mode === "workflow";
-  const isAgentCore = isWorkflow && data.execution_target === "agentcore";
   elements.evidencePanel.hidden = false;
+  elements.demoEvidence.hidden = isWorkflow;
+  if (isWorkflow) elements.demoEvidence.open = false;
   elements.recoveryClock.hidden = !isWorkflow;
   elements.driverTag.textContent = isWorkflow ? "RECOVERY" : "SAMPLE";
   if (isWorkflow) renderRecoveryClock(data);
@@ -2699,7 +2725,7 @@ function render(data) {
     : isWorkflow && !hasOpenEvidence
       ? "ALL ACCEPTED PROOF IS LOCKED · START AN EXPLICIT REPLACEMENT WORKFLOW TO CHANGE IT"
     : isWorkflow
-      ? "THIS RECOVERY HAS NO LIVE VISION PROVIDER · SYNTHETIC FIXTURES REMAIN AVAILABLE"
+      ? "PHOTO CHECKING IS UNAVAILABLE IN THIS LOCAL RUN · START A SECURE RECOVERY TO USE IT"
       : "SAMPLE MODE · FIXTURES REPLAY RECORDED SYNTHETIC OUTCOMES · NO MODEL CALL";
   if (isWorkflow) {
     const latestEvidence = data.evidence.at(-1);
@@ -2808,11 +2834,17 @@ async function loadCapabilities() {
     agentCoreEnabled = false;
   }
   elements.startBedrock.disabled = false;
-  elements.startBedrock.title = "Run notice intake on Amazon Nova Micro; this consumes AWS credit";
+  elements.startBedrock.title = "Build the correction list";
   elements.startAgentCore.disabled = false;
   elements.startAgentCore.title = accessToken
-    ? "Run the Strands graph on the deployed AgentCore runtime; this consumes AWS credit"
-    : "Sign in with the provided judge account to run the deployed AgentCore workflow";
+    ? "Build the correction list and pause for your review"
+    : "Your setup will be saved while you sign in";
+  document.querySelector("#secure-start-label").textContent = accessToken
+    ? "Build my correction list"
+    : "Sign in & build my correction list";
+  document.querySelector("#secure-start-note").textContent = accessToken
+    ? "NOTHING SENDS BEFORE YOUR REVIEW"
+    : "YOUR SETUP IS SAVED DURING SIGN-IN";
   setSetupStep(setupStep);
 }
 
@@ -2972,7 +3004,10 @@ for (const button of elements.agentReceiptButtons) {
   button.addEventListener("click", () => setWorkspaceView("activity", { updateUrl: true, focusTab: true }));
 }
 
-elements.navNewRecovery?.addEventListener("click", () => openRecoverySetup());
+elements.navNewRecovery?.addEventListener("click", () => {
+  resetRecoverySetup();
+  openRecoverySetup();
+});
 elements.navExitSample?.addEventListener("click", () => {
   setupReturnsToWelcome = false;
   openWelcomeChooser();
@@ -3013,6 +3048,7 @@ elements.home.addEventListener("click", (event) => {
 elements.startRecoveryEntry.addEventListener("click", () => {
   setJudgeTourActive(false, { updateUrl: true, focus: false });
   elements.welcomeDialog.close();
+  resetRecoverySetup();
   openRecoverySetup({ returnToWelcome: true });
 });
 
@@ -3071,7 +3107,46 @@ elements.setupNext.addEventListener("click", () => {
 
 elements.workflowAsOf.addEventListener("input", () => {
   elements.workflowDateError.hidden = true;
-  elements.workflowAsOf.removeAttribute("aria-invalid");
+  elements.noticeText.removeAttribute("aria-invalid");
+});
+
+elements.noticeText.addEventListener("input", () => {
+  elements.workflowDateError.hidden = true;
+  elements.noticeText.removeAttribute("aria-invalid");
+});
+
+elements.noticeFile.addEventListener("change", async () => {
+  const file = elements.noticeFile.files?.[0];
+  if (!file) {
+    elements.noticeFileStatus.textContent = "No file selected";
+    return;
+  }
+  if (file.size > 5_000_000) {
+    elements.noticeFile.value = "";
+    elements.noticeFileStatus.textContent = "File is larger than 5 MB";
+    return;
+  }
+  elements.workflowError.hidden = true;
+  elements.noticeFile.disabled = true;
+  elements.noticeFileStatus.textContent = `Reading ${file.name}…`;
+  try {
+    const payload = await request("/api/notices/text", {
+      method: "POST",
+      body: JSON.stringify({
+        filename: file.name,
+        file_base64: base64Standard(await file.arrayBuffer()),
+      }),
+    });
+    elements.noticeText.value = payload.text;
+    elements.noticeFileStatus.textContent = `${file.name} · ${payload.text.split(/\r?\n/).filter(Boolean).length} lines ready`;
+    elements.noticeText.focus();
+  } catch (error) {
+    showInlineWorkflowError(error, elements.workflowError);
+    elements.noticeFileStatus.textContent = "Could not read this report";
+  } finally {
+    elements.noticeFile.disabled = false;
+    elements.noticeFile.value = "";
+  }
 });
 
 elements.setupBack.addEventListener("click", () => {
@@ -3080,7 +3155,10 @@ elements.setupBack.addEventListener("click", () => {
   pane?.querySelector("input, textarea, button")?.focus();
 });
 
-elements.loadNotice.addEventListener("click", () => openRecoverySetup());
+elements.loadNotice.addEventListener("click", () => {
+  resetRecoverySetup();
+  openRecoverySetup();
+});
 
 elements.closeNotice.addEventListener("click", exitRecoverySetup);
 
@@ -3094,8 +3172,8 @@ elements.noticeForm.addEventListener("submit", async (event) => {
   if (setupStep !== 3) return;
   const noticeText = elements.noticeText.value.trim();
   if (!noticeText) return;
-  const executionTarget = event.submitter?.value === "agentcore" ? "agentcore" : "local";
-  const provider = event.submitter?.value === "local" ? "local" : "bedrock";
+  const executionTarget = event.submitter === elements.startAgentCore ? "agentcore" : "local";
+  const provider = executionTarget === "agentcore" || bedrockEnabled ? "bedrock" : "local";
   if (provider === "bedrock" && executionTarget === "local" && !bedrockEnabled) return;
   if (executionTarget === "agentcore" && !agentCoreEnabled) return;
   if (executionTarget === "agentcore" && !tokenIsCurrent(accessToken)) {
@@ -3122,7 +3200,7 @@ elements.noticeForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         notice_text: noticeText,
         intake_provider: provider,
-        as_of: elements.workflowAsOf.value,
+        as_of: recoveryWorkingDate(),
         roster: buildRoster(),
       }),
     });
@@ -3139,11 +3217,7 @@ elements.noticeForm.addEventListener("submit", async (event) => {
     workflowCreateProvider = null;
     if (workflowView.correction_review_required) {
       openPendingCorrectionReview(workflowView);
-      showToast(executionTarget === "agentcore"
-        ? "AgentCore extracted the docket and paused before outreach for your review."
-        : provider === "bedrock"
-          ? "Nova Micro grounded the notice; Strands paused before outreach for your review."
-          : "Local intake extracted the docket; Strands paused before outreach for your review.");
+      showToast("Correction list ready. Nothing has been sent; review each assignment and proof request next.");
     } else {
       setupReturnsToWelcome = false;
       elements.noticeDialog.close();
@@ -3181,8 +3255,8 @@ elements.approveCorrections.addEventListener("click", async () => {
     elements.noticeDialog.close();
     const sent = envelope.snapshot.deliveries.filter((delivery) => delivery.status === "sent").length;
     showToast(sent
-      ? `Review approved. Amazon SNS accepted ${sent} one-way message${sent === 1 ? "" : "s"}; EventBridge is armed.`
-      : `Review approved. Mettle recorded ${envelope.snapshot.deliveries.length} safe outreach action${envelope.snapshot.deliveries.length === 1 ? "" : "s"}; EventBridge is armed.`);
+      ? `Recovery started. Mettle sent ${sent} job update${sent === 1 ? "" : "s"} and scheduled the next check.`
+      : `Recovery started. Mettle prepared ${envelope.snapshot.deliveries.length} outreach action${envelope.snapshot.deliveries.length === 1 ? "" : "s"} and scheduled the next check.`);
   } catch (error) {
     showInlineWorkflowError(error, elements.workflowError);
   } finally {

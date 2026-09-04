@@ -58,7 +58,16 @@
       : "";
   }
 
-  const api = { evidenceOptionLabel, noticeDeadline, noticeInspectionDate, recoveryDateError, selectEvidenceCitation };
+  function normalizedPhone(value) {
+    const raw = String(value || "").trim();
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 10) return `+1${digits}`;
+    if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+    if (raw.startsWith("+") && digits.length >= 8 && digits.length <= 15) return `+${digits}`;
+    return raw.replace(/[\s().-]/g, "");
+  }
+
+  const api = { evidenceOptionLabel, normalizedPhone, noticeDeadline, noticeInspectionDate, recoveryDateError, selectEvidenceCitation };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.MettleEvidenceFlow = api;
 }(typeof globalThis === "undefined" ? this : globalThis));
