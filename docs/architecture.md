@@ -142,7 +142,7 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 6. **Demo interface and packet:** show the recovery timeline, inspectable Run receipt, and citation-to-evidence PDF. **Complete.**
 7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,
    package it as CodeZip, and define least-privilege deployment and rollback.
-   **Complete: runtime version 12 is deployed, immutable-artifact rollback was
+   **Complete: runtime version 15 is deployed, immutable-artifact rollback was
    exercised on the real demo runtime, and live acceptance covers start,
    contractor review with zero pre-approval outreach, resume, vision, T−3/T−2
    chase behavior, replay safety, approval, and PDF integrity in one AgentCore

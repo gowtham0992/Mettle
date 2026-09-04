@@ -7,12 +7,18 @@ bucket names, object-version IDs, session IDs, and workflow IDs out of source.
 ## Current acceptance status
 
 - Runtime: `MettleRecovery` (resource identifier recorded privately)
-- Version and status: `14`, `READY`
+- Version and status: `15`, `READY`
 - Artifact: immutable, private, versioned S3 object
 - Artifact SHA-256:
-  `678d29880f360684e6701b1f6c825514f87bcb5a3905ea65bdd17578f13f886c`
+  `6ace38ebc1bd786c43d5f84cd3ea2d43ecf413ad07867fec650db1b00b6ed92d`
 - Runtime lifecycle: 15-minute idle timeout, 8-hour maximum session
 - Log retention: 14 days
+
+The version 15 release added the evidence-review operation used when a vision
+assessment requires professional judgment. A bounded deployment check invoked
+that operation with a deliberately unknown workflow and received the expected
+`workflow_not_found` domain response, proving the new contract reached the
+runtime rather than failing request validation.
 
 The version 14 acceptance run used synthetic data. It ran Nova Micro notice
 intake, stopped with zero deliveries for contractor review, resumed the same
