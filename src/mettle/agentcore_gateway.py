@@ -20,6 +20,7 @@ from mettle.workflow_registry import (
     PacketNotApproved,
     PacketNotReady,
     PreparePacketRequest,
+    ReviewEvidenceRequest,
     ReviewWorkflowRequest,
     RunNextCheckRequest,
     ResumeWorkflowRequest,
@@ -197,6 +198,20 @@ class AgentCoreWorkflowGateway:
             workflow_id,
             operation="submit_photo_evidence",
             payload=cloud_payload,
+            idempotency_key=idempotency_key,
+        )
+
+    def review_evidence(
+        self,
+        workflow_id: str,
+        payload: ReviewEvidenceRequest,
+        *,
+        idempotency_key: str,
+    ) -> WorkflowEnvelope:
+        return self._mutate(
+            workflow_id,
+            operation="review_evidence",
+            payload=payload,
             idempotency_key=idempotency_key,
         )
 

@@ -19,6 +19,7 @@ from mettle.workflow_registry import (
     PacketNotApproved,
     PacketNotReady,
     PreparePacketRequest,
+    ReviewEvidenceRequest,
     ReviewWorkflowRequest,
     RunNextCheckRequest,
     ResumeWorkflowRequest,
@@ -112,6 +113,19 @@ class _PreparePacketInvocation(BaseModel):
     payload: PreparePacketRequest
 
 
+class _ReviewEvidenceInvocation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation: Literal["review_evidence"]
+    idempotency_key: str = Field(
+        min_length=8,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
+    workflow_id: str = Field(min_length=1, max_length=64)
+    payload: ReviewEvidenceRequest
+
+
 class _RunNextCheckInvocation(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -151,6 +165,7 @@ AgentCoreInvocation = Annotated[
     | _ReviewInvocation
     | _SubmitEvidenceInvocation
     | _SubmitPhotoEvidenceInvocation
+    | _ReviewEvidenceInvocation
     | _RunNextCheckInvocation
     | _PreparePacketInvocation
     | _ApprovePacketInvocation
@@ -250,6 +265,14 @@ class MettleAgentCoreRuntime:
                 )
                 replayed = False
                 operation = "run_next_check"
+            elif isinstance(invocation, _ReviewEvidenceInvocation):
+                envelope = self._workflows.review_evidence(
+                    invocation.workflow_id,
+                    invocation.payload,
+                    idempotency_key=invocation.idempotency_key,
+                )
+                replayed = False
+                operation = "review_evidence"
             elif isinstance(invocation, _PreparePacketInvocation):
                 envelope = self._workflows.prepare_packet(
                     invocation.workflow_id,

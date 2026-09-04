@@ -311,6 +311,19 @@ def render_packet_pdf(
         else:
             filename = _SAMPLE_FILES[assessment.sample_id]
             image_source = evidence_dir / filename
+        evidence_record = [
+            _scaled_image(image_source),
+            Spacer(1, 0.1 * inch),
+            Paragraph("EVIDENCE ACCEPTED FOR SUFFICIENCY", styles["eyebrow"]),
+            Paragraph(escape(assessment.explanation), styles["body"]),
+        ]
+        if assessment.contractor_decision:
+            evidence_record.extend(
+                [
+                    Paragraph("CONTRACTOR EVIDENCE DECISION", styles["eyebrow"]),
+                    Paragraph(escape(assessment.contractor_decision), styles["body"]),
+                ]
+            )
         story.extend(
             [
                 PageBreak(),
@@ -326,12 +339,7 @@ def render_packet_pdf(
             [
                 Spacer(1, 0.08 * inch),
                 KeepTogether(
-                    [
-                        _scaled_image(image_source),
-                        Spacer(1, 0.1 * inch),
-                        Paragraph("EVIDENCE ACCEPTED FOR SUFFICIENCY", styles["eyebrow"]),
-                        Paragraph(escape(assessment.explanation), styles["body"]),
-                    ]
+                    evidence_record
                 ),
             ]
         )

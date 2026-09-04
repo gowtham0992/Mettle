@@ -3,6 +3,9 @@ const assert = require("node:assert/strict");
 
 const {
   evidenceOptionLabel,
+  noticeDeadline,
+  noticeInspectionDate,
+  recoveryDateError,
   selectEvidenceCitation,
 } = require("../src/mettle/web/static/evidence-flow.js");
 
@@ -26,4 +29,18 @@ test("keeps the current citation selected when its proof was rejected", () => {
 test("labels generic citations with their code and evidence status", () => {
   assert.equal(evidenceOptionLabel(citations[0]), "C1 · NEC 110.26 · accepted");
   assert.equal(evidenceOptionLabel(citations[1]), "C2 · IRC R602.6 · needs proof");
+});
+
+test("extracts common municipal deadline formats", () => {
+  assert.equal(noticeDeadline("Reinspection deadline: 8/28/26"), "2026-08-28");
+  assert.equal(noticeDeadline("Reinspection on 2026-09-14"), "2026-09-14");
+  assert.equal(noticeInspectionDate("Inspection date: 09/03/2026"), "2026-09-03");
+});
+
+test("rejects a working date on or after the reinspection deadline", () => {
+  const notice = "Inspection date: 09/03/2026\nCorrections must be completed before reinspection on 09/14/2026.";
+  assert.match(recoveryDateError(notice, "2026-09-02"), /cannot be before/);
+  assert.equal(recoveryDateError(notice, "2026-09-13"), "");
+  assert.match(recoveryDateError(notice, "2026-09-14"), /must be before/);
+  assert.match(recoveryDateError(notice, "2026-09-15"), /must be before/);
 });

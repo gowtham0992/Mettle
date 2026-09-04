@@ -30,6 +30,7 @@ from mettle.workflow_registry import (
     PacketNotApproved,
     PacketNotReady,
     PreparePacketRequest,
+    ReviewEvidenceRequest,
     ReviewWorkflowRequest,
     ResumeWorkflowRequest,
     RunNextCheckRequest,
@@ -226,6 +227,9 @@ class DurableAgentCoreWorkflowGateway:
         )
         return self._mutate(workflow_id, "submit_photo_evidence", cloud_payload, idempotency_key)
 
+    def review_evidence(self, workflow_id: str, payload: ReviewEvidenceRequest, *, idempotency_key: str) -> WorkflowEnvelope:
+        return self._mutate(workflow_id, "review_evidence", payload, idempotency_key)
+
     def prepare_packet(self, workflow_id: str, payload: PreparePacketRequest, *, idempotency_key: str) -> WorkflowEnvelope:
         return self._mutate(workflow_id, "prepare_packet", payload, idempotency_key)
 
@@ -382,6 +386,9 @@ class DurableAgentCoreWorkflowGateway:
         if operation not in {
             "review",
             "resume",
+            "submit_evidence",
+            "submit_photo_evidence",
+            "review_evidence",
             "run_next_check",
             "prepare_packet",
             "approve_packet",
@@ -402,6 +409,25 @@ class DurableAgentCoreWorkflowGateway:
                 },
                 deep=True,
             )
+        latest_evidence = {
+            assessment.citation_id: assessment for assessment in envelope.evidence
+        }
+        if any(
+            assessment.status.value == "manual_review"
+            for assessment in latest_evidence.values()
+        ):
+            scheduler.cancel(previous)
+            return envelope.model_copy(
+                update={
+                    "automation": CampaignAutomation(
+                        status=AutomationStatus.AWAITING_DECISION,
+                        schedule_version=previous.schedule_version if previous else 0,
+                    )
+                },
+                deep=True,
+            )
+        if operation in {"submit_evidence", "submit_photo_evidence"}:
+            return envelope.model_copy(update={"automation": previous}, deep=True)
         if snapshot.status is WorkflowStatus.INTERRUPTED:
             scheduler.cancel(previous)
             return envelope.model_copy(

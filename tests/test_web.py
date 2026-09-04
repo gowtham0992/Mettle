@@ -56,6 +56,13 @@ class FakeAgentCoreGateway:
             idempotency_key=idempotency_key,
         )
 
+    def review_evidence(self, workflow_id, payload, *, idempotency_key):
+        return self.registry.review_evidence(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
     def run_next_check(self, workflow_id, payload, *, idempotency_key):
         return self.registry.run_next_check(
             workflow_id,
@@ -102,6 +109,19 @@ def accept_photo(*, citation: Citation, image: bytes, assessment_id: str):
         status=EvidenceStatus.ACCEPTED,
         matched_requirements=citation.evidence_requirements,
         explanation="Every requested item is visibly shown; this is not a code-compliance decision.",
+    )
+
+
+def hold_photo_for_review(*, citation: Citation, image: bytes, assessment_id: str):
+    assert image.startswith(b"\xff\xd8\xff")
+    return EvidenceAssessment(
+        assessment_id=assessment_id,
+        citation_id=citation.citation_id,
+        sample_id=f"upload_{assessment_id}",
+        image_url="",
+        status=EvidenceStatus.MANUAL_REVIEW,
+        missing_requirements=citation.evidence_requirements,
+        explanation="The image is ambiguous. Contractor review is required.",
     )
 
 
@@ -203,6 +223,129 @@ def test_real_photo_upload_is_normalized_assessed_and_idempotent() -> None:
     assert first.json()["evidence"][-1]["status"] == "accepted"
     assert replay.json() == first.json()
     assert len(replay.json()["evidence"]) == 1
+
+
+def test_ambiguous_photo_requires_and_records_contractor_review() -> None:
+    workflows = WorkflowRegistry(photo_assessor=hold_photo_for_review)
+    with client(workflows=workflows) as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "manual_review_workflow_123"},
+        ).json()
+        workflow_id = created["workflow_id"]
+        approve_review(browser, created, key="manual_review_launch_123")
+        assessed = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/photo?citation_id=1",
+            content=jpeg_photo(),
+            headers={
+                "Content-Type": "image/jpeg",
+                "Idempotency-Key": "manual_review_photo_123",
+            },
+        )
+        assessment_id = assessed.json()["evidence"][-1]["assessment_id"]
+        blocked_check = browser.post(
+            f"/api/workflows/{workflow_id}/checks/next",
+            json={},
+            headers={"Idempotency-Key": "manual_review_check_123"},
+        )
+        payload = {
+            "assessment_id": assessment_id,
+            "disposition": "accept",
+            "decision": "I reviewed the image and accept it as sufficient visible proof.",
+        }
+        resolved = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/review",
+            json=payload,
+            headers={"Idempotency-Key": "manual_review_accept_123"},
+        )
+        replay = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/review",
+            json=payload,
+            headers={"Idempotency-Key": "manual_review_accept_123"},
+        )
+
+    assert assessed.status_code == 200
+    assert assessed.json()["evidence"][-1]["status"] == "manual_review"
+    assert blocked_check.status_code == 409
+    assert "resolve the pending contractor evidence review" in blocked_check.json()["error"]["message"]
+    assert resolved.status_code == 200
+    evidence = resolved.json()["evidence"][-1]
+    assert evidence["status"] == "accepted"
+    assert evidence["automated_status"] == "manual_review"
+    assert evidence["contractor_decision"] == payload["decision"]
+    assert evidence["agent_run"][-1]["step"] == "Contractor resolution"
+    assert replay.json() == resolved.json()
+
+
+def test_contractor_can_return_ambiguous_photo_and_submit_replacement() -> None:
+    workflows = WorkflowRegistry(photo_assessor=hold_photo_for_review)
+    with client(workflows=workflows) as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "return_photo_workflow_123"},
+        ).json()
+        workflow_id = created["workflow_id"]
+        approve_review(browser, created, key="return_photo_launch_123")
+        assessed = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/photo?citation_id=1",
+            content=jpeg_photo(),
+            headers={
+                "Content-Type": "image/jpeg",
+                "Idempotency-Key": "return_photo_assess_123",
+            },
+        ).json()
+        returned = browser.post(
+            f"/api/workflows/{workflow_id}/evidence/review",
+            json={
+                "assessment_id": assessed["evidence"][-1]["assessment_id"],
+                "disposition": "reject",
+                "decision": "Send a wider image that shows the full measured clearance.",
+            },
+            headers={"Idempotency-Key": "return_photo_decision_123"},
+        )
+        replacement = browser.post(
+            f"/api/workflows/{workflow_id}/evidence",
+            json={"citation_id": "1", "sample_id": "panel_wide_measured"},
+            headers={"Idempotency-Key": "return_photo_replacement_123"},
+        )
+
+    assert returned.status_code == 200
+    returned_evidence = returned.json()["evidence"][-1]
+    assert returned_evidence["status"] == "rejected"
+    assert returned_evidence["automated_status"] == "manual_review"
+    assert replacement.status_code == 200
+    assert replacement.json()["evidence"][-1]["status"] == "accepted"
+    assert len(replacement.json()["evidence"]) == 2
+
+
+def test_accepted_evidence_cannot_be_silently_replaced() -> None:
+    with client() as browser:
+        created = browser.post(
+            "/api/workflows",
+            json=workflow_payload(),
+            headers={"Idempotency-Key": "locked_evidence_workflow_123"},
+        ).json()
+        workflow_id = created["workflow_id"]
+        approve_review(browser, created, key="locked_evidence_review_123")
+        accepted = browser.post(
+            f"/api/workflows/{workflow_id}/evidence",
+            json={"citation_id": "1", "sample_id": "panel_wide_measured"},
+            headers={"Idempotency-Key": "locked_evidence_accept_123"},
+        )
+        replacement = browser.post(
+            f"/api/workflows/{workflow_id}/evidence",
+            json={"citation_id": "1", "sample_id": "panel_closeup_insufficient"},
+            headers={"Idempotency-Key": "locked_evidence_replace_123"},
+        )
+
+    assert accepted.status_code == 200
+    assert replacement.status_code == 422
+    assert replacement.json()["error"] == {
+        "code": "invalid_evidence_submission",
+        "message": "accepted evidence is locked; keep the approved proof or start an explicit replacement workflow",
+    }
 
 
 def test_json_photo_upload_crosses_text_only_edge_and_remains_idempotent() -> None:
@@ -537,7 +680,11 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert 'error.code === "workflow_not_found"' in script.text
     assert '"Recovery session expired"' in script.text
     assert 'elements.retry.textContent = "Start a new recovery"' in script.text
-    assert "!hasApprovedEvidenceBoundary(data, button.dataset.citation)" in script.text
+    assert "!hasApprovedEvidenceBoundary(data, citationId)" in script.text
+    assert 'citation.stage === "ready"' in script.text
+    assert 'judgment.kind === "evidence_review"' in script.text
+    assert 'disposition: submittedButton.dataset.disposition' in script.text
+    assert "recoveryDateError(" in script.text
     assert 'openCount === 1 ? "correction still needs" : "corrections still need"' in script.text
     assert "async function runSampleUntilPause()" in script.text
     assert "function stageTourClock(days, cadence)" in script.text
@@ -739,6 +886,41 @@ def test_workflow_api_runs_real_strands_graph_and_restores_snapshot() -> None:
     assert created.json()["snapshot"]["status"] == "interrupted"
     assert len(created.json()["snapshot"]["deliveries"]) == 0
     assert created.json()["snapshot"]["interrupts"][0]["name"] == "correction-review"
+
+
+def test_workflow_rejects_working_date_on_or_after_reinspection_deadline() -> None:
+    for index, as_of in enumerate(("2026-08-17", "2026-08-18")):
+        payload = workflow_payload()
+        payload["as_of"] = as_of
+        with client() as browser:
+            response = browser.post(
+                "/api/workflows",
+                json=payload,
+                headers={"Idempotency-Key": f"expired_workflow_{index}_123"},
+            )
+
+        assert response.status_code == 422
+        assert response.json()["error"] == {
+            "code": "workflow_configuration_error",
+            "message": "The working date must be before the notice's reinspection deadline. Update the working date or use a current notice.",
+        }
+
+
+def test_workflow_rejects_working_date_before_notice_issue_date() -> None:
+    payload = workflow_payload()
+    payload["as_of"] = "2026-08-06"
+    with client() as browser:
+        response = browser.post(
+            "/api/workflows",
+            json=payload,
+            headers={"Idempotency-Key": "future_notice_workflow_123"},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["error"] == {
+        "code": "workflow_configuration_error",
+        "message": "The working date cannot be before the notice's inspection date. Update the working date or use a current notice.",
+    }
 
 
 def test_workflow_accepts_a_second_municipal_notice_shape_and_pauses_before_outreach() -> None:

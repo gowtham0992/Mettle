@@ -1,4 +1,8 @@
-const { evidenceOptionLabel, selectEvidenceCitation } = globalThis.MettleEvidenceFlow;
+const {
+  evidenceOptionLabel,
+  recoveryDateError,
+  selectEvidenceCitation,
+} = globalThis.MettleEvidenceFlow;
 
 const elements = {
   main: document.querySelector("#main"),
@@ -219,6 +223,14 @@ if (!elements.workflowAsOf.value) {
   const localToday = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
     .toISOString().slice(0, 10);
   elements.workflowAsOf.value = localToday;
+  const relativeDate = (offset) => {
+    const value = new Date(`${localToday}T12:00:00`);
+    value.setDate(value.getDate() + offset);
+    return `${String(value.getMonth() + 1).padStart(2, "0")}/${String(value.getDate()).padStart(2, "0")}/${value.getFullYear()}`;
+  };
+  elements.noticeText.value = elements.noticeText.value
+    .replace(/Inspection date: \d{1,2}\/\d{1,2}\/\d{4}/, `Inspection date: ${relativeDate(-3)}`)
+    .replace(/reinspection on \d{1,2}\/\d{1,2}\/\d{4}/, `reinspection on ${relativeDate(7)}`);
 }
 
 function workspaceViewFromUrl() {
@@ -541,7 +553,9 @@ function workflowCampaign(envelope, executionTarget = "local") {
     const needsJudgment = judgmentByCitation.has(citation.citation_id);
     const assessedStage = assessment?.status === "accepted"
       ? "ready"
-      : assessment?.status === "rejected" ? "evidence_rejected" : null;
+      : assessment?.status === "rejected"
+        ? "evidence_rejected"
+        : assessment?.status === "manual_review" ? "needs_judgment" : null;
     return {
       ...citation,
       assignee: delivery ? `${delivery.recipient.name} · ${maskedPhone(delivery.recipient.phone)}` : null,
@@ -624,12 +638,15 @@ function workflowCampaign(envelope, executionTarget = "local") {
     });
   }
   for (const [index, assessment] of (envelope.evidence || []).entries()) {
+    const contractorResolved = Boolean(assessment.contractor_decision);
     events.push({
       happened_at: timestamp(9, index),
-      kind: `evidence_${assessment.status}`,
-      actor: "Mettle · evidence assessor",
-      title: `${assessment.status === "accepted" ? "Accepted" : assessment.status === "rejected" ? "Rejected" : "Held"} C${assessment.citation_id} photo evidence`,
-      detail: assessment.explanation,
+      kind: contractorResolved ? "judgment_resolved" : `evidence_${assessment.status}`,
+      actor: contractorResolved ? "Contractor" : "Mettle · evidence assessor",
+      title: contractorResolved
+        ? `${assessment.status === "accepted" ? "Accepted" : "Returned"} ambiguous C${assessment.citation_id} photo after contractor review`
+        : `${assessment.status === "accepted" ? "Accepted" : assessment.status === "rejected" ? "Rejected" : "Held"} C${assessment.citation_id} photo evidence`,
+      detail: contractorResolved ? assessment.contractor_decision : assessment.explanation,
     });
   }
   if (envelope.packet) {
@@ -649,6 +666,18 @@ function workflowCampaign(envelope, executionTarget = "local") {
     judgment_id: pendingInterrupt.interrupt_id,
     status: "pending",
   }] : [];
+  for (const assessment of evidenceByCitation.values()) {
+    if (assessment.status !== "manual_review") continue;
+    judgments.push({
+      judgment_id: assessment.assessment_id,
+      kind: "evidence_review",
+      citation_id: assessment.citation_id,
+      question: "Is this ambiguous photo sufficient for the correction record?",
+      reason: `${assessment.explanation} Accept it as visible evidence or request a clearer replacement.`,
+      status: "pending",
+      evidence_review: true,
+    });
+  }
   if (envelope.packet?.status === "awaiting_approval") {
     judgments.push({
       judgment_id: envelope.packet.approval_id,
@@ -676,7 +705,7 @@ function workflowCampaign(envelope, executionTarget = "local") {
       sequence: ++evidenceSequence,
       graph: "evidence",
       node_id: step.step.toLowerCase().replaceAll(" ", "_"),
-      actor: "Evidence agent",
+      actor: step.step === "Contractor resolution" ? "Contractor" : "Evidence agent",
       status: step.status,
       detail: `C${assessment.citation_id} · ${step.detail}`,
     })),
@@ -714,7 +743,8 @@ function workflowCampaign(envelope, executionTarget = "local") {
       automated_actions: 2 + snapshot.deliveries.length + (envelope.evidence || []).length,
       contractor_decisions: (snapshot.contractor_decision ? 1 : 0)
         + (snapshot.deadline_decision ? 1 : 0)
-        + (envelope.packet?.status === "approved" ? 1 : 0),
+        + (envelope.packet?.status === "approved" ? 1 : 0)
+        + (envelope.evidence || []).filter((item) => item.contractor_decision).length,
     },
     scenario_step: 0,
     scenario_complete: true,
@@ -874,6 +904,17 @@ function validateSetupStep() {
       elements.workflowAsOf.setAttribute("aria-invalid", "true");
       elements.workflowAsOf.focus();
       elements.workflowAsOf.reportValidity();
+      return false;
+    }
+    const dateError = recoveryDateError(
+      elements.noticeText.value,
+      elements.workflowAsOf.value,
+    );
+    if (dateError) {
+      elements.workflowDateError.textContent = dateError;
+      elements.workflowDateError.hidden = false;
+      elements.workflowAsOf.setAttribute("aria-invalid", "true");
+      elements.workflowAsOf.focus();
       return false;
     }
     elements.workflowAsOf.removeAttribute("aria-invalid");
@@ -1335,9 +1376,15 @@ function renderEvidenceAssessment(assessment) {
   elements.evidenceResult.dataset.mode = assessment.label?.startsWith("Recorded sample") ? "recorded" : "live";
   elements.evidenceResult.hidden = false;
   elements.evidenceResult.className = `evidence-result evidence-result--${assessment.status}`;
+  const resultLabel = assessment.contractor_decision
+    ? `${assessment.status === "accepted" ? "Accepted" : "Returned"} by contractor`
+    : assessment.label || assessment.status.replaceAll("_", " ");
   elements.evidenceResult.replaceChildren(
-    node("strong", "", `${assessment.label || assessment.status.replaceAll("_", " ")} · C${assessment.citation_id}`),
+    node("strong", "", `${resultLabel} · C${assessment.citation_id}`),
     node("span", "", assessment.explanation),
+    ...(assessment.contractor_decision
+      ? [node("span", "evidence-result__decision", `Decision record: ${assessment.contractor_decision}`)]
+      : []),
   );
 }
 
@@ -1610,11 +1657,15 @@ function decisionPrompt(judgment) {
   if (judgment.kind === "deadline_tradeoff") {
     return ["Keep the date, or request a new one?", "Record deadline decision"];
   }
+  if (judgment.kind === "evidence_review") {
+    return ["Record why this proof is sufficient or what must be clearer", "Accept proof"];
+  }
   return ["Describe the evidence the trade must provide", "Set evidence requirement"];
 }
 
 function renderJudgment(judgment) {
   const isPacketApproval = judgment.packet_approval || judgment.kind === "final_packet_approval";
+  const isEvidenceReview = judgment.evidence_review || judgment.kind === "evidence_review";
   const card = node("article", "judgment");
   card.append(node("div", "judgment__kind", `${titleCase(judgment.kind)}${judgment.citation_id ? ` · C${judgment.citation_id}` : ""}`));
   card.append(node("h3", "", judgment.question));
@@ -1633,12 +1684,23 @@ function renderJudgment(judgment) {
   input.placeholder = placeholder;
   const button = node("button", "button", buttonLabel);
   button.type = "submit";
-  form.append(label, input, button);
+  button.dataset.disposition = isEvidenceReview ? "accept" : "";
+  const rejectButton = isEvidenceReview
+    ? node("button", "button button--outline", "Request clearer proof")
+    : null;
+  if (rejectButton) {
+    rejectButton.type = "submit";
+    rejectButton.dataset.disposition = "reject";
+    form.classList.add("judgment__evidence-review");
+  }
+  form.append(label, input, button, ...(rejectButton ? [rejectButton] : []));
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const decision = input.value.trim();
     if (decision.length < 3) return;
+    const submittedButton = event.submitter || button;
     setBusy(button, true);
+    if (rejectButton) setBusy(rejectButton, true);
     try {
       if (activeWorkflowId && isPacketApproval) {
         const workflowRoot = activeWorkflowTarget === "agentcore"
@@ -1648,6 +1710,20 @@ function renderJudgment(judgment) {
           method: "POST",
           headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
           body: JSON.stringify({ approval_id: judgment.judgment_id, decision }),
+        });
+        campaign = workflowCampaign(envelope, activeWorkflowTarget);
+      } else if (activeWorkflowId && isEvidenceReview) {
+        const workflowRoot = activeWorkflowTarget === "agentcore"
+          ? "/api/agentcore/workflows"
+          : "/api/workflows";
+        const envelope = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/evidence/review`, {
+          method: "POST",
+          headers: { "Idempotency-Key": crypto.randomUUID().replaceAll("-", "_") },
+          body: JSON.stringify({
+            assessment_id: judgment.judgment_id,
+            disposition: submittedButton.dataset.disposition,
+            decision,
+          }),
         });
         campaign = workflowCampaign(envelope, activeWorkflowTarget);
       } else if (activeWorkflowId) {
@@ -1669,7 +1745,11 @@ function renderJudgment(judgment) {
       render(campaign);
       showToast(isPacketApproval
         ? "Final approval recorded. The reinspection PDF is ready to download."
-        : "Your decision is logged. Mettle resumed the recovery run.");
+        : isEvidenceReview
+          ? submittedButton.dataset.disposition === "accept"
+            ? "Contractor acceptance recorded. This correction is ready for the packet."
+            : "Contractor requested clearer proof. This correction remains open."
+          : "Your decision is logged. Mettle resumed the recovery run.");
     } catch (error) {
       if (error.code === "workflow_not_found" && activeWorkflowTarget === "agentcore") {
         showError(error);
@@ -1681,6 +1761,7 @@ function renderJudgment(judgment) {
       }
     } finally {
       setBusy(button, false);
+      if (rejectButton) setBusy(rejectButton, false);
     }
   });
   card.append(form);
@@ -2490,7 +2571,10 @@ function renderRecoveryClock(data) {
   }));
 
   const open = data.metrics.citations_total - data.metrics.citations_ready;
-  const waiting = data.workflow_status === "interrupted";
+  const waiting = data.workflow_status === "interrupted"
+    || data.judgments.some(
+      (judgment) => judgment.status === "pending" && judgment.kind !== "final_packet_approval",
+    );
   const next = checkpoints.find((checkpoint) => checkpoint.date > data.as_of);
   const closed = open === 0;
   const expired = !next;
@@ -2588,25 +2672,32 @@ function render(data) {
   elements.driverTag.textContent = isWorkflow ? "RECOVERY" : "SAMPLE";
   if (isWorkflow) renderRecoveryClock(data);
   const selectedCitation = selectEvidenceCitation(data.citations, elements.photoCitation.value);
+  const openEvidenceCitations = data.citations.filter((citation) => citation.stage !== "ready");
   elements.photoCitation.replaceChildren(...data.citations.map((citation) => {
     const option = node("option", "", evidenceOptionLabel(citation));
     option.value = citation.citation_id;
+    option.disabled = citation.stage === "ready";
     return option;
   }));
   if ([...elements.photoCitation.options].some((option) => option.value === selectedCitation)) {
     elements.photoCitation.value = selectedCitation;
   }
-  const canAssessPhoto = activePhotoEnabled();
-  elements.photoCitation.disabled = !isWorkflow;
-  elements.photoFile.disabled = !isWorkflow;
+  const hasOpenEvidence = openEvidenceCitations.length > 0;
+  const canAssessPhoto = activePhotoEnabled() && hasOpenEvidence;
+  elements.photoCitation.disabled = !isWorkflow || !hasOpenEvidence;
+  elements.photoFile.disabled = !isWorkflow || !hasOpenEvidence;
   elements.photoSubmit.disabled = !canAssessPhoto || !elements.photoFile.files?.length;
   elements.photoSubmit.title = canAssessPhoto
     ? "This live vision check consumes a small amount of AWS credit"
+    : isWorkflow && !hasOpenEvidence
+      ? "Every correction already has locked, accepted proof"
     : isWorkflow
       ? "Start Mettle with Bedrock or AgentCore enabled to assess real photos"
       : "Start a recovery to enable live Bedrock Vision";
   elements.photoModeNote.textContent = canAssessPhoto
     ? "LIVE BEDROCK VISION AVAILABLE · AWS CREDIT IS CONSUMED ONLY WHEN YOU SUBMIT"
+    : isWorkflow && !hasOpenEvidence
+      ? "ALL ACCEPTED PROOF IS LOCKED · START AN EXPLICIT REPLACEMENT WORKFLOW TO CHANGE IT"
     : isWorkflow
       ? "THIS RECOVERY HAS NO LIVE VISION PROVIDER · SYNTHETIC FIXTURES REMAIN AVAILABLE"
       : "SAMPLE MODE · FIXTURES REPLAY RECORDED SYNTHETIC OUTCOMES · NO MODEL CALL";
@@ -2620,10 +2711,17 @@ function render(data) {
       (event) => event.title === "Contractor decision recorded; graph resumed",
     );
     for (const button of elements.evidenceButtons) {
-      button.disabled = button.dataset.requiresDecision === "true"
+      const citationId = button.dataset.citation || "1";
+      const citationLocked = data.citations.some(
+        (citation) => String(citation.citation_id) === citationId && citation.stage === "ready",
+      );
+      const boundaryMissing = button.dataset.requiresDecision === "true"
         && !contractorDecisionRecorded
-        && !hasApprovedEvidenceBoundary(data, button.dataset.citation);
-      button.title = button.disabled ? "Resolve the evidence specification first" : "";
+        && !hasApprovedEvidenceBoundary(data, citationId);
+      button.disabled = citationLocked || boundaryMissing;
+      button.title = citationLocked
+        ? "Accepted proof is locked for this correction"
+        : boundaryMissing ? "Resolve the evidence specification first" : "";
       button.textContent = button.dataset.sample === "panel_closeup_insufficient"
         ? "Assess close-up"
         : button.dataset.sample === "panel_wide_measured"

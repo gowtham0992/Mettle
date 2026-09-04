@@ -18,6 +18,11 @@ class EvidenceStatus(StrEnum):
     MANUAL_REVIEW = "manual_review"
 
 
+class EvidenceReviewDisposition(StrEnum):
+    ACCEPT = "accept"
+    REJECT = "reject"
+
+
 class EvidenceAgentStep(BaseModel):
     """A safe, high-level trace of the evidence agent's bounded work."""
 
@@ -41,6 +46,8 @@ class EvidenceAssessment(BaseModel):
     missing_requirements: list[str] = Field(default_factory=list)
     explanation: str
     agent_run: list[EvidenceAgentStep] = Field(default_factory=list)
+    automated_status: EvidenceStatus | None = None
+    contractor_decision: str | None = Field(default=None, max_length=500)
 
 
 @dataclass(frozen=True)

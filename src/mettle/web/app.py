@@ -50,6 +50,7 @@ from mettle.workflow_registry import (
     PacketNotApproved,
     PacketNotReady,
     PreparePacketRequest,
+    ReviewEvidenceRequest,
     ReviewWorkflowRequest,
     RunNextCheckRequest,
     ResumeWorkflowRequest,
@@ -796,6 +797,26 @@ def create_app(
         )
 
     @app.post(
+        "/api/agentcore/workflows/{workflow_id}/evidence/review",
+        response_model=WorkflowEnvelope,
+    )
+    def review_agentcore_evidence(
+        workflow_id: str,
+        payload: ReviewEvidenceRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        return require_agentcore(request).review_evidence(
+            workflow_id,
+            payload,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
         "/api/agentcore/workflows/{workflow_id}/checks/next",
         response_model=WorkflowEnvelope,
     )
@@ -923,6 +944,26 @@ def create_app(
     ) -> WorkflowEnvelope:
         return request.app.state.workflows.prepare_packet(
             workflow_id,
+            idempotency_key=idempotency_key,
+        )
+
+    @app.post(
+        "/api/workflows/{workflow_id}/evidence/review",
+        response_model=WorkflowEnvelope,
+    )
+    def review_evidence(
+        workflow_id: str,
+        payload: ReviewEvidenceRequest,
+        request: Request,
+        idempotency_key: str = Header(
+            min_length=8,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ) -> WorkflowEnvelope:
+        return request.app.state.workflows.review_evidence(
+            workflow_id,
+            payload,
             idempotency_key=idempotency_key,
         )
 

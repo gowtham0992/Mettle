@@ -14,6 +14,7 @@ from mettle.workflow_registry import (
     ApprovePacketRequest,
     CreateWorkflowRequest,
     PreparePacketRequest,
+    ReviewEvidenceRequest,
     ReviewWorkflowRequest,
     RunNextCheckRequest,
     SubmitEvidenceRequest,
@@ -206,6 +207,29 @@ def test_photo_evidence_is_base64_encoded_inside_the_private_agentcore_request()
     request_body = json.loads(client.requests[1]["payload"])
     assert request_body["operation"] == "submit_photo_evidence"
     assert request_body["payload"]["image_base64"] == b64encode(b"normalized-jpeg").decode("ascii")
+
+
+def test_evidence_review_uses_the_existing_private_agentcore_session() -> None:
+    created = interrupted_envelope()
+    reviewed = created.model_copy(deep=True)
+    client = QueueClient([success(created), success(reviewed)])
+    gateway = AgentCoreWorkflowGateway(client=client, runtime_arn=RUNTIME_ARN)
+    gateway.create(create_payload(), idempotency_key="cloud_evidence_review_create_123")
+
+    gateway.review_evidence(
+        created.workflow_id,
+        ReviewEvidenceRequest(
+            assessment_id="evidence-example",
+            disposition="accept",
+            decision="Contractor accepts this visible evidence.",
+        ),
+        idempotency_key="cloud_evidence_review_123",
+    )
+
+    request_body = json.loads(client.requests[1]["payload"])
+    assert request_body["operation"] == "review_evidence"
+    assert request_body["payload"]["disposition"] == "accept"
+    assert client.requests[1]["runtimeSessionId"] == client.requests[0]["runtimeSessionId"]
 
 
 def test_recovery_check_uses_the_existing_private_agentcore_session() -> None:

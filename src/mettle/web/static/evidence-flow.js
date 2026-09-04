@@ -20,7 +20,45 @@
     return String(currentIsOpen?.citation_id || open[0]?.citation_id || current?.citation_id || citations[0]?.citation_id || "");
   }
 
-  const api = { evidenceOptionLabel, selectEvidenceCitation };
+  function dateFromLine(line) {
+    if (!line) return "";
+    const match = line.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b|\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
+    if (!match) return "";
+    if (match[1]) {
+      return `${match[1]}-${String(match[2]).padStart(2, "0")}-${String(match[3]).padStart(2, "0")}`;
+    }
+    const year = Number(match[6]) < 100 ? 2000 + Number(match[6]) : Number(match[6]);
+    return `${year}-${String(match[4]).padStart(2, "0")}-${String(match[5]).padStart(2, "0")}`;
+  }
+
+  function noticeDeadline(noticeText) {
+    const line = String(noticeText || "").split(/\r?\n/).find(
+      (value) => /reinspection|correction deadline/i.test(value),
+    );
+    return dateFromLine(line);
+  }
+
+  function noticeInspectionDate(noticeText) {
+    const line = String(noticeText || "").split(/\r?\n/).find(
+      (value) => /inspection date|issued(?: on)?/i.test(value) && !/reinspection/i.test(value),
+    );
+    return dateFromLine(line);
+  }
+
+  function recoveryDateError(noticeText, workingDate) {
+    const issued = noticeInspectionDate(noticeText);
+    const deadline = noticeDeadline(noticeText);
+    if (!workingDate) return "";
+    if (issued && workingDate < issued) {
+      return `The working date cannot be before the ${issued} inspection date.`;
+    }
+    if (!deadline) return "";
+    return workingDate >= deadline
+      ? `The working date must be before the ${deadline} reinspection deadline.`
+      : "";
+  }
+
+  const api = { evidenceOptionLabel, noticeDeadline, noticeInspectionDate, recoveryDateError, selectEvidenceCitation };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.MettleEvidenceFlow = api;
 }(typeof globalThis === "undefined" ? this : globalThis));

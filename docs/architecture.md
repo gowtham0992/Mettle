@@ -129,7 +129,7 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 - Invalid structured output is rejected and leaves the campaign unchanged.
 - Duplicate outbound delivery attempts are ignored by an idempotency key.
 - Amazon SNS failure fails closed and never records a message as sent or marks a citation complete; a successful provider receipt is cached for replay-safe retries within the session.
-- Unclear evidence creates a re-request or judgment item; it never certifies completion.
+- Unclear evidence creates a contractor judgment item and pauses scheduled recovery. Acceptance or a clearer-photo request is recorded idempotently; it never certifies completion.
 - A missed deadline moves the campaign to critical review instead of silently rescheduling.
 
 ## Risk-ordered build slices
@@ -137,7 +137,7 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 1. **Notice to campaign plan:** prove traceable extraction, deadline behavior, and judgment routing without a model.
 2. **Local Strands orchestration:** run deterministic contract nodes, recorded outreach, and a resumable human interrupt. **Complete.**
 3. **Deadline chase loop:** replan open citations, record scheduled follow-ups with replay safety, stop on accepted evidence, and interrupt at the T−2 tradeoff. **Complete locally and through the deployed AgentCore-compatible contract.**
-4. **Evidence assessment:** compare trusted fixtures or normalized real photos to notice-anchored requirements and produce a specific re-request or judgment interrupt. **Local fixture adapter and dedicated Strands Evidence Agent on Bedrock complete; its model adapter forces one validated evidence-decision tool rather than accepting free-form output.**
+4. **Evidence assessment:** compare trusted fixtures or normalized real photos to notice-anchored requirements and produce a specific re-request or judgment interrupt. **Complete: the dedicated Strands Evidence Agent forces one validated evidence-decision tool; ambiguous output pauses EventBridge and creates an auditable contractor accept-or-re-request gate.**
 5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
 6. **Demo interface and packet:** show the recovery timeline, inspectable Run receipt, and citation-to-evidence PDF. **Complete.**
 7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,

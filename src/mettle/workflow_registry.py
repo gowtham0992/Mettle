@@ -13,7 +13,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from mettle.automation import CampaignAutomation
 from mettle.communication import Messenger, Recipient, RecordingMessenger
 from mettle.domain import InspectionNotice, Trade
-from mettle.evidence import EvidenceAssessment, EvidenceSampleNotFound, assess_sample
+from mettle.evidence import (
+    EvidenceAgentStep,
+    EvidenceAssessment,
+    EvidenceReviewDisposition,
+    EvidenceSampleNotFound,
+    EvidenceStatus,
+    assess_sample,
+)
 from mettle.packet import PacketRecord, PacketStatus, render_packet_pdf
 from mettle.workflow import (
     CorrectionReview,
@@ -121,6 +128,22 @@ class SubmitPhotoEvidenceRequest(BaseModel):
     citation_id: str = Field(min_length=1, max_length=50)
 
 
+class ReviewEvidenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    assessment_id: str = Field(min_length=1, max_length=64)
+    disposition: EvidenceReviewDisposition
+    decision: str = Field(min_length=3, max_length=500)
+
+    @model_validator(mode="after")
+    def normalize_decision(self) -> ReviewEvidenceRequest:
+        normalized = " ".join(self.decision.split())
+        if len(normalized) < 3:
+            raise ValueError("decision must contain at least 3 visible characters")
+        object.__setattr__(self, "decision", normalized)
+        return self
+
+
 class RunNextCheckRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -166,6 +189,7 @@ class _WorkflowEntry:
         self.review_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
         self.evidence: list[EvidenceAssessment] = []
         self.evidence_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
+        self.evidence_review_replays: dict[str, tuple[str, WorkflowEnvelope]] = {}
         self.check_replays: dict[str, WorkflowEnvelope] = {}
         self.uploaded_photos: dict[str, bytes] = {}
         self.packet: PacketRecord | None = None
@@ -225,6 +249,18 @@ class WorkflowRegistry:
         )
         if citation is None:
             raise EvidenceSubmissionError("citation does not belong to this workflow")
+        latest = next(
+            (
+                item
+                for item in reversed(entry.evidence)
+                if item.citation_id == citation_id
+            ),
+            None,
+        )
+        if latest is not None and latest.status is EvidenceStatus.ACCEPTED:
+            raise EvidenceSubmissionError(
+                "accepted evidence is locked; keep the approved proof or start an explicit replacement workflow"
+            )
         if not citation.evidence_requirements and entry.snapshot.contractor_decision:
             return citation.model_copy(
                 update={"evidence_requirements": [entry.snapshot.contractor_decision]}
@@ -270,6 +306,17 @@ class WorkflowRegistry:
                 **({"notice_extractor": notice_extractor} if notice_extractor else {}),
             )
             snapshot = session.start()
+            if snapshot.notice is not None and payload.as_of < snapshot.notice.issued_on:
+                raise WorkflowConfigurationError(
+                    "The working date cannot be before the notice's inspection date. Update the working date or use a current notice."
+                )
+            if (
+                snapshot.notice is not None
+                and payload.as_of >= snapshot.notice.reinspection_due_on
+            ):
+                raise WorkflowConfigurationError(
+                    "The working date must be before the notice's reinspection deadline. Update the working date or use a current notice."
+                )
             workflow_id = token_urlsafe(12)
             self._entries[workflow_id] = _WorkflowEntry(
                 session,
@@ -438,6 +485,94 @@ class WorkflowRegistry:
             entry.evidence_replays[idempotency_key] = (fingerprint, envelope)
             return envelope
 
+    def review_evidence(
+        self,
+        workflow_id: str,
+        payload: ReviewEvidenceRequest,
+        *,
+        idempotency_key: str,
+    ) -> WorkflowEnvelope:
+        with self._lock:
+            entry = self._entries.get(workflow_id)
+        if entry is None:
+            raise WorkflowNotFound("workflow does not exist")
+
+        fingerprint = _fingerprint(payload)
+        with entry.lock:
+            replay = entry.evidence_review_replays.get(idempotency_key)
+            if replay is not None:
+                existing_fingerprint, envelope = replay
+                if existing_fingerprint != fingerprint:
+                    raise WorkflowConflict(
+                        "idempotency key was already used with a different evidence review"
+                    )
+                return envelope.model_copy(deep=True)
+
+            index = next(
+                (
+                    index
+                    for index, assessment in enumerate(entry.evidence)
+                    if assessment.assessment_id == payload.assessment_id
+                ),
+                None,
+            )
+            if index is None:
+                raise EvidenceSubmissionError(
+                    "evidence assessment does not belong to this workflow"
+                )
+            assessment = entry.evidence[index]
+            latest = next(
+                item
+                for item in reversed(entry.evidence)
+                if item.citation_id == assessment.citation_id
+            )
+            if latest.assessment_id != assessment.assessment_id:
+                raise WorkflowConflict(
+                    "only the latest evidence assessment may be reviewed"
+                )
+            if assessment.status is not EvidenceStatus.MANUAL_REVIEW:
+                raise WorkflowConflict(
+                    "this evidence assessment is not awaiting contractor review"
+                )
+
+            accepted = payload.disposition is EvidenceReviewDisposition.ACCEPT
+            resolved = assessment.model_copy(
+                update={
+                    "status": (
+                        EvidenceStatus.ACCEPTED
+                        if accepted
+                        else EvidenceStatus.REJECTED
+                    ),
+                    "automated_status": EvidenceStatus.MANUAL_REVIEW,
+                    "contractor_decision": payload.decision,
+                    "explanation": (
+                        "Contractor reviewed the ambiguous image and accepted it as sufficient visible evidence. This decision does not certify code compliance."
+                        if accepted
+                        else "Contractor reviewed the ambiguous image and requested clearer replacement proof."
+                    ),
+                    "agent_run": [
+                        *assessment.agent_run,
+                        EvidenceAgentStep(
+                            step="Contractor resolution",
+                            status="completed",
+                            detail=(
+                                "Contractor accepted the ambiguous image as sufficient visible evidence."
+                                if accepted
+                                else "Contractor requested clearer replacement proof."
+                            ),
+                        ),
+                    ],
+                },
+                deep=True,
+            )
+            entry.evidence[index] = resolved
+            envelope = self._envelope(workflow_id, entry)
+            entry.evidence_review_replays[idempotency_key] = (
+                fingerprint,
+                envelope,
+            )
+            return envelope
+
     def run_next_check(
         self,
         workflow_id: str,
@@ -456,6 +591,13 @@ class WorkflowRegistry:
                 raise WorkflowConflict("campaign checks stop after packet preparation")
 
             latest = {item.citation_id: item for item in entry.evidence}
+            if any(
+                assessment.status is EvidenceStatus.MANUAL_REVIEW
+                for assessment in latest.values()
+            ):
+                raise WorkflowConflict(
+                    "resolve the pending contractor evidence review before continuing the campaign"
+                )
             accepted = {
                 citation_id
                 for citation_id, assessment in latest.items()

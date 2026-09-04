@@ -74,7 +74,7 @@ Mettle is event-driven work across time, not a prompt-response wrapper. It keeps
 | Notice understanding | A real `strands.Agent` using a bounded Nova Micro model and validated structured output | [`src/mettle/agents/intake.py`](src/mettle/agents/intake.py) |
 | Campaign orchestration | Two Strands `GraphBuilder` graphs: intake-to-coordination and deadline chase | [`src/mettle/workflow.py`](src/mettle/workflow.py) |
 | Human judgment | Strands hooks interrupt before outreach, at ambiguous requirements, and at the deadline tradeoff | [`src/mettle/workflow.py`](src/mettle/workflow.py) |
-| Visible-evidence assessment | A dedicated multimodal `strands.Agent` on Nova Lite, followed by deterministic accept, re-request, or manual-review policy | [`src/mettle/agents/vision.py`](src/mettle/agents/vision.py) |
+| Visible-evidence assessment | A dedicated multimodal `strands.Agent` on Nova Lite, followed by deterministic accept, re-request, or a contractor-resolved manual-review gate | [`src/mettle/agents/vision.py`](src/mettle/agents/vision.py), [`src/mettle/workflow_registry.py`](src/mettle/workflow_registry.py) |
 | Inspectable autonomy | Safe Strands graph hooks and evidence-agent traces rendered as a visible Run receipt without exposing prompts or private payloads | [`src/mettle/workflow.py`](src/mettle/workflow.py), [`src/mettle/web/static/app.js`](src/mettle/web/static/app.js) |
 | Managed agent runtime | The same typed workflow operations run behind an Amazon Bedrock AgentCore entrypoint | [`agentcore_app.py`](agentcore_app.py) |
 | Work across time | One-time EventBridge schedules wake the next deadline checkpoint; schedule versions and idempotency keys make stale or replayed events safe | [`src/mettle/automation.py`](src/mettle/automation.py), [`src/mettle/scheduler_runtime.py`](src/mettle/scheduler_runtime.py) |
@@ -146,12 +146,14 @@ The gateway owns the AgentCore session identifier, reuses it for safe retries an
 ## Test the working implementation
 
 ```bash
-uv run pytest
+uv sync --frozen --extra dev
 npm ci
+npm --prefix agentcore/cdk ci
+npm run verify
 npx agentcore validate --json
 ```
 
-The offline suite exercises notice parsing, campaign policy, Strands node tracing, interruptions and resume, failed-review retry safety, multimodal evidence-agent contracts, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, schedule creation and stale-event rejection, one-way delivery guardrails, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
+`npm run verify` is the single local release gate. It runs the Python application suite, infrastructure-template assertions, browser-flow logic tests, JavaScript syntax checks, TypeScript build, and AgentCore CDK tests. GitHub Actions runs the same command on every push to `main` and every pull request. The offline suite exercises notice parsing, campaign policy, Strands node tracing, interruptions and resume, failed-review retry safety, multimodal evidence-agent contracts, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, schedule creation and stale-event rejection, one-way delivery guardrails, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
 
 [`scripts/web_scheduler_smoke.py`](scripts/web_scheduler_smoke.py) provides the paid deployment acceptance path. It creates a synthetic authenticated workflow, confirms schedule version 1 exists, waits for the private worker to advance the workflow and arm version 2, then cancels the follow-on smoke schedule. The final deployment acceptance passed with an empty DLQ and no SMS permission or send.
 
@@ -160,7 +162,8 @@ The offline suite exercises notice parsing, campaign policy, Strands node tracin
 - **No public cloud spending path:** the guided demo is deterministic; credit-metered routes require an admin-created Cognito account.
 - **No credentials in the client:** all AWS profiles, regions, model IDs, runtime identifiers, and session IDs remain server-side.
 - **Least privilege:** checked-in IAM policies restrict model access to Nova Micro and Nova Lite and runtime invocation to Mettle's resource.
-- **Replay safety:** workflow creation, follow-ups, evidence submission, and resume operations use idempotency controls.
+- **Replay safety:** workflow creation, follow-ups, evidence submission, evidence review, and resume operations use idempotency controls.
+- **Evidence integrity:** accepted proof is locked against accidental replacement; ambiguous proof pauses the chase until the contractor accepts it or requests a clearer image.
 - **Bounded scheduling:** each checkpoint is a one-time EventBridge schedule with a versioned payload, two retries, a dead-letter queue, and automatic deletion; stale events cannot advance the workflow.
 - **No open messaging channel:** SMS is outbound-only and disabled by default. Enabling Amazon SNS requires a server-side SHA-256 allowlist for one demo phone; all other recipients remain recorded simulations.
 - **Safe uploads:** image bodies are capped, decoded, stripped of metadata, dimension-bounded, and re-encoded before model use.

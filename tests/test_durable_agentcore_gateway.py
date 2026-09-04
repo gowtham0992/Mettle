@@ -14,6 +14,7 @@ from botocore.exceptions import ClientError
 from mettle.automation import AutomationStatus, CampaignAutomation, ScheduledCheckEvent
 from mettle.agentcore_gateway import AgentCoreGatewayError
 from mettle.durable_agentcore_gateway import DurableAgentCoreWorkflowGateway
+from mettle.evidence import EvidenceAssessment, EvidenceStatus
 from mettle.request_identity import (
     AuthenticationRequired,
     reset_principal,
@@ -21,7 +22,9 @@ from mettle.request_identity import (
 )
 from mettle.workflow_registry import (
     CreateWorkflowRequest,
+    ReviewEvidenceRequest,
     ReviewWorkflowRequest,
+    SubmitPhotoEvidenceRequest,
     WorkflowNotFound,
     WorkflowRegistry,
 )
@@ -323,3 +326,81 @@ def test_review_schedules_checkpoint_and_stale_event_cannot_advance_twice() -> N
     assert stale_executed is False
     assert stale == advanced
     assert len(client.requests) == 3
+
+
+def test_ambiguous_evidence_pauses_scheduler_until_contractor_resolves_it() -> None:
+    def hold_photo(*, citation, image, assessment_id):
+        return EvidenceAssessment(
+            assessment_id=assessment_id,
+            citation_id=citation.citation_id,
+            sample_id=f"upload_{assessment_id}",
+            image_url="",
+            status=EvidenceStatus.MANUAL_REVIEW,
+            missing_requirements=citation.evidence_requirements,
+            explanation="Contractor review is required.",
+        )
+
+    source = WorkflowRegistry(photo_assessor=hold_photo)
+    created, _ = source.create(payload(), idempotency_key="pause_source_create")
+    review = review_request(created)
+    reviewed = source.review(
+        created.workflow_id,
+        review,
+        idempotency_key="pause_source_review",
+    )
+    held = source.submit_photo_evidence(
+        created.workflow_id,
+        SubmitPhotoEvidenceRequest(citation_id="1"),
+        image=b"normalized-image",
+        idempotency_key="pause_source_photo",
+    )
+    assessment_id = held.evidence[-1].assessment_id
+    resolution = ReviewEvidenceRequest(
+        assessment_id=assessment_id,
+        disposition="accept",
+        decision="Contractor accepts the visible proof.",
+    )
+    resolved = source.review_evidence(
+        created.workflow_id,
+        resolution,
+        idempotency_key="pause_source_resolution",
+    )
+    client = QueueClient(
+        [
+            {"ok": True, "workflow": created.model_dump(mode="json")},
+            {"ok": True, "workflow": reviewed.model_dump(mode="json")},
+            {"ok": True, "workflow": held.model_dump(mode="json")},
+            {"ok": True, "workflow": resolved.model_dump(mode="json")},
+        ]
+    )
+    table = MemoryTable()
+    scheduler = FakeCampaignScheduler()
+    durable = gateway(table, client, campaign_scheduler=scheduler)
+    token = set_principal("cognito-alice")
+    try:
+        cloud_created, _ = durable.create(
+            payload(), idempotency_key="pause_public_create"
+        )
+        cloud_reviewed = durable.review(
+            cloud_created.workflow_id,
+            review,
+            idempotency_key="pause_public_review",
+        )
+        held_cloud = durable.submit_photo_evidence(
+            cloud_created.workflow_id,
+            SubmitPhotoEvidenceRequest(citation_id="1"),
+            image=b"normalized-image",
+            idempotency_key="pause_public_photo",
+        )
+        resolved_cloud = durable.review_evidence(
+            cloud_created.workflow_id,
+            resolution,
+            idempotency_key="pause_public_resolution",
+        )
+    finally:
+        reset_principal(token)
+
+    assert cloud_reviewed.automation.status is AutomationStatus.SCHEDULED
+    assert held_cloud.automation.status is AutomationStatus.AWAITING_DECISION
+    assert resolved_cloud.automation.status is AutomationStatus.SCHEDULED
+    assert resolved_cloud.automation.schedule_version == 2

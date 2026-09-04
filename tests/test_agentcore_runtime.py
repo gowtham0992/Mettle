@@ -46,6 +46,26 @@ def runtime() -> MettleAgentCoreRuntime:
     )
 
 
+def manual_review_runtime() -> MettleAgentCoreRuntime:
+    def hold_photo(*, citation, image, assessment_id):
+        return EvidenceAssessment(
+            assessment_id=assessment_id,
+            citation_id=citation.citation_id,
+            sample_id=f"upload_{assessment_id}",
+            image_url="",
+            status=EvidenceStatus.MANUAL_REVIEW,
+            missing_requirements=citation.evidence_requirements,
+            explanation="Contractor review is required.",
+        )
+
+    return MettleAgentCoreRuntime(
+        workflows=WorkflowRegistry(
+            bedrock_intake=parse_notice,
+            photo_assessor=hold_photo,
+        )
+    )
+
+
 def jpeg_photo() -> bytes:
     output = BytesIO()
     Image.new("RGB", (80, 60), "gray").save(output, format="JPEG")
@@ -161,6 +181,52 @@ def test_agentcore_accepts_bounded_base64_photo_for_vision_assessment() -> None:
 
     assert response["ok"] is True
     assert response["workflow"]["evidence"][-1]["status"] == "accepted"
+
+
+def test_agentcore_routes_ambiguous_photo_to_contractor_resolution() -> None:
+    subject = manual_review_runtime()
+    session_id = "session-manual-12345678901234567890123456789"
+    started = subject.handle(
+        {
+            "operation": "start",
+            "idempotency_key": "agentcore_manual_start_123",
+            "payload": workflow_payload(),
+        },
+        session_id=session_id,
+    )
+    workflow = started["workflow"]
+    approve_review(subject, workflow, session_id, "agentcore_manual_launch_123")
+    assessed = subject.handle(
+        {
+            "operation": "submit_photo_evidence",
+            "idempotency_key": "agentcore_manual_photo_123",
+            "workflow_id": workflow["workflow_id"],
+            "payload": {
+                "citation_id": "1",
+                "image_base64": base64.b64encode(jpeg_photo()).decode("ascii"),
+            },
+        },
+        session_id=session_id,
+    )
+    assessment_id = assessed["workflow"]["evidence"][-1]["assessment_id"]
+    resolved = subject.handle(
+        {
+            "operation": "review_evidence",
+            "idempotency_key": "agentcore_manual_accept_123",
+            "workflow_id": workflow["workflow_id"],
+            "payload": {
+                "assessment_id": assessment_id,
+                "disposition": "accept",
+                "decision": "Contractor accepts this image as sufficient visible proof.",
+            },
+        },
+        session_id=session_id,
+    )
+
+    assert assessed["workflow"]["evidence"][-1]["status"] == "manual_review"
+    assert resolved["ok"] is True
+    assert resolved["workflow"]["evidence"][-1]["status"] == "accepted"
+    assert resolved["workflow"]["evidence"][-1]["automated_status"] == "manual_review"
 
 
 def test_agentcore_runs_deadline_check_inside_the_same_session() -> None:

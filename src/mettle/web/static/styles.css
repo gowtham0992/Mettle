@@ -194,6 +194,7 @@ img { display: block; max-width: 100%; }
 .judgment-card p, .judgment p { color: var(--muted); }
 .judgment-card textarea, .judgment textarea, .judgment input { width: 100%; min-height: 48px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--ink); color: var(--white); resize: vertical; }
 .judgment form { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: center; }.judgment form input { margin: 0; }.judgment form .button { min-height: 48px; }
+.judgment form.judgment__evidence-review { grid-template-columns: minmax(0,1fr) auto auto; }
 .judgment-card label, .judgment label { display: block; color: var(--muted); font-family: var(--mono); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .away-briefing { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--ink-2); }
 .away-briefing summary { display: flex; justify-content: space-between; gap: 20px; padding: 15px 18px; color: var(--muted); }
@@ -648,6 +649,7 @@ img { display: block; max-width: 100%; }
   .workflow-journey li strong { display: block; margin-top: 6px; font-size: 8px; }
   .workflow-journey li small { display: none; }
   .notice-dialog form { min-height: 100dvh; }
+  .judgment form.judgment__evidence-review { grid-template-columns: 1fr; }
   .notice-dialog__header { min-height: 82px; padding: 16px 18px; }
   .notice-dialog__header h2 { font-size: 21px; }
   .notice-dialog__header-actions .theme-toggle { min-width: 44px; width: 44px; padding: 0; }
