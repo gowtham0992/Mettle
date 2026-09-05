@@ -48,6 +48,13 @@ class _StartInvocation(BaseModel):
     payload: CreateWorkflowRequest
 
 
+class _RestoreInvocation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    operation: Literal["restore"]
+    workflow_id: str = Field(min_length=1, max_length=64)
+    checkpoint: dict[str, Any]
+
+
 class _ResumeInvocation(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -161,6 +168,7 @@ class _RenderPacketInvocation(BaseModel):
 
 AgentCoreInvocation = Annotated[
     _StartInvocation
+    | _RestoreInvocation
     | _ResumeInvocation
     | _ReviewInvocation
     | _SubmitEvidenceInvocation
@@ -209,7 +217,14 @@ class MettleAgentCoreRuntime:
             return _error("invalid_request", "AgentCore request validation failed.")
 
         try:
-            if isinstance(invocation, _StartInvocation):
+            if isinstance(invocation, _RestoreInvocation):
+                try:
+                    envelope = self._workflows.restore_checkpoint(invocation.workflow_id, invocation.checkpoint)
+                except (ValidationError, ValueError, TypeError, KeyError):
+                    return _error("invalid_checkpoint", "Stored recovery checkpoint could not be restored.")
+                operation = "restore"
+                replayed = False
+            elif isinstance(invocation, _StartInvocation):
                 envelope, replayed = self._workflows.create(
                     invocation.payload,
                     idempotency_key=invocation.idempotency_key,
@@ -354,4 +369,5 @@ class MettleAgentCoreRuntime:
             "ok": True,
             "replayed": replayed,
             "workflow": envelope.model_dump(mode="json"),
+            "checkpoint": self._workflows.checkpoint(envelope.workflow_id),
         }

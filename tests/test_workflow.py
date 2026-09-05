@@ -57,6 +57,12 @@ def test_strands_workflow_coordinates_grounded_work_then_interrupts() -> None:
     assert snapshot.status is WorkflowStatus.INTERRUPTED
     assert len(snapshot.interrupts) == 1
     assert snapshot.interrupts[0].name == "correction-review"
+    recipients = snapshot.interrupts[0].reason["recipients"]
+    assert recipients == [
+        {"trade": trade.value, "name": person.name, "phone_suffix": person.phone[-4:]}
+        for trade, person in ROSTER.items()
+    ]
+    assert all(person.phone not in str(recipients) for person in ROSTER.values())
     assert messenger.deliveries == ()
     assert [step.node_id for step in snapshot.agent_run] == [
         "intake",

@@ -91,8 +91,7 @@ DynamoDB table, and write contractor-approved packets beneath one private S3
 bucket. It cannot create or update runtimes, list either bucket, scan the table,
 or call IAM. DynamoDB keys contain only a hash of the verified Cognito subject;
 each workflow and idempotency attempt is therefore caller-scoped without
-persisting an email address or access token. Records expire with the AgentCore
-session after eight hours.
+persisting an email address or access token. Records become eligible for expiry 30 days after their last update. New runs keep versioned JSON graph/evidence checkpoints in the private bucket; these never cross the public HTTP boundary.
 
 After a successful authenticated mutation, deterministic campaign policy
 selects the next logical checkpoint. The gateway creates a versioned, one-time
@@ -100,13 +99,11 @@ EventBridge schedule targeting a private Lambda worker. Its payload contains no
 phone number, notice text, property address, or AgentCore session identifier.
 It carries only an owner hash, workflow identifier, logical date, schedule
 name, and version. The worker reloads the caller-scoped mapping from DynamoDB
-and rejects stale versions before invoking the same AgentCore session.
+and rejects stale versions before restoring the committed checkpoint in a fresh AgentCore session. Legacy runs without checkpoints still use their original session.
 Schedules delete after completion, retry twice, and send exhausted events to
-an encrypted dead-letter queue. The 90-second demo cadence proves autonomous
-wake-up inside the eight-hour runtime-session boundary; durable multi-day
-campaigns require a future persistence layer.
+an encrypted dead-letter queue. An uncertain operation leaves a durable hold marker to prevent duplicate outreach, requiring operator reconciliation. Cold runtime restoration has passed cloud acceptance; authenticated gateway and overnight scheduling acceptance remain pending.
 
-Generated PDFs are integrity-checked, stored encrypted for at most one day,
+Generated PDFs are integrity-checked, stored encrypted with 31-day lifecycle expiry,
 and returned through a 60-second presigned download. Internet photo bodies are
 capped at 3.5 MB before the existing decode, pixel-bound, metadata-strip, and
 JPEG re-encode boundary. Tight route-level API Gateway throttling and WAF rate

@@ -7,12 +7,14 @@ bucket names, object-version IDs, session IDs, and workflow IDs out of source.
 ## Current acceptance status
 
 - Runtime: `MettleRecovery` (resource identifier recorded privately)
-- Version and status: `15`, `READY`
+- Version and status: `16`, `READY`
 - Artifact: immutable, private, versioned S3 object
 - Artifact SHA-256:
-  `6ace38ebc1bd786c43d5f84cd3ea2d43ecf413ad07867fec650db1b00b6ed92d`
+  `4d8a1159c1147cf0e6c3e59a7a07dcf83e530885878f219c525f931480298fd8`
 - Runtime lifecycle: 15-minute idle timeout, 8-hour maximum session
 - Log retention: 14 days
+
+Version 16 adds private JSON recovery checkpoints. Cloud acceptance started a synthetic recovery with no deliveries, restored its contractor-review interrupt in a fresh runtime session, and completed review with recorded-only outreach. Both web and scheduler code hashes were verified after deployment. The public health endpoint passed and the unauthenticated contractor endpoint returned 401. Full authenticated gateway acceptance and overnight scheduling remain pending; see `recovery-checkpoints.md`.
 
 The version 15 release added the evidence-review operation used when a vision
 assessment requires professional judgment. A bounded deployment check invoked
@@ -134,10 +136,7 @@ uv run python scripts/agentcore_smoke.py \
 Add `--vision` to exercise live Nova Lite and `--chase` to exercise the T-3
 follow-up, replay safety, and T-2 deadline interrupt.
 
-AgentCore sessions are ephemeral. This slice uses a 15-minute idle timeout and
-an 8-hour maximum lifetime; start and resume must remain in the same session.
-Durable campaign recovery across runtime-session expiry is intentionally out of
-scope and the UI directs the contractor to start a fresh recovery.
+AgentCore sessions remain ephemeral (15-minute idle timeout, eight-hour maximum lifetime). New checkpoint-bearing recoveries restore in a fresh runtime per operation. Legacy runs without checkpoints remain session-bound. Do not downgrade checkpoint-bearing runs to a runtime without restore support.
 
 ## Rollback
 

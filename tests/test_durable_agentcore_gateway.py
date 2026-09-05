@@ -94,16 +94,29 @@ class MemoryTable:
             return {}
         if UpdateExpression.startswith("SET lock_token"):
             now = ExpressionAttributeValues[":now"]
+            if item.get("checkpoint_pending"):
+                raise conditional_failure()
             if item.get("lock_token") is not None and item.get("lock_until", 0) >= now:
                 raise conditional_failure()
             item["lock_token"] = ExpressionAttributeValues[":token"]
             item["lock_until"] = ExpressionAttributeValues[":until"]
+            return {}
+        if UpdateExpression == "SET checkpoint_pending = :pending":
+            assert item.get("lock_token") == ExpressionAttributeValues[":token"]
+            item["checkpoint_pending"] = ExpressionAttributeValues[":pending"]
+            return {}
+        if UpdateExpression == "REMOVE checkpoint_pending":
+            assert item.get("lock_token") == ExpressionAttributeValues[":token"]
+            item.pop("checkpoint_pending", None)
             return {}
         if UpdateExpression.startswith("SET envelope"):
             if item.get("lock_token") != ExpressionAttributeValues[":token"]:
                 raise conditional_failure()
             item["envelope"] = ExpressionAttributeValues[":envelope"]
             item["expires_at"] = ExpressionAttributeValues[":expires_at"]
+            if ":checkpoint_key" in ExpressionAttributeValues:
+                item["checkpoint_key"] = ExpressionAttributeValues[":checkpoint_key"]
+            item.pop("checkpoint_pending", None)
             item.pop("lock_token", None)
             item.pop("lock_until", None)
             item.pop("packet_key", None)

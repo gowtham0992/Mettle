@@ -139,7 +139,8 @@ def test_storage_is_private_encrypted_and_ephemeral_packets_expire() -> None:
         assert algorithm["ServerSideEncryptionByDefault"]["SSEAlgorithm"] == "AES256"
 
     packet_rule = RESOURCES["PacketBucket"]["Properties"]["LifecycleConfiguration"]["Rules"][0]
-    assert packet_rule["ExpirationInDays"] == 1
+    # Must outlive the 30-day workflow record; one day destroys cold recovery.
+    assert packet_rule["ExpirationInDays"] == 31
 
 
 def test_cost_and_abuse_boundaries_are_explicit() -> None:

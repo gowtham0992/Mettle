@@ -73,9 +73,9 @@ Resources:
           - ObjectOwnership: BucketOwnerEnforced
       LifecycleConfiguration:
         Rules:
-          - Id: DeleteEphemeralPackets
+          - Id: DeleteRecoveryArtifacts
             Status: Enabled
-            ExpirationInDays: 1
+            ExpirationInDays: 31
       Tags:
         - Key: Project
           Value: Mettle
@@ -315,6 +315,12 @@ Resources:
                   - dynamodb:PutItem
                   - dynamodb:UpdateItem
                 Resource: !GetAtt WorkflowTable.Arn
+              - Sid: ReadWritePrivateRecoveryCheckpoints
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub '${PacketBucket.Arn}/*'
               - Sid: InvokeOnlyMettleRuntime
                 Effect: Allow
                 Action: bedrock-agentcore:InvokeAgentRuntime

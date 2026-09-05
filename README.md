@@ -47,7 +47,7 @@ The **Agent run** panel makes the orchestration inspectable: judges can see spec
 
 The browser playback is clearly labeled as a guided demonstration. The repository also includes the working Strands workflow, opt-in Bedrock execution, and deployed AgentCore boundary used by the live cloud path.
 
-The unauthenticated Strands route keeps workflow state in one warm Lambda instance, so shared `?workflow=` links are demonstration conveniences rather than durable records. The deployed authenticated AgentCore path owns session mapping in DynamoDB and creates one-time EventBridge schedules with stale-event rejection, retries, and a dead-letter queue. The 90-second judge run is deliberately accelerated and remains bounded by AgentCore's eight-hour session lifetime; multi-day production campaign persistence is future work.
+The unauthenticated Strands route keeps workflow state in one warm Lambda instance, so shared `?workflow=` links are demonstration conveniences rather than durable records. New authenticated recoveries save private, versioned checkpoints and restore a fresh AgentCore runtime for each operation. DynamoDB owns caller-scoped records and EventBridge schedules use stale-event rejection and a dead-letter queue. Cold recovery is tested locally through approved PDF generation and in the deployed runtime through contractor review; authenticated browser-to-storage acceptance and overnight cloud scheduling remain pending. Legacy runs without checkpoints are still session-bound. See [checkpoint guarantees and limits](docs/recovery-checkpoints.md).
 
 ## Architecture
 
@@ -167,8 +167,8 @@ npx agentcore validate --json
 - **Bounded scheduling:** each checkpoint is a one-time EventBridge schedule with a versioned payload, two retries, a dead-letter queue, and automatic deletion; stale events cannot advance the workflow.
 - **No open messaging channel:** SMS is outbound-only and disabled by default. Enabling Amazon SNS requires a server-side SHA-256 allowlist for one demo phone; all other recipients remain recorded simulations.
 - **Safe uploads:** image bodies are capped, decoded, stripped of metadata, dimension-bounded, and re-encoded before model use.
-- **Short-lived artifacts:** approved PDFs are integrity-checked, encrypted in private S3, and delivered through a 60-second presigned URL; stored packets expire after one day.
-- **Explicit limitations:** AgentCore session state is not presented as durable memory. The accelerated scheduler demonstrates autonomous wake-ups inside one live session, not durable multi-day production operation.
+- **Private artifacts:** approved PDFs are integrity-checked, encrypted in private S3, and delivered through a 60-second presigned URL. Recovery artifacts become eligible for deletion after 31 days; workflow records after 30 days from their last update.
+- **Explicit limitations:** uncertain operation outcomes hold recovery for operator reconciliation rather than risking duplicate outreach. Legacy runs are session-bound; full cloud gateway and overnight acceptance for the new checkpoint path remain pending.
 
 For the full permission model and teardown procedure, see [`docs/aws-access.md`](docs/aws-access.md).
 

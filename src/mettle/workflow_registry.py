@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from collections.abc import Callable
 from datetime import date
 from enum import StrEnum
@@ -25,6 +26,7 @@ from mettle.packet import PacketRecord, PacketStatus, render_packet_pdf
 from mettle.workflow import (
     CorrectionReview,
     RecoveryWorkflowSession,
+    RecoveryCheckpoint,
     ReviewedCitation,
     WorkflowConfigurationError,
     WorkflowSnapshot,
@@ -172,6 +174,7 @@ class WorkflowEnvelope(BaseModel):
     evidence: list[EvidenceAssessment] = Field(default_factory=list)
     packet: PacketRecord | None = None
     automation: CampaignAutomation | None = None
+    recovery_hold: bool = False
 
 
 class _WorkflowEntry:
@@ -226,6 +229,41 @@ class WorkflowRegistry:
     @property
     def bedrock_enabled(self) -> bool:
         return self._bedrock_intake is not None
+
+    def checkpoint(self, workflow_id: str) -> dict:
+        with self._lock:
+            entry = self._entries.get(workflow_id)
+            if entry is None:
+                raise WorkflowNotFound("workflow does not exist")
+        with entry.lock:
+            return {
+                "version": 1,
+                "envelope": self._envelope(workflow_id, entry).model_dump(mode="json"),
+                "session": entry.session.checkpoint().model_dump(mode="json"),
+                "photos": {key: base64.b64encode(value).decode("ascii") for key, value in entry.uploaded_photos.items()},
+            }
+
+    def restore_checkpoint(self, workflow_id: str, checkpoint: dict) -> WorkflowEnvelope:
+        """Restore trusted private storage, never a user-supplied HTTP body."""
+        if checkpoint.get("version") != 1 or set(checkpoint) != {"version", "envelope", "session", "photos"}:
+            raise WorkflowConfigurationError("unsupported recovery checkpoint")
+        envelope = WorkflowEnvelope.model_validate(checkpoint["envelope"])
+        session_checkpoint = RecoveryCheckpoint.model_validate(checkpoint["session"])
+        if envelope.workflow_id != workflow_id or envelope.snapshot != session_checkpoint.snapshot:
+            raise WorkflowConfigurationError("checkpoint identity or snapshot mismatch")
+        photos = {key: base64.b64decode(value, validate=True) for key, value in checkpoint["photos"].items()}
+        session = RecoveryWorkflowSession.restore(session_checkpoint, messenger=self._messenger_factory())
+        entry = _WorkflowEntry(session, envelope.snapshot, envelope.intake_provider)
+        entry.evidence = envelope.evidence
+        entry.packet = envelope.packet
+        entry.uploaded_photos = photos
+        with self._lock:
+            if workflow_id in self._entries:
+                raise WorkflowConflict("cannot overwrite an active recovery")
+            if len(self._entries) >= self._capacity:
+                raise WorkflowCapacityReached("local workflow capacity has been reached")
+            self._entries[workflow_id] = entry
+        return envelope
 
     @property
     def vision_enabled(self) -> bool:

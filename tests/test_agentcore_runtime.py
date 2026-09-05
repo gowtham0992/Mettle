@@ -1,4 +1,6 @@
 import base64
+import json
+import pytest
 from io import BytesIO
 from pathlib import Path
 
@@ -298,8 +300,24 @@ def test_agentcore_boundary_returns_quiet_error_for_unknown_workflow() -> None:
     }
 
 
-def test_agentcore_session_completes_evidence_approval_and_pdf_packet() -> None:
-    subject = runtime()
+class ColdRuntime:
+    """Discard all in-process state between operations, retaining only JSON."""
+    checkpoint = None
+
+    def handle(self, payload, *, session_id):
+        subject = runtime()
+        if self.checkpoint is not None:
+            restored = subject.handle({"operation": "restore", "workflow_id": self.checkpoint["envelope"]["workflow_id"], "checkpoint": self.checkpoint}, session_id=session_id)
+            assert restored["ok"] is True
+        result = subject.handle(payload, session_id=session_id)
+        if "checkpoint" in result:
+            self.checkpoint = json.loads(json.dumps(result["checkpoint"]))
+        return result
+
+
+@pytest.mark.parametrize("cold", [False, True])
+def test_agentcore_session_completes_evidence_approval_and_pdf_packet(cold) -> None:
+    subject = ColdRuntime() if cold else runtime()
     session_id = "session-complete-123456789012345678901234567890"
     started = subject.handle(
         {
@@ -324,10 +342,10 @@ def test_agentcore_session_completes_evidence_approval_and_pdf_packet() -> None:
     ):
         latest = subject.handle(
             {
-                "operation": "submit_evidence",
+                "operation": "submit_photo_evidence" if cold else "submit_evidence",
                 "idempotency_key": f"agentcore_full_evidence_{index}",
                 "workflow_id": workflow_id,
-                "payload": {"citation_id": citation_id, "sample_id": sample_id},
+                "payload": {"citation_id": citation_id, "image_base64": base64.b64encode(jpeg_photo()).decode("ascii")} if cold else {"citation_id": citation_id, "sample_id": sample_id},
             },
             session_id=session_id,
         )

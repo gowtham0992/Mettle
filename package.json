@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "test:ui": "node --test tests/evidence-flow.test.js",
+    "test:ui": "node --test tests/*.test.js",
     "verify": "bash scripts/verify.sh"
   },
   "devDependencies": {

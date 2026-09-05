@@ -678,7 +678,7 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert '"Content-Type": "application/json"' in script.text
     assert "base64Standard(await file.arrayBuffer())" in script.text
     assert 'error.code === "workflow_not_found"' in script.text
-    assert '"Recovery session expired"' in script.text
+    assert '"Recovery unavailable"' in script.text
     assert 'elements.retry.textContent = "Start a new recovery"' in script.text
     assert "!hasApprovedEvidenceBoundary(data, citationId)" in script.text
     assert 'citation.stage === "ready"' in script.text

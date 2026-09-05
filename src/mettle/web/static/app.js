@@ -196,6 +196,7 @@ const stepLabels = [
 
 let campaign = null;
 let activeWorkflowId = null;
+let noticeImportVersion = 0;
 let activeWorkflowTarget = "local";
 let toastTimer = null;
 let bedrockEnabled = false;
@@ -729,15 +730,17 @@ function workflowCampaign(envelope, executionTarget = "local") {
   );
   return {
     source_mode: "workflow",
+    recovery_hold: envelope.recovery_hold === true,
     execution_target: executionTarget,
     intake_provider: envelope.intake_provider || "local",
     workflow_status: snapshot.status,
-    automation_status: automation?.status || null,
-    next_check_at: automation?.next_check_at || null,
+    automation_status: envelope.recovery_hold ? "held" : automation?.status || null,
+    next_check_at: envelope.recovery_hold ? null : automation?.next_check_at || null,
     accelerated_demo_clock: automation?.accelerated_demo_clock === true,
     correction_review_required: correctionReviewRequired,
     correction_review_interrupt: correctionReviewRequired ? pendingInterrupt.interrupt_id : null,
     review_citations: correctionReviewRequired ? pendingInterrupt.reason.citations : [],
+    review_recipients: correctionReviewRequired ? pendingInterrupt.reason.recipients || [] : [],
     notice_id: notice.notice_id,
     property_label: notice.property_label,
     as_of: plan.as_of,
@@ -822,8 +825,8 @@ function showError(error) {
   elements.loading.hidden = true;
   elements.error.hidden = false;
   if (error.code === "workflow_not_found" && activeWorkflowTarget === "agentcore") {
-    elements.errorTitle.textContent = "Recovery session expired";
-    elements.errorMessage.textContent = "AgentCore contractor runs are intentionally bounded to eight hours. Start a fresh recovery to continue; the guided sample remains available without AWS spend.";
+    elements.errorTitle.textContent = "Recovery unavailable";
+    elements.errorMessage.textContent = "This recovery could not be loaded. Older runs may not have a restorable checkpoint. Keep your report and contact the operator before starting again, so outreach is not duplicated.";
     elements.retry.textContent = "Start a new recovery";
     retryHandler = startFreshRecoveryFromError;
     return;
@@ -1011,22 +1014,27 @@ function renderCorrectionReview(data) {
 
     const recipient = node("div", "correction-review__recipient");
     const updateRecipient = () => {
-      const match = buildRoster().find((contact) => contact.trade === tradeSelect.value);
+      const match = data.review_recipients?.find((contact) => contact.trade === tradeSelect.value);
       recipient.replaceChildren(
         node("span", "", "MESSAGE GOES TO"),
-        node("strong", "", `${match?.name || "Primary contractor"} · ${maskedPhone(match?.phone)}`),
+        node("strong", "", match ? `${match.name} · ••• ••• ${match.phone_suffix}` : "Saved recipient unavailable — do not assume who will be contacted."),
       );
     };
     tradeSelect.addEventListener("change", updateRecipient);
     updateRecipient();
 
-    const routeLabel = node("div", "correction-review__route");
-    routeLabel.append(node("span", "", "PROOF METHOD"), node("strong", "", "Job-site photo"), node("small", "", "Mettle checks only what is visibly shown; it does not certify code compliance."));
-    const routeSelect = node("input");
-    routeSelect.type = "hidden";
+    const routeLabel = node("label", "correction-review__route", "PROOF METHOD");
+    const routeSelect = node("select");
     routeSelect.dataset.reviewRoute = "";
-    routeSelect.value = "photo_evidence";
+    routeSelect.setAttribute("aria-label", `Proof method for citation ${citation.citation_id}`);
+    for (const [value, label] of Object.entries({photo_evidence: "Job-site photo", document_evidence: "Document evidence", physical_reinspection: "Physical reinspection"})) {
+      const option = node("option", "", label);
+      option.value = value;
+      routeSelect.append(option);
+    }
+    routeSelect.value = citation.closure_route || "photo_evidence";
     routeLabel.append(routeSelect);
+    routeLabel.append(node("small", "", "Keep the notice’s required method. A photo does not replace documents, an inspector visit, or code certification."));
 
     const proofLabel = node("label", "", "WHAT MUST COME BACK · ONE REQUIREMENT PER LINE");
     const proof = node("textarea");
@@ -1093,6 +1101,7 @@ function openRecoverySetup({ returnToWelcome = false } = {}) {
 }
 
 function resetRecoverySetup() {
+  noticeImportVersion += 1;
   elements.noticeForm.reset();
   elements.workflowAsOf.value = currentLocalDate();
   elements.noticeText.value = "";
@@ -1137,6 +1146,16 @@ function configureNextAction(data) {
   elements.nextAction.classList.toggle("next-action--sample", !isWorkflow);
   elements.nextActionEyebrow.textContent = pending.length ? "ACTION REQUIRED" : "NEXT STEP";
   elements.nextActionMeta.textContent = isWorkflow ? "ONE ACTION · CONTRACTOR CONTROLLED" : "SYNTHETIC DATA · 90 SECONDS";
+
+  if (data.recovery_hold) {
+    elements.nextAction.hidden = false;
+    elements.nextActionTitle.textContent = "Recovery held to prevent duplicate messages";
+    elements.nextActionCopy.textContent = "The last operation’s outcome could not be confirmed. Your last saved record remains available. Ask the operator to reconcile it before retrying or starting a replacement recovery.";
+    elements.nextActionButton.textContent = "View saved activity";
+    elements.nextActionMeta.textContent = "OPERATOR REVIEW REQUIRED · NO AUTOMATIC RETRY";
+    nextActionHandler = () => setWorkspaceView("activity", { updateUrl: true });
+    return;
+  }
 
   if (isWorkflow && data.correction_review_required) {
     elements.nextActionTitle.textContent = "Review the extracted corrections";
@@ -1269,7 +1288,7 @@ function renderCorrectionSummary(data) {
   const ready = data.citations.filter((citation) => citation.stage === "ready").length;
   const chasing = data.citations.filter((citation) => ["awaiting_evidence", "evidence_rejected"].includes(citation.stage)).length;
   const needsYou = data.judgments.filter((judgment) => judgment.status === "pending" && judgment.kind !== "final_packet_approval").length;
-  const preOutreach = data.metrics.messages_handled === 0 && pendingJudgment(data, "route-review");
+  const preOutreach = data.correction_review_required || (data.metrics.messages_handled === 0 && pendingJudgment(data, "route-review"));
   elements.correctionSummary.replaceChildren(
     node("span", "", `${total} corrections`),
     node("strong", "summary-ready", `${ready} proof accepted`),
@@ -1306,7 +1325,7 @@ function renderCitation(citation, data) {
   summary.append(operations);
 
   const proof = node("div", "citation__proof");
-  const imagePath = citationEvidenceImages[citation.stage]?.[citation.citation_id];
+  const imagePath = data.source_mode === "workflow" ? null : citationEvidenceImages[citation.stage]?.[citation.citation_id];
   if (imagePath) {
     const image = document.createElement("img");
     image.src = imagePath;
@@ -3014,6 +3033,12 @@ elements.navExitSample?.addEventListener("click", () => {
 });
 
 window.addEventListener("popstate", () => {
+  const params = new URLSearchParams(window.location.search);
+  if ((params.get("workflow") || null) !== activeWorkflowId
+      || (activeWorkflowId && (params.get("runtime") || "local") !== activeWorkflowTarget)) {
+    window.location.reload();
+    return;
+  }
   const tourFromUrl = new URLSearchParams(window.location.search).get("tour") === "1";
   setJudgeTourActive(tourFromUrl, { focus: false });
   if (!tourFromUrl) setWorkspaceView(workspaceViewFromUrl());
@@ -3111,11 +3136,13 @@ elements.workflowAsOf.addEventListener("input", () => {
 });
 
 elements.noticeText.addEventListener("input", () => {
+  noticeImportVersion += 1;
   elements.workflowDateError.hidden = true;
   elements.noticeText.removeAttribute("aria-invalid");
 });
 
 elements.noticeFile.addEventListener("change", async () => {
+  const importVersion = ++noticeImportVersion;
   const file = elements.noticeFile.files?.[0];
   if (!file) {
     elements.noticeFileStatus.textContent = "No file selected";
@@ -3137,6 +3164,11 @@ elements.noticeFile.addEventListener("change", async () => {
         file_base64: base64Standard(await file.arrayBuffer()),
       }),
     });
+    if (importVersion !== noticeImportVersion || !elements.noticeDialog.open || setupStep !== 1) {
+      elements.noticeFileStatus.textContent = "Import discarded because you edited or left the report. Select the file again if needed.";
+      return;
+    }
+    workflowCreateKey = null;
     elements.noticeText.value = payload.text;
     elements.noticeFileStatus.textContent = `${file.name} · ${payload.text.split(/\r?\n/).filter(Boolean).length} lines ready`;
     elements.noticeText.focus();

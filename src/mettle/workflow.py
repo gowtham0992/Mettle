@@ -4,7 +4,8 @@ from collections.abc import Callable, Mapping
 from datetime import date
 from enum import StrEnum
 from hashlib import blake2s
-from typing import Any
+from importlib.metadata import version
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from strands.agent.agent_result import AgentResult
@@ -230,6 +231,11 @@ class CorrectionReviewHook(HookProvider):
             "correction-review",
             reason={
                 "notice_id": notice.notice_id,
+                "recipients": [
+                    {"trade": trade.value, "name": recipient.name,
+                     "phone_suffix": recipient.phone[-4:]}
+                    for trade, recipient in event.invocation_state.get("roster", {}).items()
+                ],
                 "citations": [
                     citation.model_dump(mode="json") for citation in notice.citations
                 ],
@@ -372,6 +378,22 @@ class AgentRunTraceHook(HookProvider):
                 return
 
 
+class RecoveryCheckpoint(BaseModel):
+    """Private, versioned JSON checkpoint; never accepted from the browser."""
+
+    model_config = ConfigDict(extra="forbid")
+    version: Literal[1] = 1
+    strands_version: str = Field(default_factory=lambda: version("strands-agents"))
+    snapshot: WorkflowSnapshot
+    roster: dict[Trade, Recipient]
+    graph: dict[str, Any]
+    result: dict[str, Any]
+    active_graph: Literal["recovery", "chase"]
+    correction_review: CorrectionReview | None = None
+    accepted_citation_ids: set[str] = Field(default_factory=set)
+    evidence_feedback: dict[str, str] = Field(default_factory=dict)
+
+
 class RecoveryWorkflowSession:
     """One stateful Strands recovery run with explicit start/resume boundaries."""
 
@@ -413,6 +435,50 @@ class RecoveryWorkflowSession:
             invocation_state=self._state,
         )
         return self._snapshot()
+
+    def checkpoint(self) -> RecoveryCheckpoint:
+        if self._last_result is None:
+            raise WorkflowStateError("workflow has not started")
+        return RecoveryCheckpoint(
+            snapshot=self._snapshot(),
+            roster=self._state["roster"],
+            graph=self._active_graph.serialize_state(),
+            result=self._last_result.to_dict(),
+            active_graph="chase" if self._active_graph is self._chase_graph else "recovery",
+            correction_review=self._state.get("correction_review"),
+            accepted_citation_ids=self._state.get("accepted_citation_ids", set()),
+            evidence_feedback=self._state.get("evidence_feedback", {}),
+        )
+
+    @classmethod
+    def restore(cls, checkpoint: RecoveryCheckpoint, *, messenger: Messenger) -> "RecoveryWorkflowSession":
+        if checkpoint.strands_version != version("strands-agents"):
+            raise WorkflowStateError("checkpoint requires its original Strands SDK version")
+        snapshot = checkpoint.snapshot
+        if snapshot.notice is None or snapshot.plan is None:
+            raise WorkflowStateError("checkpoint has no recovery plan")
+        session = cls(
+            notice_text="Restored recovery; intake must not be repeated.",
+            as_of=snapshot.plan.as_of,
+            roster=checkpoint.roster,
+            messenger=messenger,
+        )
+        session._state.update({
+            "notice": snapshot.notice,
+            "plan": snapshot.plan,
+            "deliveries": list(snapshot.deliveries),
+            "agent_run": [step.model_dump(mode="json") for step in snapshot.agent_run],
+            "contractor_decision": snapshot.contractor_decision,
+            "deadline_decision": snapshot.deadline_decision,
+            "correction_review": checkpoint.correction_review,
+            "accepted_citation_ids": set(checkpoint.accepted_citation_ids),
+            "evidence_feedback": dict(checkpoint.evidence_feedback),
+        })
+        session._active_graph = session._chase_graph if checkpoint.active_graph == "chase" else session._graph
+        session._active_graph.deserialize_state(checkpoint.graph)
+        session._last_result = MultiAgentResult.from_dict(checkpoint.result)
+        session._started = True
+        return session
 
     def run_next_check(
         self,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
+import json
 import time
 from hashlib import sha256
 from typing import Any
@@ -43,7 +44,7 @@ from mettle.workflow_registry import (
 )
 
 
-SESSION_TTL_SECONDS = 8 * 60 * 60
+SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 LOCK_SECONDS = 45
 MAX_PACKET_BYTES = 25_000_000
 LOGGER = logging.getLogger(__name__)
@@ -137,6 +138,7 @@ class DurableAgentCoreWorkflowGateway:
             },
         )
         envelope = self._parse_result(result)
+        checkpoint_key = self._save_checkpoint(owner, envelope, result)
         workflow_key = self._workflow_key(owner, envelope.workflow_id)
         try:
             self._table.put_item(
@@ -146,6 +148,7 @@ class DurableAgentCoreWorkflowGateway:
                     "session_id": session_id,
                     "workflow_id": envelope.workflow_id,
                     "envelope": envelope.model_dump(mode="json"),
+                    **({"checkpoint_key": checkpoint_key} if checkpoint_key else {}),
                     "expires_at": self._expires_at(),
                 },
                 ConditionExpression=(
@@ -177,7 +180,8 @@ class DurableAgentCoreWorkflowGateway:
 
     def get(self, workflow_id: str) -> WorkflowEnvelope:
         owner = self._owner()
-        return self._envelope(self._workflow(owner, workflow_id).get("envelope"))
+        workflow = self._workflow(owner, workflow_id)
+        return self._envelope(workflow.get("envelope")).model_copy(update={"recovery_hold": bool(workflow.get("checkpoint_pending"))})
 
     def run_scheduled_check(
         self,
@@ -264,6 +268,8 @@ class DurableAgentCoreWorkflowGateway:
         idempotency_key: str,
     ) -> WorkflowEnvelope:
         workflow = self._workflow(owner, workflow_id)
+        if workflow.get("checkpoint_pending"):
+            raise WorkflowConflict("The previous operation has an uncertain outcome. Recovery is held to prevent duplicate outreach; operator review is required.")
         fingerprint = _fingerprint(payload)
         attempt_key = self._attempt_key(
             owner, f"w#{workflow_id}#m#{operation}", idempotency_key
@@ -299,6 +305,7 @@ class DurableAgentCoreWorkflowGateway:
                 UpdateExpression="SET lock_token = :token, lock_until = :until",
                 ConditionExpression=(
                     "attribute_exists(pk) AND "
+                    "attribute_not_exists(checkpoint_pending) AND "
                     "(attribute_not_exists(lock_token) OR lock_until < :now)"
                 ),
                 ExpressionAttributeValues={
@@ -319,8 +326,18 @@ class DurableAgentCoreWorkflowGateway:
             # acquisition. Re-read under our lock so schedule versions and the
             # AgentCore session always come from the latest committed envelope.
             workflow = self._get(workflow_key)
+            session_id = workflow["session_id"]
+            checkpointed = bool(workflow.get("checkpoint_key"))
+            if checkpointed:
+                session_id = self._restore_checkpoint(workflow)
+                self._table.update_item(
+                    Key={"pk": workflow_key},
+                    UpdateExpression="SET checkpoint_pending = :pending",
+                    ConditionExpression="lock_token = :token",
+                    ExpressionAttributeValues={":pending": idempotency_key, ":token": lock_token},
+                )
             result = self._invoke(
-                session_id=workflow["session_id"],
+                session_id=session_id,
                 payload={
                     "operation": operation,
                     "idempotency_key": idempotency_key,
@@ -328,11 +345,22 @@ class DurableAgentCoreWorkflowGateway:
                     "payload": payload.model_dump(mode="json"),
                 },
             )
+            if checkpointed and result.get("error", {}).get("code") in {
+                "invalid_request", "invalid_evidence_submission", "packet_not_ready", "packet_not_approved", "workflow_conflict",
+            }:
+                self._table.update_item(
+                    Key={"pk": workflow_key}, UpdateExpression="REMOVE checkpoint_pending",
+                    ConditionExpression="lock_token = :token",
+                    ExpressionAttributeValues={":token": lock_token},
+                )
             envelope = self._parse_result(result)
             if envelope.workflow_id != workflow_id:
                 raise AgentCoreGatewayError(
                     "AgentCore returned a different workflow identifier"
                 )
+            checkpoint_key = self._save_checkpoint(owner, envelope, result)
+            if checkpointed and not checkpoint_key:
+                raise AgentCoreGatewayError("Runtime did not return a recovery checkpoint")
             previous_envelope = self._envelope(workflow.get("envelope"))
             envelope = self._reconcile_automation(
                 owner=owner,
@@ -344,13 +372,15 @@ class DurableAgentCoreWorkflowGateway:
                 Key={"pk": workflow_key},
                 UpdateExpression=(
                     "SET envelope = :envelope, expires_at = :expires_at "
-                    "REMOVE lock_token, lock_until, packet_key"
+                    + (", checkpoint_key = :checkpoint_key " if checkpoint_key else "")
+                    + "REMOVE lock_token, lock_until, packet_key, checkpoint_pending"
                 ),
                 ConditionExpression="lock_token = :token",
                 ExpressionAttributeValues={
                     ":envelope": envelope.model_dump(mode="json"),
                     ":expires_at": self._expires_at(),
                     ":token": lock_token,
+                    **({":checkpoint_key": checkpoint_key} if checkpoint_key else {}),
                 },
             )
             self._table.update_item(
@@ -474,7 +504,7 @@ class DurableAgentCoreWorkflowGateway:
         key = workflow.get("packet_key")
         if not isinstance(key, str):
             result = self._invoke(
-                session_id=workflow["session_id"],
+                session_id=self._restore_checkpoint(workflow) if workflow.get("checkpoint_key") else workflow["session_id"],
                 payload={"operation": "render_packet", "workflow_id": workflow_id},
             )
             if result.get("ok") is not True or result.get("content_type") != "application/pdf":
@@ -516,6 +546,33 @@ class DurableAgentCoreWorkflowGateway:
             },
             ExpiresIn=60,
         )
+
+    def _save_checkpoint(self, owner: str, envelope: WorkflowEnvelope, result: dict) -> str | None:
+        checkpoint = result.get("checkpoint")
+        if checkpoint is None:
+            return None  # Compatibility with previously deployed runtimes.
+        if not isinstance(checkpoint, dict) or checkpoint.get("envelope") != envelope.model_dump(mode="json"):
+            raise AgentCoreGatewayError("Runtime checkpoint does not match the recovery")
+        raw = json.dumps(checkpoint, separators=(",", ":")).encode("utf-8")
+        if len(raw) > MAX_PACKET_BYTES:
+            raise AgentCoreGatewayError("Recovery checkpoint is too large")
+        key = f"{owner}/{envelope.workflow_id}/checkpoints/{sha256(raw).hexdigest()}.json"
+        self._packet_bucket.put_object(Key=key, Body=raw, ContentType="application/json", ServerSideEncryption="AES256", CacheControl="no-store")
+        return key
+
+    def _restore_checkpoint(self, workflow: dict) -> str:
+        key = workflow["checkpoint_key"]
+        raw = self._packet_bucket.Object(key).get()["Body"].read(MAX_PACKET_BYTES + 1)
+        if len(raw) > MAX_PACKET_BYTES or key.rsplit("/", 1)[-1] != f"{sha256(raw).hexdigest()}.json":
+            raise AgentCoreGatewayError("Stored recovery checkpoint failed integrity validation")
+        checkpoint = json.loads(raw)
+        if checkpoint.get("envelope", {}).get("workflow_id") != workflow["workflow_id"]:
+            raise AgentCoreGatewayError("Stored recovery checkpoint belongs to a different workflow")
+        session_id = f"mettle-{uuid4().hex}"
+        self._parse_result(self._invoke(session_id=session_id, payload={
+            "operation": "restore", "workflow_id": workflow["workflow_id"], "checkpoint": checkpoint,
+        }))
+        return session_id
 
     def _workflow(self, owner: str, workflow_id: str) -> dict[str, Any]:
         item = self._get(self._workflow_key(owner, workflow_id), required=False)
