@@ -920,6 +920,13 @@ def create_app(
             idempotency_key=idempotency_key,
         )
 
+    @app.get("/api/agentcore/workflows/{workflow_id}/evidence/{assessment_id}/photo")
+    def read_agentcore_photo(workflow_id: str, assessment_id: str, request: Request) -> Response:
+        require_principal()
+        image = require_agentcore(request).read_evidence_photo(workflow_id, assessment_id)
+        return JSONResponse({"image_base64": base64.b64encode(image).decode("ascii")},
+                            headers={"Cache-Control": "no-store"})
+
     @app.get("/api/agentcore/workflows/{workflow_id}/packet.pdf")
     def download_agentcore_packet(workflow_id: str, request: Request) -> Response:
         pdf = require_agentcore(request).render_packet(workflow_id)
@@ -1069,6 +1076,12 @@ def create_app(
             payload,
             idempotency_key=idempotency_key,
         )
+
+    @app.get("/api/workflows/{workflow_id}/evidence/{assessment_id}/photo")
+    def read_local_photo(workflow_id: str, assessment_id: str, request: Request) -> Response:
+        image = request.app.state.workflows.read_evidence_photo(workflow_id, assessment_id)
+        return JSONResponse({"image_base64": base64.b64encode(image).decode("ascii")},
+                            headers={"Cache-Control": "no-store"})
 
     @app.get("/api/workflows/{workflow_id}/packet.pdf")
     def download_packet(workflow_id: str, request: Request) -> Response:

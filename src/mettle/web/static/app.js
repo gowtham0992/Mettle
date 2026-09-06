@@ -333,7 +333,52 @@ function openCorrection(citationId) {
 }
 
 function renderWorkbench(data) {
-  globalThis.MettleWorkbench.render(data, {node, openCorrection, renderJudgment, renderEvidenceRoute, setWorkspaceView, elements});
+  globalThis.MettleWorkbench.render(data, {node, openCorrection, renderJudgment, renderEvidenceRoute, renderEvidencePhoto, setWorkspaceView, elements});
+}
+
+const evidencePhotoRequests = new Map();
+function renderEvidencePhoto(host, assessment, decisionHost) {
+  host.replaceChildren();
+  host.hidden = !assessment || Boolean(assessment.contractor_record);
+  if (host.hidden) return;
+  const accept = [...decisionHost.querySelectorAll('button')].find(b => b.textContent === 'Accept proof');
+  if (accept) accept.disabled = true;
+  host.append(node('p', 'mono-label', 'Submitted photo · review against the notice'));
+  const status = node('p', '', 'Loading your stored photo…');
+  host.append(status);
+  const workflowId = activeWorkflowId;
+  const root = activeWorkflowTarget === 'agentcore' ? '/api/agentcore/workflows' : '/api/workflows';
+  const key = `${root}/${encodeURIComponent(workflowId)}/evidence/${encodeURIComponent(assessment.assessment_id)}/photo`;
+  async function load() {
+    status.textContent = 'Loading your stored photo…';
+    try {
+      let src;
+      if (!workflowId && /^\/static\/evidence\/[a-z0-9-]+\.png$/.test(assessment.image_url || '')) {
+        src = assessment.image_url;
+      } else {
+        if (!evidencePhotoRequests.has(key)) {
+          if (evidencePhotoRequests.size >= 4) evidencePhotoRequests.delete(evidencePhotoRequests.keys().next().value);
+          evidencePhotoRequests.set(key, request(key).catch(error => { evidencePhotoRequests.delete(key); throw error; }));
+        }
+        const result = await evidencePhotoRequests.get(key);
+        if (!/^\/9j\/[A-Za-z0-9+/=\r\n]+$/.test(result.image_base64 || '') || result.image_base64.length > 6700000) throw new Error('Stored photo could not be displayed.');
+        src = `data:image/jpeg;base64,${result.image_base64}`;
+      }
+      if (!status.isConnected) return;
+      const img = node('img', 'stored-evidence-photo');
+      img.alt = `Submitted evidence for correction ${assessment.citation_id}`;
+      img.onload = () => { status.textContent = 'Inspect the photo and every required item before accepting. Evidence is not code certification.'; if (accept?.isConnected) accept.disabled = false; };
+      img.onerror = () => { status.textContent = 'Photo could not be displayed. Reload this page to try again; do not approve unseen proof.'; };
+      img.src = src;
+      host.append(img);
+    } catch (error) {
+      if (!status.isConnected) return;
+      status.textContent = error.message || 'Photo could not be loaded.';
+      const retry = node('button', 'button button--outline', 'Retry photo'); retry.type = 'button';
+      retry.onclick = () => { retry.remove(); load(); }; host.append(retry);
+    }
+  }
+  load();
 }
 
 function setTourIsolation(active) {
@@ -400,6 +445,7 @@ function tokenIsCurrent(token) {
 }
 
 function clearAuth() {
+  evidencePhotoRequests.clear();
   accessToken = null;
   sessionStorage.removeItem("mettle_access_token");
   updateAuthControl();
@@ -1799,13 +1845,20 @@ function decisionPrompt(judgment) {
   return ["Describe the evidence the trade must provide", "Set evidence requirement"];
 }
 
-function renderJudgment(judgment) {
+function renderJudgment(judgment, {photoReview = false} = {}) {
   const isPacketApproval = judgment.packet_approval || judgment.kind === "final_packet_approval";
   const isEvidenceReview = judgment.evidence_review || judgment.kind === "evidence_review";
   const card = node("article", "judgment");
   card.append(node("div", "judgment__kind", `${titleCase(judgment.kind)}${judgment.citation_id ? ` · C${judgment.citation_id}` : ""}`));
   card.append(node("h3", "", judgment.question));
   card.append(node("p", "", judgment.reason));
+  if (isEvidenceReview && !photoReview) {
+    const review = node("button", "button button--orange", "Review photo & decide →");
+    review.type = "button";
+    review.onclick = () => openCorrection(judgment.citation_id);
+    card.append(review);
+    return card;
+  }
 
   const [placeholder, buttonLabel] = decisionPrompt(judgment);
   const form = document.createElement("form");
@@ -2425,6 +2478,7 @@ function renderJudgeTour(data) {
   elements.tourControlTitle.textContent = phase.controlTitle;
   elements.tourControlCopy.textContent = phase.controlCopy;
   const lens = judgeLensByPhase[phase.key] || judgeLensByPhase.boundary;
+  document.getElementById("tour-agent-receipt").textContent = `RECORDED AGENT WORK · ${lens.agent}`;
   elements.judgeLensImpact.textContent = lens.impact;
   elements.judgeLensAgent.textContent = lens.agent;
   elements.judgeLensHuman.textContent = lens.human;

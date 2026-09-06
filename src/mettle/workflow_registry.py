@@ -774,6 +774,19 @@ class WorkflowRegistry:
             )
             return envelope
 
+    def read_evidence_photo(self, workflow_id: str, assessment_id: str) -> bytes:
+        with self._lock:
+            entry = self._entries.get(workflow_id)
+        if entry is None:
+            raise WorkflowNotFound("workflow does not exist")
+        with entry.lock:
+            if not any(item.assessment_id == assessment_id for item in entry.evidence):
+                raise WorkflowNotFound("evidence photo does not exist")
+            image = entry.uploaded_photos.get(assessment_id)
+            if image is None:
+                raise WorkflowNotFound("evidence photo does not exist")
+            return bytes(image)
+
     def render_packet(self, workflow_id: str, *, evidence_dir: Path) -> bytes:
         with self._lock:
             entry = self._entries.get(workflow_id)

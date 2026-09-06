@@ -138,6 +138,19 @@ def test_known_vision_failure_preserves_checkpoint_and_allows_replacement():
         result = gateway.submit_photo_evidence(first.workflow_id, SubmitPhotoEvidenceRequest(citation_id="2"), image=jpeg_photo(), idempotency_key="vision_replacement")
         assert result.evidence[-1].citation_id == "2"
         assert result.evidence[-1].status is EvidenceStatus.ACCEPTED
+        assessment_id = result.evidence[-1].assessment_id
+        client.sessions.clear()
+        photo = gateway.read_evidence_photo(first.workflow_id, assessment_id)
+        assert photo.startswith(b"\xff\xd8\xff")
+        assert client.sessions == {}  # Reading proof does not wake the model runtime.
+        with pytest.raises(WorkflowNotFound):
+            gateway.read_evidence_photo(first.workflow_id, "unknown-photo")
+        other = set_principal("different-contractor")
+        try:
+            with pytest.raises(WorkflowNotFound):
+                gateway.read_evidence_photo(first.workflow_id, assessment_id)
+        finally:
+            reset_principal(other)
         assert sum(len(m.deliveries) for m in client.messengers) == sent
     finally:
         reset_principal(token)

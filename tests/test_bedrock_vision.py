@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from pydantic import ValidationError
 
 import pytest
 import mettle.agents.vision as vision_module
@@ -26,6 +27,31 @@ CITATION = Citation(
         "Photo with a tape measure showing the clearance",
     ],
 )
+
+
+def test_fixed_requirement_slots_do_not_depend_on_model_copying_source(monkeypatch):
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            pass
+
+        def structured_output(self, output_model, prompt):
+            assert set(output_model.model_json_schema()["$defs"]["RequirementFindings"]["required"]) == {"r1", "r2"}
+            return output_model.model_validate({
+                "image_relevance": "relevant", "image_summary": "Panel and working area.",
+                "findings": {"r2": {"verdict": "uncertain", "observation": "Unreadable scale."},
+                             "r1": {"verdict": "shown", "observation": "Full panel visible."}},
+            })
+    monkeypatch.setattr(vision_module, "Agent", FakeAgent)
+    result = assess_visible_evidence_with_agent(model=object(), image=b"jpeg", prompt="inspect", requirements=CITATION.evidence_requirements)
+    assert [f.requirement for f in result.findings] == CITATION.evidence_requirements
+    assert [f.verdict for f in result.findings] == ["shown", "uncertain"]
+
+
+def test_fixed_slots_reject_missing_and_invented_requirement_keys():
+    contract = vision_module.evidence_output_contract(["Original requirement."])
+    for findings in [{}, {"r2": {"verdict": "shown", "observation": "Visible."}}]:
+        with pytest.raises(ValidationError):
+            contract.model_validate({"image_relevance": "relevant", "image_summary": "Panel.", "findings": findings})
 
 
 def _finding(requirement: str, verdict: str, observation: str):

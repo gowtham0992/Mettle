@@ -289,6 +289,22 @@ class AgentCoreWorkflowGateway:
             workflow.packet_pdf = pdf
             return bytes(pdf)
 
+    def read_evidence_photo(self, workflow_id: str, assessment_id: str) -> bytes:
+        with self._lock:
+            workflow = self._workflows.get(workflow_id)
+            if workflow is None:
+                raise WorkflowNotFound("AgentCore workflow does not exist on this server")
+            result = self._invoke(session_id=workflow.session_id, payload={
+                "operation": "read_evidence_photo", "workflow_id": workflow_id,
+                "assessment_id": assessment_id,
+            })
+            if not result.get("ok"):
+                self._parse_result(result)
+            try:
+                return base64.b64decode(result["image_base64"], validate=True)
+            except (KeyError, ValueError, TypeError):
+                raise AgentCoreGatewayError("Evidence photo could not be read") from None
+
     def _mutate(
         self,
         workflow_id: str,

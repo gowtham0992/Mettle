@@ -314,3 +314,7 @@ body[data-source-mode="workflow"] .demo-driver {display:none;}
   .provenance-workspace .workspace-heading h1{font-size:30px;}.aws-boundary__flow{flex-wrap:wrap;}.agent-flow__heading{display:block;}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto;}*,*::before,*::after{animation:none!important;transition:none!important;}}
+/* The actual proof precedes the decision, in both themes. */
+.stored-evidence { padding: 24px; border: 1px solid var(--line); border-radius: 16px; margin-bottom: 20px; }
+.stored-evidence-photo { display: block; width: 100%; max-height: 480px; object-fit: contain; margin-top: 16px; background: var(--panel-2); border-radius: 8px; }
+.tour-agent-receipt { padding: 12px 16px; border-left: 3px solid var(--green); background: var(--panel); color: var(--white); font-size: 13px; line-height: 1.6; }

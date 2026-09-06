@@ -565,7 +565,23 @@ class DurableAgentCoreWorkflowGateway:
         self._packet_bucket.put_object(Key=key, Body=raw, ContentType="application/json", ServerSideEncryption="AES256", CacheControl="no-store")
         return key
 
-    def _restore_checkpoint(self, workflow: dict) -> str:
+    def read_evidence_photo(self, workflow_id: str, assessment_id: str) -> bytes:
+        workflow = self._workflow(self._owner(), workflow_id)
+        envelope = self._envelope(workflow.get("envelope"))
+        if not any(item.assessment_id == assessment_id for item in envelope.evidence):
+            raise WorkflowNotFound("evidence photo does not exist")
+        if not workflow.get("checkpoint_key"):
+            raise WorkflowNotFound("evidence photo does not exist")
+        checkpoint = self._read_checkpoint(workflow)
+        encoded = checkpoint.get("photos", {}).get(assessment_id)
+        if not encoded:
+            raise WorkflowNotFound("evidence photo does not exist")
+        try:
+            return base64.b64decode(encoded, validate=True)
+        except (ValueError, TypeError):
+            raise AgentCoreGatewayError("Stored evidence photo could not be read") from None
+
+    def _read_checkpoint(self, workflow: dict) -> dict:
         key = workflow["checkpoint_key"]
         raw = self._packet_bucket.Object(key).get()["Body"].read(MAX_PACKET_BYTES + 1)
         if len(raw) > MAX_PACKET_BYTES or key.rsplit("/", 1)[-1] != f"{sha256(raw).hexdigest()}.json":
@@ -573,6 +589,10 @@ class DurableAgentCoreWorkflowGateway:
         checkpoint = json.loads(raw)
         if checkpoint.get("envelope", {}).get("workflow_id") != workflow["workflow_id"]:
             raise AgentCoreGatewayError("Stored recovery checkpoint belongs to a different workflow")
+        return checkpoint
+
+    def _restore_checkpoint(self, workflow: dict) -> str:
+        checkpoint = self._read_checkpoint(workflow)
         session_id = f"mettle-{uuid4().hex}"
         self._parse_result(self._invoke(session_id=session_id, payload={
             "operation": "restore", "workflow_id": workflow["workflow_id"], "checkpoint": checkpoint,

@@ -25,7 +25,7 @@
     };
   }
   function render(data, api) {
-    const {node, openCorrection, renderJudgment, renderEvidenceRoute, setWorkspaceView, elements} = api;
+    const {node, openCorrection, renderJudgment, renderEvidenceRoute, renderEvidencePhoto, setWorkspaceView, elements} = api;
     const $ = id => document.getElementById(id);
     const summary = recoverySummary(data);
     const selected = selectedCitation(data, elements.photoCitation.value);
@@ -85,12 +85,12 @@
     $("correction-context").textContent=`Correction ${id} · ${selected.stage.replaceAll("_"," ")}`;
     $("correction-title").textContent=`${selected.trade.charAt(0).toUpperCase()+selected.trade.slice(1)} correction`;
     $("correction-subtitle").textContent=selected.assignee || "Awaiting contractor review before outreach";
-    $("correction-source-title").textContent=selected.code_reference || "Original correction";
+    $("correction-source-title").textContent=selected.code_reference && selected.code_reference !== "Not stated in notice" ? selected.code_reference : "Original correction · no code cited";
     $("correction-source-text").textContent=selected.notice_text;
     $("correction-requirements").replaceChildren(...(selected.evidence_requirements.length ? selected.evidence_requirements : ["The notice does not define observable proof. Contractor direction is required."]).map(r=>node("li","",r)));
     $("correction-authority-note").textContent="The original notice stays unchanged. Evidence acceptance is not a code-compliance certificate.";
     const pending=data.judgments.filter(j=>j.status==="pending" && String(j.citation_id||"")===id);
-    $("correction-decision").replaceChildren(...pending.map(renderJudgment));
+    $("correction-decision").replaceChildren(...pending.map(j=>renderJudgment(j, {photoReview:true})));
     $("correction-decision").hidden=!pending.length;
     const beforeReview = data.correction_review_required || data.judgments.some(j=>j.judgment_id==="route-review" && j.status==="pending");
     if (beforeReview && !pending.length) {
@@ -103,6 +103,9 @@
     const history=$("correction-history");
     history.replaceChildren();
     const assessment=[...(data.evidence||[])].reverse().find(a=>String(a.citation_id)===id);
+    let photo=$("stored-evidence");
+    if (!photo) { photo=node("section","stored-evidence");photo.id="stored-evidence";$("correction-decision").before(photo); }
+    renderEvidencePhoto(photo, assessment, $("correction-decision"));
     if (selected.evidence_note || assessment) {
       history.append(node("p","mono-label","Evidence record"),node("h2","",selected.stage==="ready" ? "Proof is ready for your packet." : "What Mettle needs next"),node("p","",assessment?.explanation || selected.evidence_note));
     }

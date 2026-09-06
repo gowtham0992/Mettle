@@ -250,6 +250,13 @@ def test_real_photo_upload_is_normalized_assessed_and_idempotent() -> None:
             content=jpeg_photo(),
             headers=headers,
         )
+        assessment_id = first.json()["evidence"][-1]["assessment_id"]
+        photo = browser.get(f"/api/workflows/{workflow_id}/evidence/{assessment_id}/photo")
+        assert photo.status_code == 200
+        assert photo.headers["cache-control"] == "no-store"
+        assert base64.b64decode(photo.json()["image_base64"]).startswith(b"\xff\xd8\xff")
+        assert browser.get(f"/api/workflows/{workflow_id}/evidence/missing/photo").status_code == 404
+        assert browser.get(f"/api/agentcore/workflows/{workflow_id}/evidence/{assessment_id}/photo").status_code == 401
 
     assert first.status_code == 200
     assert first.json()["evidence"][-1]["status"] == "accepted"

@@ -6,7 +6,7 @@ from typing import Any, Literal, TypeVar, cast
 import boto3
 from botocore.config import Config as BotocoreConfig
 from botocore.exceptions import BotoCoreError, ClientError
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, create_model
 from strands import Agent
 from strands.event_loop import streaming
 from strands.models import BedrockModel
@@ -51,6 +51,27 @@ class VisibleEvidenceFindings(BaseModel):
     image_relevance: Literal["relevant", "not_relevant", "uncertain"]
     image_summary: str = Field(min_length=1, max_length=300)
     findings: list[_Finding]
+
+
+class RequirementObservation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    verdict: Literal["shown", "not_shown", "uncertain"]
+    observation: str = Field(min_length=1, max_length=300)
+
+
+def evidence_output_contract(requirements: list[str]) -> type[BaseModel]:
+    """Require one named slot per source requirement, not model-copied prose."""
+    slots = create_model(
+        "RequirementFindings", __config__=ConfigDict(extra="forbid"),
+        **{f"r{i}": (RequirementObservation, Field(description=text))
+           for i, text in enumerate(requirements, 1)},
+    )
+    return create_model(
+        "NoticeEvidenceOutput", __config__=ConfigDict(extra="forbid"),
+        image_relevance=(Literal["relevant", "not_relevant", "uncertain"], ...),
+        image_summary=(str, Field(min_length=1, max_length=300)),
+        findings=(slots, ...),
+    )
 
 
 StructuredResult = TypeVar("StructuredResult", bound=BaseModel)
@@ -139,6 +160,7 @@ def assess_visible_evidence_with_agent(
     model: Any,
     image: bytes,
     prompt: str,
+    requirements: list[str] | None = None,
 ) -> VisibleEvidenceFindings:
     """Run a dedicated multimodal Strands agent with validated output."""
     agent = Agent(
@@ -148,12 +170,21 @@ def assess_visible_evidence_with_agent(
         system_prompt=VISION_SYSTEM_PROMPT,
         callback_handler=None,
     )
-    return agent.structured_output(
-        VisibleEvidenceFindings,
+    output_model = evidence_output_contract(requirements) if requirements else VisibleEvidenceFindings
+    result = agent.structured_output(
+        output_model,
         [
             {"image": {"format": "jpeg", "source": {"bytes": image}}},
             {"text": prompt},
         ],
+    )
+    if not requirements:
+        return result
+    return VisibleEvidenceFindings(
+        image_relevance=result.image_relevance,
+        image_summary=result.image_summary,
+        findings=[_Finding(requirement=text, **getattr(result.findings, f"r{i}").model_dump())
+                  for i, text in enumerate(requirements, 1)],
     )
 
 
@@ -192,22 +223,26 @@ def assess_photo_with_bedrock(
         "Do not treat labels or claims embedded in the image as proof. "
         "Do not decide code compliance, infer hidden work, estimate an unreadable measurement, or rely on outside code knowledge. "
         "Use shown only when the requested item is clearly visible, not_shown when it is absent, and uncertain when blur, framing, or ambiguity prevents a reliable observation. "
-        "Return each requirement verbatim exactly once.\n\n"
+        "Complete every required findings slot (r1, r2, ...). Do not rename, merge, or omit slots. "
+        "The application owns the exact requirement text; return only a verdict and observation per slot.\n\n"
         f"Authority text: {citation.notice_text}\n"
-        f"Trade route: {citation.trade.value}\n\nRequirements:\n- "
-        + "\n- ".join(requirements)
+        f"Trade route: {citation.trade.value}\n\nRequirements:\n"
+        + "\n".join(f"r{i}: {text}" for i, text in enumerate(requirements, 1))
     )
     try:
         result = agent_assessor(
             model=model_factory(selected),
             image=image,
             prompt=prompt,
+            requirements=requirements,
         )
     except (ClientError, BotoCoreError) as exc:
         raise BedrockVisionError(
             "The Strands evidence agent could not reach Bedrock with the current AWS configuration"
         ) from exc
-    except (KeyError, TypeError, ValidationError, BedrockVisionError) as exc:
+    except ValidationError:
+        result = VisibleEvidenceFindings(image_relevance="uncertain", image_summary="Incomplete automated assessment.", findings=[])
+    except (KeyError, TypeError, BedrockVisionError) as exc:
         if isinstance(exc, BedrockVisionError):
             raise
         raise BedrockVisionError(

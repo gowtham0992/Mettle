@@ -159,6 +159,13 @@ class _ApprovePacketInvocation(BaseModel):
     payload: ApprovePacketRequest
 
 
+class _ReadEvidencePhotoInvocation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    operation: Literal["read_evidence_photo"]
+    workflow_id: str = Field(min_length=1, max_length=64)
+    assessment_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+
+
 class _RenderPacketInvocation(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -177,6 +184,7 @@ AgentCoreInvocation = Annotated[
     | _RunNextCheckInvocation
     | _PreparePacketInvocation
     | _ApprovePacketInvocation
+    | _ReadEvidencePhotoInvocation
     | _RenderPacketInvocation,
     Field(discriminator="operation"),
 ]
@@ -303,6 +311,9 @@ class MettleAgentCoreRuntime:
                 )
                 replayed = False
                 operation = "approve_packet"
+            elif isinstance(invocation, _ReadEvidencePhotoInvocation):
+                image = self._workflows.read_evidence_photo(invocation.workflow_id, invocation.assessment_id)
+                return {"ok": True, "image_base64": base64.b64encode(image).decode("ascii")}
             else:
                 pdf = self._workflows.render_packet(
                     invocation.workflow_id,
