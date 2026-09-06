@@ -34,7 +34,12 @@ def extract_notice_with_agent(text: str, *, model: Any | None = None) -> Inspect
         InspectionNotice,
         "Extract this failed-inspection notice without interpreting code. "
         "For a heading such as 'CITATION 3', citation_id must be exactly '3'. "
-        "When no EVIDENCE language exists for a citation, return an empty "
+        "Evidence instructions need not have an EVIDENCE heading: extract explicit "
+        "requests such as 'provide a clear wide photo showing the panel and cleared floor', "
+        "'provide the manufacturer document', or 'on-site inspector verification'. "
+        "Preserve these requests in evidence_requirements without adding measurements "
+        "or conditions absent from the notice. Select the matching closure_route. "
+        "When no explicit proof instructions exist for a citation, return an empty "
         "evidence_requirements list and set ambiguity_reason.\n\n"
         f"{text}",
     )

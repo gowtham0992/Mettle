@@ -90,6 +90,18 @@ const elements = {
   photoSubmit: document.querySelector("#photo-submit"),
   photoModeNote: document.querySelector("#photo-mode-note"),
   photoError: document.querySelector("#photo-error"),
+  recordForm: document.querySelector("#record-evidence-form"),
+  recordTitle: document.querySelector("#record-title"),
+  recordGuidance: document.querySelector("#record-guidance"),
+  recordRequirements: document.querySelector("#record-requirements"),
+  recordReference: document.querySelector("#record-reference"),
+  recordReviewer: document.querySelector("#record-reviewer"),
+  recordDate: document.querySelector("#record-date"),
+  recordDetails: document.querySelector("#record-details"),
+  recordConfirmed: document.querySelector("#record-confirmed"),
+  recordConfirmation: document.querySelector("#record-confirmation"),
+  recordSubmit: document.querySelector("#record-submit"),
+  recordError: document.querySelector("#record-error"),
   metrics: document.querySelector("#metrics-list"),
   packet: document.querySelector("#packet-status"),
   packetReadiness: document.querySelector("#packet-readiness"),
@@ -576,6 +588,7 @@ function workflowCampaign(envelope, executionTarget = "local") {
         : assessment?.status === "manual_review" ? "needs_judgment" : null;
     return {
       ...citation,
+      code_reference: citation.code_reference?.toLowerCase() === "unknown" ? "No code reference supplied" : citation.code_reference,
       assignee: delivery ? `${delivery.recipient.name} · ${maskedPhone(delivery.recipient.phone)}` : null,
       evidence_note: assessment?.explanation || (needsJudgment
         ? "Mettle needs an evidence-spec decision before outreach"
@@ -656,15 +669,16 @@ function workflowCampaign(envelope, executionTarget = "local") {
     });
   }
   for (const [index, assessment] of (envelope.evidence || []).entries()) {
-    const contractorResolved = Boolean(assessment.contractor_decision);
+    const sourceRecord = assessment.contractor_record;
+    const contractorResolved = Boolean(assessment.contractor_decision || sourceRecord);
     events.push({
       happened_at: timestamp(9, index),
       kind: contractorResolved ? "judgment_resolved" : `evidence_${assessment.status}`,
       actor: contractorResolved ? "Contractor" : "Mettle · evidence assessor",
-      title: contractorResolved
+      title: sourceRecord ? `Contractor recorded C${assessment.citation_id} ${sourceRecord.route === "physical_reinspection" ? "inspection outcome" : "document review"}` : contractorResolved
         ? `${assessment.status === "accepted" ? "Accepted" : "Returned"} ambiguous C${assessment.citation_id} photo after contractor review`
         : `${assessment.status === "accepted" ? "Accepted" : assessment.status === "rejected" ? "Rejected" : "Held"} C${assessment.citation_id} photo evidence`,
-      detail: contractorResolved ? assessment.contractor_decision : assessment.explanation,
+      detail: sourceRecord ? `Source: ${sourceRecord.reference}. ${assessment.explanation}` : contractorResolved ? assessment.contractor_decision : assessment.explanation,
     });
   }
   if (envelope.packet) {
@@ -723,7 +737,7 @@ function workflowCampaign(envelope, executionTarget = "local") {
       sequence: ++evidenceSequence,
       graph: "evidence",
       node_id: step.step.toLowerCase().replaceAll(" ", "_"),
-      actor: step.step === "Contractor resolution" ? "Contractor" : "Evidence agent",
+      actor: assessment.contractor_record || step.step === "Contractor resolution" ? "Contractor" : "Evidence agent",
       status: step.status,
       detail: `C${assessment.citation_id} · ${step.detail}`,
     })),
@@ -764,7 +778,7 @@ function workflowCampaign(envelope, executionTarget = "local") {
       contractor_decisions: (snapshot.contractor_decision ? 1 : 0)
         + (snapshot.deadline_decision ? 1 : 0)
         + (envelope.packet?.status === "approved" ? 1 : 0)
-        + (envelope.evidence || []).filter((item) => item.contractor_decision).length,
+        + (envelope.evidence || []).filter((item) => item.contractor_decision || item.contractor_record).length,
     },
     scenario_step: 0,
     scenario_complete: true,
@@ -858,6 +872,12 @@ function showToast(message) {
 function setBusy(button, busy) {
   button.disabled = busy;
   button.setAttribute("aria-busy", String(busy));
+  if (!button.busyStatus && busy) {
+    button.busyStatus = node("p", "photo-evidence__mode", "Working on this step… Your request is in progress; please don’t submit again.");
+    button.busyStatus.setAttribute("role", "status");
+    button.after(button.busyStatus);
+  }
+  if (button.busyStatus) button.busyStatus.hidden = !busy;
 }
 
 function activePhotoEnabled() {
@@ -995,7 +1015,7 @@ function renderCorrectionReview(data) {
     const card = node("article", "correction-review__card");
     card.dataset.reviewCitation = citation.citation_id;
     card.append(node("span", "correction-review__id", `C${citation.citation_id}`));
-    card.append(node("span", "correction-review__code", `${citation.code_reference} · authority language`));
+    card.append(node("span", "correction-review__code", `${!citation.code_reference || citation.code_reference.toLowerCase() === "unknown" ? "No code reference supplied" : citation.code_reference} · authority language`));
     card.append(node("p", "correction-review__authority", `“${citation.notice_text}”`));
     if (citation.ambiguity_reason) card.append(node("span", "correction-review__needs-you", `Needs your judgment: ${citation.ambiguity_reason}`));
 
@@ -1196,14 +1216,19 @@ function configureNextAction(data) {
         ? () => openWorkspacePanel("recovery", ".citation--needs-action", ".citation--needs-action .judgment input")
         : () => openWorkspacePanel("recovery", "#judgment-list", "#judgment-list .judgment input");
   } else if (openCitation) {
+    const recordRoute = openCitation.closure_route && openCitation.closure_route !== "photo_evidence";
+    const physical = openCitation.closure_route === "physical_reinspection";
     elements.nextActionTitle.textContent = `Collect proof for C${openCitation.citation_id}`;
-    elements.nextActionCopy.textContent = openCitation.stage === "evidence_rejected"
+    elements.nextActionCopy.textContent = recordRoute
+      ? physical ? "Arrange the required inspector visit outside Mettle. After it is completed, record the source reference and outcome. A booking is not proof of completion."
+        : "Review the required document, then record its reference and the details that address this correction. Keep the original for the inspector."
+      : openCitation.stage === "evidence_rejected"
       ? "The last photo did not visibly show everything requested. Review the feedback and replace it."
       : "Choose the correction and add the job-site photo you expect to use for closure.";
-    elements.nextActionButton.textContent = activePhotoEnabled() ? "Add a photo" : "Review evidence status";
+    elements.nextActionButton.textContent = recordRoute ? physical ? "Record inspection outcome" : "Record document review" : activePhotoEnabled() ? "Add a photo" : "Review evidence status";
     nextActionHandler = () => {
       elements.photoCitation.value = openCitation.citation_id;
-      openWorkspacePanel("evidence", "#evidence-panel", "#photo-file");
+      openWorkspacePanel("evidence", "#evidence-panel", recordRoute ? "#record-reference" : "#photo-file");
     };
   } else if (data.packet_status === "blocked") {
     elements.nextActionTitle.textContent = "Assemble the review packet";
@@ -1416,12 +1441,18 @@ function renderEvidenceAssessment(assessment) {
   elements.evidenceResult.dataset.mode = assessment.label?.startsWith("Recorded sample") ? "recorded" : "live";
   elements.evidenceResult.hidden = false;
   elements.evidenceResult.className = `evidence-result evidence-result--${assessment.status}`;
-  const resultLabel = assessment.contractor_decision
+  const resultLabel = assessment.contractor_record ? "Contractor-reviewed record"
+    : assessment.contractor_decision
     ? `${assessment.status === "accepted" ? "Accepted" : "Returned"} by contractor`
     : assessment.label || assessment.status.replaceAll("_", " ");
   elements.evidenceResult.replaceChildren(
     node("strong", "", `${resultLabel} · C${assessment.citation_id}`),
     node("span", "", assessment.explanation),
+    ...(assessment.contractor_record ? [
+      node("span", "", `Source: ${assessment.contractor_record.reference}`),
+      node("span", "", `Reviewed by ${assessment.contractor_record.reviewer} · ${assessment.contractor_record.reviewed_on}`),
+      node("span", "", assessment.contractor_record.details),
+    ] : []),
     ...(assessment.contractor_decision
       ? [node("span", "evidence-result__decision", `Decision record: ${assessment.contractor_decision}`)]
       : []),
@@ -2721,7 +2752,7 @@ function render(data) {
   elements.photoCitation.replaceChildren(...data.citations.map((citation) => {
     const option = node("option", "", evidenceOptionLabel(citation));
     option.value = citation.citation_id;
-    option.disabled = citation.stage === "ready";
+    option.disabled = false;
     return option;
   }));
   if ([...elements.photoCitation.options].some((option) => option.value === selectedCitation)) {
@@ -2729,7 +2760,7 @@ function render(data) {
   }
   const hasOpenEvidence = openEvidenceCitations.length > 0;
   const canAssessPhoto = activePhotoEnabled() && hasOpenEvidence;
-  elements.photoCitation.disabled = !isWorkflow || !hasOpenEvidence;
+  elements.photoCitation.disabled = !isWorkflow || !data.citations.length;
   elements.photoFile.disabled = !isWorkflow || !hasOpenEvidence;
   elements.photoSubmit.disabled = !canAssessPhoto || !elements.photoFile.files?.length;
   elements.photoSubmit.title = canAssessPhoto
@@ -2746,8 +2777,9 @@ function render(data) {
     : isWorkflow
       ? "PHOTO CHECKING IS UNAVAILABLE IN THIS LOCAL RUN · START A SECURE RECOVERY TO USE IT"
       : "SAMPLE MODE · FIXTURES REPLAY RECORDED SYNTHETIC OUTCOMES · NO MODEL CALL";
+  renderEvidenceRoute(data);
   if (isWorkflow) {
-    const latestEvidence = data.evidence.at(-1);
+    const latestEvidence = [...data.evidence].reverse().find((item) => String(item.citation_id) === elements.photoCitation.value);
     elements.evidenceResult.hidden = !latestEvidence;
     if (latestEvidence) {
       renderEvidenceAssessment(latestEvidence);
@@ -2876,6 +2908,91 @@ elements.photoCitation.addEventListener("change", () => {
   elements.photoFile.value = "";
   elements.photoError.hidden = true;
   elements.photoSubmit.disabled = true;
+  renderEvidenceRoute(campaign);
+});
+
+const recordDrafts = new Map();
+let activeRecordDraft = null;
+function renderEvidenceRoute(data) {
+  const citation = data.citations.find((item) => String(item.citation_id) === elements.photoCitation.value);
+  const record = data.source_mode === "workflow" && citation && citation.closure_route !== "photo_evidence" && Boolean(citation.closure_route);
+  const key = record ? `${activeWorkflowId}:${citation.citation_id}` : null;
+  if (activeRecordDraft !== key) {
+    if (activeRecordDraft) recordDrafts.set(activeRecordDraft, {
+      reference: elements.recordReference.value, reviewer: elements.recordReviewer.value,
+      date: elements.recordDate.value, details: elements.recordDetails.value,
+      confirmed: elements.recordConfirmed.checked,
+    });
+    const draft = recordDrafts.get(key);
+    elements.recordForm.reset();
+    if (draft) {
+      elements.recordReference.value = draft.reference;
+      elements.recordReviewer.value = draft.reviewer;
+      elements.recordDate.value = draft.date;
+      elements.recordDetails.value = draft.details;
+      elements.recordConfirmed.checked = draft.confirmed;
+    }
+    activeRecordDraft = key;
+    elements.recordError.hidden = true;
+  }
+  elements.recordForm.hidden = !record || citation.stage === "ready";
+  elements.photoForm.hidden = Boolean(record) || citation?.stage === "ready";
+  if (data.source_mode === "workflow") {
+    const assessment = [...(data.evidence || [])].reverse().find((item) => String(item.citation_id) === elements.photoCitation.value);
+    elements.evidenceResult.hidden = !assessment;
+    if (assessment) renderEvidenceAssessment(assessment);
+  }
+  if (!record) return;
+  const physical = citation.closure_route === "physical_reinspection";
+  elements.recordTitle.textContent = physical ? "Record a completed inspection" : "Record a document review";
+  elements.recordGuidance.textContent = physical
+    ? "Arrange the visit with the authority outside Mettle. Only record a completed verification here—not a booking or a planned visit. Mettle does not contact the inspector."
+    : "Review the original document against the notice. Save its reference and relevant findings here; keep the original available for the inspector. This is not a document upload or an AI verification.";
+  elements.recordConfirmation.textContent = physical
+    ? "I reviewed the completed inspector verification and confirm it addresses every required item. This is not merely a scheduled visit. I retain the original record."
+    : "I reviewed the original document and confirm it addresses every required item. I retain the original source.";
+  elements.recordRequirements.textContent = `Required: ${(citation.evidence_requirements || []).join("; ")}`;
+  elements.recordSubmit.disabled = citation.stage === "ready" || Boolean(data.recovery_hold);
+  elements.recordDate.max = new Date().toLocaleDateString("en-CA");
+}
+
+let recordSubmission = null;
+let recordSubmitting = false;
+elements.recordForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (recordSubmitting || !activeWorkflowId || !elements.recordForm.reportValidity()) return;
+  const citation = campaign.citations.find((item) => String(item.citation_id) === elements.photoCitation.value);
+  if (!citation || citation.closure_route === "photo_evidence") return;
+  const body = JSON.stringify({citation_id: citation.citation_id, contractor_record: {
+    route: citation.closure_route, reference: elements.recordReference.value.trim(),
+    reviewer: elements.recordReviewer.value.trim(), reviewed_on: elements.recordDate.value,
+    details: elements.recordDetails.value.trim(), confirmed: elements.recordConfirmed.checked,
+  }});
+  if (!recordSubmission || recordSubmission.body !== body || recordSubmission.workflow !== activeWorkflowId) {
+    recordSubmission = {body, workflow: activeWorkflowId, key: crypto.randomUUID().replaceAll("-", "_")};
+  }
+  elements.recordError.hidden = true;
+  recordSubmitting = true;
+  setBusy(elements.recordSubmit, true);
+  try {
+    const root = activeWorkflowTarget === "agentcore" ? "/api/agentcore/workflows" : "/api/workflows";
+    const envelope = await request(`${root}/${encodeURIComponent(activeWorkflowId)}/evidence`, {
+      method: "POST", headers: {"Idempotency-Key": recordSubmission.key}, body,
+    });
+    campaign = workflowCampaign(envelope, activeWorkflowTarget);
+    recordDrafts.delete(activeRecordDraft);
+    activeRecordDraft = null;
+    elements.recordForm.reset();
+    recordSubmission = null;
+    render(campaign);
+    showToast("Contractor-reviewed source record saved. Original remains with you.");
+  } catch (error) {
+    showInlineWorkflowError(error, elements.recordError);
+  } finally {
+    recordSubmitting = false;
+    setBusy(elements.recordSubmit, false);
+    renderEvidenceRoute(campaign);
+  }
 });
 
 elements.photoForm.addEventListener("submit", async (event) => {
@@ -2909,6 +3026,7 @@ elements.photoForm.addEventListener("submit", async (event) => {
   } catch (error) {
     showInlineWorkflowError(error, elements.photoError);
   } finally {
+    setBusy(elements.photoSubmit, false);
     elements.photoSubmit.disabled = !activePhotoEnabled() || !elements.photoFile.files?.length;
     elements.photoSubmit.setAttribute("aria-busy", "false");
   }
@@ -3258,8 +3376,10 @@ elements.noticeForm.addEventListener("submit", async (event) => {
     showInlineWorkflowError(error, elements.workflowError);
   } finally {
     setBusy(elements.startWorkflow, false);
+    setBusy(elements.startBedrock, false);
     elements.startBedrock.disabled = !bedrockEnabled;
     elements.startBedrock.setAttribute("aria-busy", "false");
+    setBusy(elements.startAgentCore, false);
     elements.startAgentCore.disabled = !agentCoreEnabled;
     elements.startAgentCore.setAttribute("aria-busy", "false");
   }
@@ -3362,7 +3482,8 @@ elements.clockAction.addEventListener("click", async () => {
   } catch (error) {
     showError(error);
   } finally {
-    if (campaign?.workflow_status !== "interrupted") setBusy(elements.clockAction, false);
+    setBusy(elements.clockAction, false);
+    elements.clockAction.disabled = campaign?.workflow_status === "interrupted";
   }
 });
 
@@ -3399,9 +3520,8 @@ elements.packetAction.addEventListener("click", async () => {
   } catch (error) {
     showError(error);
   } finally {
-    if (campaign?.packet_status !== "awaiting_approval") {
-      setBusy(elements.packetAction, false);
-    }
+    setBusy(elements.packetAction, false);
+    elements.packetAction.disabled = campaign?.packet_status === "awaiting_approval";
   }
 });
 

@@ -65,3 +65,45 @@ test("uncertain recovery visibly takes priority over the normal approval action"
   assert.equal(elements.nextActionButton.textContent, "View saved activity");
   assert.match(elements.nextActionCopy.textContent, /operator/);
 });
+
+test("each non-photo route guides the contractor to a source record, never a photo", () => {
+  for (const route of ["document_evidence", "physical_reinspection"]) {
+    const elements = Object.fromEntries(["nextAction", "nextActionEyebrow", "nextActionMeta", "nextActionTitle", "nextActionCopy", "nextActionButton"].map((key) => [key, {dataset: {}, classList: {toggle() {}}}]));
+    const context = vm.createContext({elements, activeWorkspaceView: "recovery", activePhotoEnabled: () => true});
+    vm.runInContext(source.slice(source.indexOf("function configureNextAction("), source.indexOf("function renderJourney(")), context);
+    context.configureNextAction({source_mode: "workflow", judgments: [], citations: [{citation_id: "2", stage: "awaiting_evidence", closure_route: route}], packet_status: "blocked"});
+    assert.match(elements.nextActionButton.textContent, /Record (document review|inspection outcome)/);
+    assert.doesNotMatch(elements.nextActionButton.textContent, /photo/i);
+  }
+});
+
+test("record drafts do not bleed across corrections and accepted records are read-only", () => {
+  const keys = ["photoCitation", "recordForm", "photoForm", "recordTitle", "recordGuidance", "recordRequirements", "recordReference", "recordReviewer", "recordDate", "recordDetails", "recordConfirmed", "recordConfirmation", "recordSubmit", "recordError", "evidenceResult"];
+  const elements = Object.fromEntries(keys.map((key) => [key, {value: "", checked: false}]));
+  elements.recordForm.reset = () => {
+    for (const key of ["recordReference", "recordReviewer", "recordDate", "recordDetails"]) elements[key].value = "";
+    elements.recordConfirmed.checked = false;
+  };
+  let shown;
+  const context = vm.createContext({elements, activeWorkflowId: "test", renderEvidenceAssessment: (a) => {shown = a;}});
+  vm.runInContext(source.slice(source.indexOf("const recordDrafts ="), source.indexOf("let recordSubmission =")), context);
+  const data = {source_mode: "workflow", citations: [
+    {citation_id: "1", closure_route: "document_evidence", stage: "awaiting_evidence"},
+    {citation_id: "2", closure_route: "physical_reinspection", stage: "awaiting_evidence"},
+  ], evidence: []};
+  elements.photoCitation.value = "1";
+  context.renderEvidenceRoute(data);
+  elements.recordReference.value = "Document one";
+  elements.photoCitation.value = "2";
+  context.renderEvidenceRoute(data);
+  assert.equal(elements.recordReference.value, "");
+  assert.match(elements.recordGuidance.textContent, /not a booking/);
+  elements.photoCitation.value = "1";
+  context.renderEvidenceRoute(data);
+  assert.equal(elements.recordReference.value, "Document one");
+  data.citations[0].stage = "ready";
+  data.evidence = [{citation_id: "1", status: "accepted"}];
+  context.renderEvidenceRoute(data);
+  assert.equal(elements.recordForm.hidden, true);
+  assert.equal(shown.citation_id, "1");
+});

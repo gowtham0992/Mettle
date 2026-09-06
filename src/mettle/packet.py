@@ -306,17 +306,29 @@ def render_packet_pdf(
     for citation in notice.citations:
         assessment = latest[citation.citation_id]
         uploaded = (uploaded_photos or {}).get(assessment.assessment_id)
-        if uploaded is not None:
+        if assessment.contractor_record is not None:
+            record = assessment.contractor_record
+            evidence_record = [
+                Paragraph("CONTRACTOR-REVIEWED SOURCE RECORD", styles["eyebrow"]),
+                Paragraph(escape(record.route.replace("_", " ").title()), styles["heading"]),
+                Paragraph(escape(f"Reference: {record.reference}"), styles["body"]),
+                Paragraph(escape(f"Reviewed by {record.reviewer} on {record.reviewed_on.isoformat()}"), styles["body"]),
+                Paragraph(escape(record.details), styles["body"]),
+                Paragraph(escape(assessment.explanation), styles["body"]),
+                Paragraph("Original source retained by the contractor; not attached or independently authenticated by Mettle.", styles["small"]),
+            ]
+        elif uploaded is not None:
             image_source: Path | BytesIO = BytesIO(uploaded)
         else:
             filename = _SAMPLE_FILES[assessment.sample_id]
             image_source = evidence_dir / filename
-        evidence_record = [
-            _scaled_image(image_source),
-            Spacer(1, 0.1 * inch),
-            Paragraph("EVIDENCE ACCEPTED FOR SUFFICIENCY", styles["eyebrow"]),
-            Paragraph(escape(assessment.explanation), styles["body"]),
-        ]
+        if assessment.contractor_record is None:
+            evidence_record = [
+                _scaled_image(image_source),
+                Spacer(1, 0.1 * inch),
+                Paragraph("EVIDENCE ACCEPTED FOR SUFFICIENCY", styles["eyebrow"]),
+                Paragraph(escape(assessment.explanation), styles["body"]),
+            ]
         if assessment.contractor_decision:
             evidence_record.extend(
                 [

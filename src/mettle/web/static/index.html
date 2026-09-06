@@ -223,19 +223,31 @@
 
             <section class="evidence-panel" id="evidence-panel" aria-labelledby="evidence-title" hidden>
               <div class="packet-section-heading">
-                <div><p class="mono-label">ADD OR TEST PROOF</p><h2 id="evidence-title">Visible-evidence check</h2></div>
+                <div><p class="mono-label">PROOF FOR THIS CORRECTION</p><h2 id="evidence-title">Add the required proof</h2></div>
                 <span class="evidence-panel__mode">NO CODE CERTIFICATION</span>
               </div>
+              <div class="photo-evidence"><label><span>Correction</span><select id="photo-citation" aria-label="Correction for evidence"></select></label></div>
               <form class="photo-evidence" id="photo-evidence-form">
                 <div class="photo-evidence__copy">
                   <strong>Assess a job-site photo against the notice</strong>
                   <span>JPEG or PNG · 5 MB max · ambiguous proof returns to the contractor</span>
                 </div>
-                <label><span>Correction</span><select id="photo-citation" aria-label="Correction for uploaded photo"></select></label>
                 <label class="photo-evidence__file"><span>Photo</span><input id="photo-file" type="file" accept="image/jpeg,image/png"></label>
                 <button class="button button--orange" id="photo-submit" type="submit" disabled>Assess with Bedrock Vision</button>
                 <p class="photo-evidence__mode" id="photo-mode-note">Start a recovery to assess a real photo.</p>
                 <p class="photo-evidence__error" id="photo-error" role="alert" hidden></p>
+              </form>
+              <form class="photo-evidence" id="record-evidence-form" hidden>
+                <div class="photo-evidence__copy"><strong id="record-title">Record a document review</strong><span id="record-guidance"></span></div>
+                <p id="record-requirements"></p>
+                <label><span>Source reference · title, revision or inspection record number</span><input id="record-reference" required minlength="3" maxlength="240" placeholder="e.g. connector manual, revision B, page 12"></label>
+                <label><span>Reviewed by</span><input id="record-reviewer" required minlength="3" maxlength="120" autocomplete="name"></label>
+                <label><span>Review / completed inspection date</span><input id="record-date" type="date" required></label>
+                <label><span>What the source confirms · address every requirement above</span><textarea id="record-details" required minlength="20" maxlength="4000" rows="5" placeholder="Record the relevant document excerpt or the completed inspection outcome. Retain the original source."></textarea></label>
+                <label class="correction-review__consent"><input id="record-confirmed" type="checkbox" required><span id="record-confirmation">I reviewed the original source and confirm it addresses every required item. I will retain the original.</span></label>
+                <button class="button button--orange" id="record-submit" type="submit">Save contractor-reviewed record</button>
+                <p class="photo-evidence__mode">HUMAN-REVIEWED RECORD · NO MODEL VERIFICATION · ORIGINAL IS NOT UPLOADED</p>
+                <p class="photo-evidence__error" id="record-error" role="alert" hidden></p>
               </form>
               <details class="demo-evidence" id="demo-evidence">
                 <summary>Open synthetic proof fixtures</summary>

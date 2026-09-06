@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from mettle.domain import Citation
 
@@ -33,6 +35,30 @@ class EvidenceAgentStep(BaseModel):
     detail: str = Field(min_length=1, max_length=240)
 
 
+class ContractorEvidenceRecord(BaseModel):
+    """A human-reviewed source record, never a model certification."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    route: Literal["document_evidence", "physical_reinspection"]
+    reference: str = Field(min_length=3, max_length=240)
+    reviewer: str = Field(min_length=3, max_length=120)
+    reviewed_on: date
+    details: str = Field(min_length=20, max_length=4000)
+    confirmed: bool = Field(strict=True)
+
+    @model_validator(mode="after")
+    def validate_record(self):
+        if not self.confirmed:
+            raise ValueError("contractor review must be explicitly confirmed")
+        for name, minimum in (("reference", 3), ("reviewer", 3), ("details", 20)):
+            normalized = " ".join(getattr(self, name).split())
+            if len(normalized) < minimum:
+                raise ValueError(f"{name} must contain meaningful text")
+            object.__setattr__(self, name, normalized)
+        return self
+
+
 class EvidenceAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -48,6 +74,7 @@ class EvidenceAssessment(BaseModel):
     agent_run: list[EvidenceAgentStep] = Field(default_factory=list)
     automated_status: EvidenceStatus | None = None
     contractor_decision: str | None = Field(default=None, max_length=500)
+    contractor_record: ContractorEvidenceRecord | None = None
 
 
 @dataclass(frozen=True)

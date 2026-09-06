@@ -222,7 +222,11 @@ img { display: block; max-width: 100%; }
 .photo-evidence__copy { display: grid; gap: 4px; }
 .photo-evidence__copy span, .photo-evidence__mode { color: var(--muted); font-size: 11px; }
 .photo-evidence label { display: grid; gap: 6px; color: var(--muted); font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
-.photo-evidence select, .photo-evidence input { width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--ink); color: var(--white); }
+.photo-evidence select, .photo-evidence input, .photo-evidence textarea { width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--ink); color: var(--white); }
+.photo-evidence textarea { resize: vertical; font: inherit; line-height: 1.6; }
+.photo-evidence input:not([type="checkbox"]), .photo-evidence textarea, .photo-evidence select { font-family: var(--sans); font-size: 14px; letter-spacing: normal; text-transform: none; }
+.photo-evidence .correction-review__consent { display: flex; align-items: flex-start; text-transform: none; letter-spacing: normal; font: inherit; font-size: 12px; line-height: 1.5; }
+.photo-evidence input[type="checkbox"] { width: 18px; min-height: 18px; flex: 0 0 18px; }
 .photo-evidence__error { color: var(--red); }
 .demo-evidence { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
 .demo-evidence summary { color: var(--muted); font-size: 12px; }

@@ -13,9 +13,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from mettle.automation import CampaignAutomation
 from mettle.communication import Messenger, Recipient, RecordingMessenger
-from mettle.domain import InspectionNotice, Trade
+from mettle.domain import ClosureRoute, InspectionNotice, Trade
 from mettle.evidence import (
     EvidenceAgentStep,
+    ContractorEvidenceRecord,
     EvidenceAssessment,
     EvidenceReviewDisposition,
     EvidenceSampleNotFound,
@@ -117,11 +118,19 @@ class SubmitEvidenceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     citation_id: str = Field(min_length=1, max_length=50)
-    sample_id: str = Field(
+    sample_id: str | None = Field(
+        default=None,
         min_length=1,
         max_length=64,
         pattern=r"^[a-z0-9_]+$",
     )
+    contractor_record: ContractorEvidenceRecord | None = None
+
+    @model_validator(mode="after")
+    def select_one_evidence_source(self):
+        if (self.sample_id is None) == (self.contractor_record is None):
+            raise ValueError("provide exactly one evidence source")
+        return self
 
 
 class SubmitPhotoEvidenceRequest(BaseModel):
@@ -469,6 +478,27 @@ class WorkflowRegistry:
                 return envelope.model_copy(deep=True)
 
             effective_citation = self._effective_citation(entry, payload.citation_id)
+            if payload.contractor_record is not None:
+                record = payload.contractor_record
+                if record.route != effective_citation.closure_route.value:
+                    raise EvidenceSubmissionError("record route must match the approved correction route")
+                if record.reviewed_on > date.today():
+                    raise EvidenceSubmissionError("record review date cannot be in the future")
+                assessment = EvidenceAssessment(
+                    assessment_id=f"evidence-{token_urlsafe(9)}",
+                    citation_id=payload.citation_id, sample_id="contractor_record", image_url="",
+                    status=EvidenceStatus.ACCEPTED,
+                    matched_requirements=list(effective_citation.evidence_requirements),
+                    explanation="Contractor reviewed the source record and confirmed it addresses the required proof. Mettle did not independently verify the document or certify an inspection outcome.",
+                    contractor_record=record,
+                    agent_run=[EvidenceAgentStep(step="Contractor source-record review", status="completed", detail="Explicit human confirmation recorded; no vision assessment or code certification.")],
+                )
+                entry.evidence.append(assessment)
+                envelope = self._envelope(workflow_id, entry)
+                entry.evidence_replays[idempotency_key] = (fingerprint, envelope)
+                return envelope
+            if effective_citation.closure_route is not ClosureRoute.PHOTO_EVIDENCE:
+                raise EvidenceSubmissionError("this route requires a contractor source record, not a photo")
             try:
                 assessment = assess_sample(
                     citation=effective_citation,
@@ -511,6 +541,8 @@ class WorkflowRegistry:
                 return envelope.model_copy(deep=True)
 
             citation = self._effective_citation(entry, payload.citation_id)
+            if citation.closure_route is not ClosureRoute.PHOTO_EVIDENCE:
+                raise EvidenceSubmissionError("this route requires a contractor source record, not a photo")
             assessment_id = f"evidence-{token_urlsafe(9)}"
             assessment = self._photo_assessor(
                 citation=citation,
