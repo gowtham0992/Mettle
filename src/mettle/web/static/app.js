@@ -226,13 +226,14 @@ let recoveryDraftRestored = false;
 let pendingCorrectionReview = null;
 let correctionReviewKey = null;
 let nextActionHandler = null;
+const judgmentDrafts = new Map();
 let tourActionHandler = null;
 let tourSecondaryHandler = null;
 let animationSkipRequested = false;
 let finishTourDelay = null;
 let tourClockOverride = null;
 let retryHandler = () => loadCampaign();
-const workspaceViews = new Set(["recovery", "evidence", "activity"]);
+const workspaceViews = new Set(["recovery", "correction", "evidence", "activity"]);
 let activeWorkspaceView = workspaceViewFromUrl();
 let judgeTourActive = new URLSearchParams(window.location.search).get("tour") === "1"
   || sessionStorage.getItem("mettle_entry_selected") === "tour";
@@ -261,7 +262,7 @@ if (!elements.workflowAsOf.value) {
 
 function workspaceViewFromUrl() {
   const requested = new URLSearchParams(window.location.search).get("view");
-  return ["recovery", "evidence", "activity"].includes(requested) ? requested : "recovery";
+  return ["recovery", "correction", "evidence", "activity"].includes(requested) ? requested : "recovery";
 }
 
 function setWorkspaceView(view, { updateUrl = false, focusTab = false } = {}) {
@@ -280,7 +281,7 @@ function setWorkspaceView(view, { updateUrl = false, focusTab = false } = {}) {
   }
   if (elements.nextAction.dataset.actionVisible) {
     elements.nextAction.hidden = elements.nextAction.dataset.actionVisible !== "true"
-      || elements.nextAction.dataset.actionView !== nextView;
+      || nextView !== "recovery";
   }
   if (updateUrl) {
     const url = new URL(window.location.href);
@@ -288,15 +289,48 @@ function setWorkspaceView(view, { updateUrl = false, focusTab = false } = {}) {
     else url.searchParams.set("view", nextView);
     window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }
+  if (campaign && (updateUrl || focusTab)) renderWorkbench(campaign);
 }
 
 function openWorkspacePanel(view, targetSelector, focusSelector = null) {
+  if (targetSelector === "#evidence-panel" || targetSelector === ".citation--needs-action") {
+    const pending = targetSelector === ".citation--needs-action"
+      ? campaign?.judgments.find(j => j.status === "pending" && j.citation_id) : null;
+    openCorrection(pending?.citation_id || elements.photoCitation.value);
+    window.setTimeout(() => document.querySelector(focusSelector?.replace(".citation--needs-action", "#correction-decision"))?.focus(), 0);
+    return;
+  }
   setWorkspaceView(view, { updateUrl: true });
   window.setTimeout(() => {
     const target = document.querySelector(targetSelector);
     target?.scrollIntoView({ behavior: "smooth", block: "start" });
     if (focusSelector) document.querySelector(focusSelector)?.focus();
   }, 0);
+}
+
+function openCorrection(citationId) {
+  if (!campaign) return;
+  const citation = globalThis.MettleWorkbench.selectedCitation(campaign, citationId);
+  if (!citation) return;
+  const changed = elements.photoCitation.value !== String(citation.citation_id);
+  if (changed) {
+    elements.photoFile.value = "";
+    elements.photoError.hidden = true;
+    elements.evidenceResult.hidden = true;
+  }
+  elements.photoCitation.value = String(citation.citation_id);
+  const url = new URL(window.location.href);
+  url.searchParams.set("view", "correction");
+  url.searchParams.set("correction", citation.citation_id);
+  window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  setWorkspaceView("correction");
+  renderWorkbench(campaign);
+  document.getElementById("correction-title").focus();
+  window.scrollTo({top:0,behavior:"auto"});
+}
+
+function renderWorkbench(data) {
+  globalThis.MettleWorkbench.render(data, {node, openCorrection, renderJudgment, renderEvidenceRoute, setWorkspaceView, elements});
 }
 
 function setTourIsolation(active) {
@@ -1162,7 +1196,7 @@ function configureNextAction(data) {
     : "recovery";
   elements.nextAction.dataset.actionView = actionView;
   elements.nextAction.dataset.actionVisible = "true";
-  elements.nextAction.hidden = activeWorkspaceView !== actionView;
+  elements.nextAction.hidden = activeWorkspaceView !== "recovery";
   elements.nextAction.classList.toggle("next-action--sample", !isWorkflow);
   elements.nextActionEyebrow.textContent = pending.length ? "ACTION REQUIRED" : "NEXT STEP";
   elements.nextActionMeta.textContent = isWorkflow ? "ONE ACTION · CONTRACTOR CONTROLLED" : "SYNTHETIC DATA · 90 SECONDS";
@@ -1199,8 +1233,11 @@ function configureNextAction(data) {
         ? () => openWorkspacePanel("recovery", ".citation--needs-action", ".citation--needs-action .judgment input")
         : () => openWorkspacePanel("recovery", "#judgment-list", "#judgment-list .judgment input");
     } else {
-      elements.nextAction.dataset.actionVisible = "false";
-      elements.nextAction.hidden = true;
+      elements.nextAction.dataset.actionVisible = "true";
+      elements.nextAction.hidden = activeWorkspaceView !== "recovery";
+      elements.nextActionTitle.textContent = "Mettle is handling the open work";
+      elements.nextActionCopy.textContent = "Continue this recorded sample to see proof arrive, follow-ups change, and the next contractor decision appear. No live messages or model calls.";
+      elements.nextActionButton.textContent = "Continue sample recovery";
       nextActionHandler = () => elements.advance.click();
     }
     return;
@@ -1323,62 +1360,19 @@ function renderCorrectionSummary(data) {
 }
 
 function renderCitation(citation, data) {
-  const judgment = data.judgments.find(
-    (item) => item.status === "pending" && String(item.citation_id || "") === String(citation.citation_id),
-  );
-  const preOutreach = data.metrics.messages_handled === 0 && pendingJudgment(data, "route-review");
-  const [statusLabel, nextStep] = preOutreach
-    ? ["ROUTE HELD", "Awaiting contractor approval before outreach."]
-    : correctionStatus(citation);
-  const card = node("article", `citation${judgment ? " citation--needs-action" : ""}`);
-  card.id = `correction-${citation.citation_id}`;
-
-  const summary = node("div", "citation__summary");
-  summary.append(node("div", "citation__number", `C${citation.citation_id}`));
-  const identity = node("div", "citation__identity");
-  identity.append(
-    node("p", "citation__code", `${titleCase(citation.trade)} · ${citation.code_reference}`),
-    node("p", "citation__finding", `“${citation.notice_text}”`),
-  );
-  summary.append(identity);
-
-  const operations = node("div", "citation__operations");
-  operations.append(
-    node("strong", "", preOutreach ? "Proposed route · not contacted" : citation.assignee || "Unassigned · contractor direction required"),
-    node("span", "", nextStep),
-  );
-  summary.append(operations);
-
-  const proof = node("div", "citation__proof");
-  const imagePath = data.source_mode === "workflow" ? null : citationEvidenceImages[citation.stage]?.[citation.citation_id];
-  if (imagePath) {
-    const image = document.createElement("img");
-    image.src = imagePath;
-    image.alt = citation.stage === "ready"
-      ? `Accepted synthetic proof for correction ${citation.citation_id}`
-      : `Returned synthetic proof for correction ${citation.citation_id}`;
-    proof.append(image);
-  }
-  proof.append(node("span", `status status--${preOutreach ? "needs_judgment" : citation.stage}`, statusLabel));
-  summary.append(proof);
-  card.append(summary);
-
-  const details = node("details", "citation__details");
-  details.append(node("summary", "", "View notice and proof record"));
-  const record = node("div", "citation__record");
-  const requirements = node("ul", "citation__requirements");
-  for (const requirement of citation.evidence_requirements) requirements.append(node("li", "", requirement));
-  if (!requirements.children.length) requirements.append(node("li", "", "The notice does not define observable proof; contractor instruction is required."));
-  record.append(requirements, node("p", "citation__record-note", citation.evidence_note || nextStep));
-  details.append(record);
-  card.append(details);
-
-  if (judgment) {
-    const decision = node("div", "citation__decision");
-    decision.append(renderJudgment(judgment));
-    card.append(decision);
-  }
-  return card;
+  const judgment = data.judgments.find(j => j.status === "pending" && String(j.citation_id || "") === String(citation.citation_id));
+  const row = node("article", `citation citation--compact${judgment ? " citation--needs-action" : ""}`);
+  row.id = `correction-${citation.citation_id}`;
+  const button = node("button", "correction-row"); button.type = "button";
+  button.append(node("span", "citation__number", `C${citation.citation_id}`));
+  const identity = node("span", "correction-row__identity");
+  identity.append(node("strong", "", titleCase(citation.trade)), node("span", "", citation.notice_text));
+  const status = node("span", `status status--${citation.stage}`, correctionStatus(citation)[0]);
+  button.append(identity, status, node("span", "correction-row__arrow", "→"));
+  button.setAttribute("aria-label", `Open correction ${citation.citation_id}: ${citation.trade}`);
+  button.addEventListener("click", () => openCorrection(citation.citation_id));
+  row.append(button);
+  return row;
 }
 
 function renderEvent(event) {
@@ -1753,6 +1747,9 @@ function renderJudgment(judgment) {
   input.minLength = 3;
   input.maxLength = 500;
   input.placeholder = placeholder;
+  const draftKey = `${activeWorkflowId || "sample"}:${judgment.judgment_id}`;
+  input.value = judgmentDrafts.get(draftKey) || "";
+  input.addEventListener("input", () => judgmentDrafts.set(draftKey, input.value));
   const button = node("button", "button", buttonLabel);
   button.type = "submit";
   button.dataset.disposition = isEvidenceReview ? "accept" : "";
@@ -1814,6 +1811,7 @@ function renderJudgment(judgment) {
         });
       }
       render(campaign);
+      judgmentDrafts.delete(draftKey);
       showToast(isPacketApproval
         ? "Final approval recorded. The reinspection PDF is ready to download."
         : isEvidenceReview
@@ -2586,7 +2584,7 @@ function renderPacket(data) {
     const copy = node("span", "packet-row__code", `${titleCase(citation.trade)} · ${citation.code_reference}`);
     const ready = citation.stage === "ready";
     copy.append(node("span", "packet-row__detail", ready
-      ? citation.evidence_note || "Accepted visible proof is included in the packet record."
+      ? "Accepted evidence · open the record for review"
       : correctionStatus(citation)[1]));
     row.append(copy);
     row.append(node("span", `packet-row__state${ready ? " packet-row__state--ready" : ""}`, ready ? "ACCEPTED" : "PENDING"));
@@ -2747,7 +2745,9 @@ function render(data) {
   elements.recoveryClock.hidden = !isWorkflow;
   elements.driverTag.textContent = isWorkflow ? "RECOVERY" : "SAMPLE";
   if (isWorkflow) renderRecoveryClock(data);
-  const selectedCitation = selectEvidenceCitation(data.citations, elements.photoCitation.value);
+  const requestedCorrection = new URLSearchParams(window.location.search).get("correction");
+  const explicitlySelected = activeWorkspaceView === "correction" && data.citations.find(c => String(c.citation_id) === requestedCorrection);
+  const selectedCitation = explicitlySelected ? String(explicitlySelected.citation_id) : selectEvidenceCitation(data.citations, elements.photoCitation.value);
   const openEvidenceCitations = data.citations.filter((citation) => citation.stage !== "ready");
   elements.photoCitation.replaceChildren(...data.citations.map((citation) => {
     const option = node("option", "", evidenceOptionLabel(citation));
@@ -2841,6 +2841,7 @@ function render(data) {
   advanceLabels[1].textContent = isWorkflow ? "LIVE" : data.scenario_complete ? "DONE ✓" : demoRunning ? "WORKING…" : "TIME ▶";
   elements.loadNotice.querySelector("span").textContent = "NEW RECOVERY";
   elements.reset.querySelector("span").textContent = isWorkflow ? "OPEN SAMPLE" : "RESET SAMPLE";
+  renderWorkbench(data);
 }
 
 async function loadCampaign() {
@@ -2909,6 +2910,7 @@ elements.photoCitation.addEventListener("change", () => {
   elements.photoError.hidden = true;
   elements.photoSubmit.disabled = true;
   renderEvidenceRoute(campaign);
+  openCorrection(elements.photoCitation.value);
 });
 
 const recordDrafts = new Map();
@@ -3160,6 +3162,11 @@ window.addEventListener("popstate", () => {
   const tourFromUrl = new URLSearchParams(window.location.search).get("tour") === "1";
   setJudgeTourActive(tourFromUrl, { focus: false });
   if (!tourFromUrl) setWorkspaceView(workspaceViewFromUrl());
+  if (campaign) {
+    const selected = globalThis.MettleWorkbench.selectedCitation(campaign, params.get("correction"));
+    if (selected) elements.photoCitation.value = String(selected.citation_id);
+    renderWorkbench(campaign);
+  }
 });
 
 elements.nextActionButton.addEventListener("click", () => nextActionHandler?.());
@@ -3407,8 +3414,8 @@ elements.approveCorrections.addEventListener("click", async () => {
     elements.noticeDialog.close();
     const sent = envelope.snapshot.deliveries.filter((delivery) => delivery.status === "sent").length;
     showToast(sent
-      ? `Recovery started. Mettle sent ${sent} job update${sent === 1 ? "" : "s"} and scheduled the next check.`
-      : `Recovery started. Mettle prepared ${envelope.snapshot.deliveries.length} outreach action${envelope.snapshot.deliveries.length === 1 ? "" : "s"} and scheduled the next check.`);
+      ? `Recovery started. Mettle sent ${sent} job update${sent === 1 ? "" : "s"}.${campaign.automation_status === "scheduled" ? " The next check is scheduled." : " No background checkpoint is active."}`
+      : `Recovery started. Mettle prepared ${envelope.snapshot.deliveries.length} outreach action${envelope.snapshot.deliveries.length === 1 ? "" : "s"}.${campaign.automation_status === "scheduled" ? " The next check is scheduled." : " No background checkpoint is active."}`);
   } catch (error) {
     showInlineWorkflowError(error, elements.workflowError);
   } finally {
@@ -3571,6 +3578,7 @@ initializeAuth().then(async () => {
 window.setInterval(async () => {
   if (
     document.visibilityState !== "visible"
+    || document.activeElement?.matches("input, textarea, select")
     || !activeWorkflowId
     || activeWorkflowTarget !== "agentcore"
     || campaign?.automation_status !== "scheduled"

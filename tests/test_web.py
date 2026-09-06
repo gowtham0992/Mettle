@@ -584,15 +584,19 @@ def test_dashboard_and_campaign_api_load() -> None:
         evidence_flow = browser.get("/static/evidence-flow.js")
         script = browser.get("/static/app.js")
         styles = browser.get("/static/styles.css")
+        workbench = browser.get("/static/workbench.js")
+        workbench_styles = browser.get("/static/workbench.css")
         campaign = browser.get("/api/campaign")
 
     assert page.status_code == 200
     assert evidence_flow.status_code == 200
+    assert workbench.status_code == 200
+    assert workbench_styles.status_code == 200
     assert "Recovery command center" in page.text
     assert "Start with the failed-inspection report" in page.text
     assert "Start a recovery" in page.text
-    assert "Try a sample recovery" in page.text
-    assert "Start a secure recovery" in page.text
+    assert "Judge walkthrough" in page.text
+    assert "Start my recovery" in page.text
     assert "What Mettle handled" in page.text
     assert "models interpret language and visible evidence; they never decide deadlines, gates, or what Mettle may claim" in page.text
     assert "The browser never owns the agent runtime." in page.text
@@ -611,7 +615,10 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert 'id="start-workflow-button"' in page.text
     assert "Approve & start follow-up" in page.text
     assert "4 · Review" in page.text
-    assert "Evidence & packet" in page.text
+    assert 'data-workspace-panel="correction"' in page.text
+    assert 'id="correction-source-text"' in page.text
+    assert '/static/workbench.js' in page.text
+    assert '/static/workbench.css' in page.text
     assert "Inspectable Strands control flow" in page.text
     assert "STRANDS GRAPHBUILDER" in page.text
     assert "RUN RECEIPT · SANITIZED · READ ONLY" in page.text

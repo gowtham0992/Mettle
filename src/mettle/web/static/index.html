@@ -7,7 +7,9 @@
     <title>Mettle · Recovery command center</title>
     <link rel="icon" href="/static/mettle-icon.png" type="image/png">
     <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/workbench.css">
     <script src="/static/evidence-flow.js" defer></script>
+    <script src="/static/workbench.js" defer></script>
     <script src="/static/app.js" defer></script>
   </head>
   <body>
@@ -67,11 +69,12 @@
         <button class="workspace-tab" type="button" data-workspace-tab="recovery" aria-current="page">
           <span class="workspace-tab__icon" aria-hidden="true">01</span><strong>Today</strong><small>What needs attention</small>
         </button>
+        <button class="workspace-tab" type="button" data-workspace-tab="correction"><span class="workspace-tab__icon" aria-hidden="true">02</span><strong>Corrections</strong><small>Notice, proof, and decisions</small></button>
         <button class="workspace-tab" type="button" data-workspace-tab="evidence">
-          <span class="workspace-tab__icon" aria-hidden="true">02</span><strong>Evidence & packet</strong><small>Proof, review, and release</small>
+          <span class="workspace-tab__icon" aria-hidden="true">03</span><strong>Packet</strong><small>Proof, review, and release</small>
         </button>
         <button class="workspace-tab workspace-tab--provenance" type="button" data-workspace-tab="activity" aria-label="How Mettle worked">
-          <span class="workspace-tab__icon" aria-hidden="true">03</span><strong><span class="workspace-label-full">Activity</span><span class="workspace-label-short" aria-hidden="true">Activity</span></strong><small>What Mettle handled</small>
+          <span class="workspace-tab__icon" aria-hidden="true">04</span><strong><span class="workspace-label-full">Activity</span><span class="workspace-label-short" aria-hidden="true">Activity</span></strong><small>What Mettle handled</small>
         </button>
         <div class="workspace-agent-status" aria-label="Background recovery status">
           <span id="workspace-agent-state"><i aria-hidden="true"></i> METTLE IS WORKING</span>
@@ -170,11 +173,11 @@
           <header class="workspace-heading">
             <div>
               <p class="mono-label">TODAY · FAILED-INSPECTION RECOVERY</p>
-              <h1 id="docket-title">Here’s what needs attention.</h1>
+              <h1 id="docket-title">A little needs you. The rest is moving.</h1>
             </div>
             <div class="correction-summary" id="correction-summary" aria-live="polite"></div>
           </header>
-          <div id="citation-list" class="citation-list"></div>
+          <div class="today-work-grid"><div><div id="today-action-slot"></div><div class="workbench-list-heading"><h2>Every correction, in one place</h2><span id="workbench-count"></span></div><div id="citation-list" class="citation-list"></div></div><aside id="workbench-activity" class="workbench-activity" aria-label="What Mettle is handling"></aside></div>
           <div id="judgment-list" class="judgment-list workspace-judgments"></div>
           <details class="away-briefing" id="away-briefing" hidden>
             <summary>
@@ -197,31 +200,7 @@
           </section>
         </section>
 
-        <section class="packet-workspace" data-workspace-panel="evidence">
-          <header class="workspace-heading workspace-heading--packet">
-            <div>
-              <p class="mono-label">CONTRACTOR-REVIEWED HANDOFF</p>
-              <h1>Reinspection packet</h1>
-              <p>Mettle assembles the evidence. The contractor reviews and releases it.</p>
-            </div>
-            <strong id="packet-status" class="packet-stamp">LOCKED</strong>
-          </header>
-          <div class="packet-layout">
-            <section class="packet-primary" aria-labelledby="packet-coverage-title">
-              <div class="packet-section-heading">
-                <div><p class="mono-label">EVIDENCE COVERAGE</p><h2 id="packet-coverage-title">What is ready</h2></div>
-                <strong id="packet-readiness">0 OF 0 READY</strong>
-              </div>
-              <div id="packet-list" class="packet-list"></div>
-              <div class="packet-preview" id="packet-preview" hidden></div>
-              <div class="packet-judgment" id="packet-judgment"></div>
-              <div class="packet-release">
-                <p id="packet-note">Nothing is released until the contractor approves it.</p>
-                <button class="button button--orange packet-action" id="packet-action" type="button" hidden>Prepare packet for approval</button>
-              </div>
-            </section>
-
-            <section class="evidence-panel" id="evidence-panel" aria-labelledby="evidence-title" hidden>
+<section class="correction-workspace" data-workspace-panel="correction"><header class="workbench-detail-header"><button class="button button--outline" id="correction-back" type="button">← Back to today</button><nav id="correction-tabs" aria-label="Choose a correction"></nav><p class="mono-label" id="correction-context"></p><h1 id="correction-title" tabindex="-1">Correction detail</h1><p id="correction-subtitle"></p></header><div class="correction-layout"><div class="correction-main"><div id="correction-decision"></div>            <section class="evidence-panel" id="evidence-panel" aria-labelledby="evidence-title" hidden>
               <div class="packet-section-heading">
                 <div><p class="mono-label">PROOF FOR THIS CORRECTION</p><h2 id="evidence-title">Add the required proof</h2></div>
                 <span class="evidence-panel__mode">NO CODE CERTIFICATION</span>
@@ -261,7 +240,32 @@
               </details>
               <div class="evidence-result" id="evidence-result" aria-live="polite" hidden></div>
             </section>
-          </div>
+ <div id="correction-history"></div></div><aside class="correction-source"><p class="mono-label">The notice is the source</p><h2 id="correction-source-title">Required correction</h2><blockquote id="correction-source-text"></blockquote><h3>Required proof</h3><ul id="correction-requirements"></ul><p id="correction-authority-note"></p><button class="button button--outline" type="button" data-open-agent-receipt>See how Mettle handled it →</button></aside></div></section>
+        <section class="packet-workspace" data-workspace-panel="evidence">
+          <header class="workspace-heading workspace-heading--packet">
+            <div>
+              <p class="mono-label">CONTRACTOR-REVIEWED HANDOFF</p>
+              <h1>Reinspection packet</h1>
+              <p>Mettle assembles the evidence. The contractor reviews and releases it.</p>
+            </div>
+            <strong id="packet-status" class="packet-stamp">LOCKED</strong>
+          </header>
+          <div id="packet-action-slot"></div><div class="packet-layout">
+            <section class="packet-primary" aria-labelledby="packet-coverage-title">
+              <div class="packet-section-heading">
+                <div><p class="mono-label">EVIDENCE COVERAGE</p><h2 id="packet-coverage-title">What is ready</h2></div>
+                <strong id="packet-readiness">0 OF 0 READY</strong>
+              </div>
+              <div id="packet-list" class="packet-list"></div>
+              <div class="packet-preview" id="packet-preview" hidden></div>
+              <div class="packet-judgment" id="packet-judgment"></div>
+              <div class="packet-release">
+                <p id="packet-note">Nothing is released until the contractor approves it.</p>
+                <button class="button button--orange packet-action" id="packet-action" type="button" hidden>Prepare packet for approval</button>
+              </div>
+            </section>
+
+         </div>
         </section>
 
         <section class="provenance-workspace" data-workspace-panel="activity">
@@ -276,7 +280,7 @@
           <section class="agent-flow" aria-labelledby="agent-flow-title">
             <header class="agent-flow__heading">
               <div><p class="mono-label">ORCHESTRATION AT A GLANCE</p><h2 id="agent-flow-title">What runs, what wakes it, where it stops.</h2></div>
-              <p>Model work is dark. Deterministic control is light. Contractor authority is orange.</p>
+              <p>Each step names its role: model agent, deterministic policy, or contractor decision.</p>
             </header>
             <p class="agent-flow__thesis"><strong>Bounded authority:</strong> models interpret language and visible evidence; they never decide deadlines, gates, or what Mettle may claim.</p>
             <div class="agent-flow__track" id="agent-flow" aria-label="Mettle agent orchestration flow"></div>
@@ -353,21 +357,21 @@
         <div class="welcome-dialog__editorial">
           <div class="welcome-dialog__copy">
             <p class="mono-label">NOTICE IN → RECOVERY OUT</p>
-            <h1 id="welcome-title" tabindex="-1">Get the correction work back under control.</h1>
+            <h1 id="welcome-title" tabindex="-1">Less chasing. More building.</h1>
             <p>Mettle reads the failed-inspection report, organizes the responsible trades and proof, follows the deadline, and interrupts you only for decisions.</p>
           </div>
           <div class="welcome-dialog__choices">
             <button class="entry-choice entry-choice--primary" id="start-tour-entry" type="button">
               <span class="entry-choice__index">01</span>
               <span class="entry-choice__badge">RECOMMENDED FOR JUDGES · 3 MIN</span>
-              <strong>Try a sample recovery</strong>
+              <strong>Judge walkthrough</strong>
               <span>Follow one complete job while the Judge Guide explains the agent work and human boundaries inside the real product.</span>
               <span class="entry-choice__action">START →</span>
             </button>
             <button class="entry-choice" id="start-recovery-entry" type="button">
               <span class="entry-choice__index">02</span>
               <span class="entry-choice__badge">FOR CONTRACTORS</span>
-              <strong>Start a secure recovery</strong>
+              <strong>Start my recovery</strong>
               <span>Add a redacted correction report and the people responsible. Mettle saves your setup if sign-in is needed.</span>
               <span class="entry-choice__action entry-choice__action--quiet" id="recovery-entry-action">START →</span>
             </button>
