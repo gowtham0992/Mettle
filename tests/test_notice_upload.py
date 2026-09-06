@@ -4,6 +4,41 @@ import pytest
 from pypdf import PdfWriter
 
 from mettle.notice_upload import NoticeUploadError, extract_notice_text
+from mettle.notice_upload import extract_notice_ocr
+from mettle.photo_upload import PhotoUploadError
+from PIL import Image
+from unittest.mock import Mock
+
+
+def test_ocr_normalizes_photo_and_returns_only_detected_lines():
+    stream = BytesIO()
+    Image.new("RGB", (100, 100), "white").save(stream, format="PNG")
+    client = Mock()
+    client.detect_document_text.return_value = {"Blocks": [
+        {"BlockType": "LINE", "Text": "Permit TEST-1: repair panel clearance"},
+        {"BlockType": "WORD", "Text": "duplicate"},
+    ]}
+    assert extract_notice_ocr(stream.getvalue(), filename="notice.png", client=client) == "Permit TEST-1: repair panel clearance"
+    assert client.detect_document_text.call_args.kwargs["Document"]["Bytes"].startswith(b"\xff\xd8")
+
+
+def test_ocr_rejects_invalid_images_before_aws():
+    client = Mock()
+    with pytest.raises(PhotoUploadError):
+        extract_notice_ocr(b"not a photo", filename="notice.png", client=client)
+    client.detect_document_text.assert_not_called()
+
+
+def test_ocr_rejects_multiple_pages_before_aws():
+    stream = BytesIO()
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.add_blank_page(width=200, height=200)
+    writer.write(stream)
+    client = Mock()
+    with pytest.raises(NoticeUploadError):
+        extract_notice_ocr(stream.getvalue(), filename="notice.pdf", client=client)
+    client.detect_document_text.assert_not_called()
 
 
 def test_accepts_utf8_text_report() -> None:

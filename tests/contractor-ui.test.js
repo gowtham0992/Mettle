@@ -40,10 +40,11 @@ test("an in-flight report import cannot overwrite an edited draft", async () => 
   let resolve;
   const response = new Promise((done) => { resolve = done; });
   const elements = {
+    noticeOcr: {checked:false, addEventListener() {}},
     noticeFile: {files: [{name: "notice.txt", size: 20, arrayBuffer: async () => new ArrayBuffer(0)}], addEventListener: (_, fn) => {handler = fn;}},
     noticeText: {value: "Original", focus() {}}, noticeFileStatus: {}, workflowError: {}, noticeDialog: {open: true},
   };
-  const context = vm.createContext({elements, noticeImportVersion: 0, setupStep: 1, request: () => response, base64Standard: () => "", showInlineWorkflowError() {}});
+  const context = vm.createContext({elements, document:{querySelector:()=>({addEventListener(){}})}, noticeImportVersion: 0, setupStep: 1, request: () => response, base64Standard: () => "", showInlineWorkflowError() {}});
   vm.runInContext(source.slice(source.indexOf('elements.noticeFile.addEventListener("change"'), source.indexOf('elements.setupBack.addEventListener')), context);
   const pending = handler();
   context.noticeImportVersion++;

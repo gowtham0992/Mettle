@@ -361,19 +361,19 @@
             <p>Mettle reads the failed-inspection report, organizes the responsible trades and proof, follows the deadline, and interrupts you only for decisions.</p>
           </div>
           <div class="welcome-dialog__choices">
-            <button class="entry-choice entry-choice--primary" id="start-tour-entry" type="button">
+            <button class="entry-choice entry-choice--primary" id="start-recovery-entry" type="button">
               <span class="entry-choice__index">01</span>
-              <span class="entry-choice__badge">RECOMMENDED FOR JUDGES · 3 MIN</span>
-              <strong>Judge walkthrough</strong>
-              <span>Follow one complete job while the Judge Guide explains the agent work and human boundaries inside the real product.</span>
-              <span class="entry-choice__action">START →</span>
-            </button>
-            <button class="entry-choice" id="start-recovery-entry" type="button">
-              <span class="entry-choice__index">02</span>
               <span class="entry-choice__badge">FOR CONTRACTORS</span>
               <strong>Start my recovery</strong>
               <span>Add a redacted correction report and the people responsible. Mettle saves your setup if sign-in is needed.</span>
-              <span class="entry-choice__action entry-choice__action--quiet" id="recovery-entry-action">START →</span>
+              <span class="entry-choice__action" id="recovery-entry-action">START →</span>
+            </button>
+            <button class="entry-choice" id="start-tour-entry" type="button">
+              <span class="entry-choice__index">02</span>
+              <span class="entry-choice__badge">SEE HOW IT WORKS · 3 MIN</span>
+              <strong>Judge walkthrough</strong>
+              <span>Follow one complete job while the Judge Guide explains the agent work and human boundaries inside the real product.</span>
+              <span class="entry-choice__action entry-choice__action--quiet">START →</span>
             </button>
             <button id="try-sample-entry" type="button" hidden>Open sample workspace</button>
             <button class="entry-choice entry-choice--resume" id="resume-current-entry" type="button" hidden>
@@ -442,15 +442,20 @@
             </label>
             <div><strong id="notice-file-status">No file selected</strong><span>5 MB max · selectable text required · file is not stored</span></div>
           </div>
+          <label class="field" id="notice-ocr-option" hidden><span><input type="checkbox" id="notice-ocr"> Read a photo or single-page scan with AWS OCR (sign-in required)</span><small>One page, 3.5 MB maximum. AWS processing is used only when you select a file with this option checked.</small></label>
+          <button type="button" class="button button--outline" id="notice-ocr-signin" hidden>Sign in to read a photo · choose the file after sign-in</button>
+          <label class="field" id="notice-ocr-review" hidden><span><input type="checkbox" id="notice-ocr-confirm"> I checked the extracted text against the original, including dates and correction numbers.</span></label>
           <p class="notice-import__divider"><span>or paste the report text</span></p>
+          <p class="notice-dialog__intro" id="notice-photo-help">Photo reading is not enabled on this deployment. Copy the inspection comments as text, check them against the original, and paste below.</p>
           <label class="field field--notice">
             <span>FAILED-INSPECTION REPORT · REDACTED TEXT</span>
             <textarea id="notice-text" name="notice_text" required maxlength="100000" spellcheck="false" placeholder="Paste the permit number, job address, inspection date, reinspection deadline, and numbered correction comments."></textarea>
           </label>
           <div class="run-settings">
+            <div id="notice-missing-details" hidden></div>
             <input id="workflow-as-of" name="as_of" type="hidden">
             <div class="setup-guidance">
-              <strong>Include the permit, job address, inspection date, deadline, and numbered comments.</strong>
+              <strong>Keep the report’s header and correction comments. You do not need to rewrite them as tasks.</strong>
               <span>This is a public prototype. Remove client names and use a redacted address before continuing.</span>
               <small class="field-error" id="workflow-date-error" role="alert" hidden></small>
             </div>
@@ -481,7 +486,7 @@
         <section class="setup-pane" data-setup-pane="3" hidden>
           <p class="notice-dialog__intro">Mettle is ready to turn the report into a correction list. It will stop for your review before any outreach begins.</p>
           <div class="launch-review">
-            <div><span>INPUT</span><strong id="review-notice-summary">Report ready</strong><small>Authority language remains attached to every citation.</small></div>
+            <div><span>INPUT</span><strong id="review-notice-summary">Report ready</strong><small>The inspector’s original wording stays beside every correction.</small></div>
             <div><span>PEOPLE</span><strong id="review-contact-summary">Primary contractor ready</strong><small>Missing trade contacts route to the primary contractor.</small></div>
             <div><span>YOUR CONTROL</span><strong>Nothing sends yet</strong><small>You will confirm every assignee and proof request on the next screen.</small></div>
           </div>

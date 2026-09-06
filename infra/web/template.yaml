@@ -3,6 +3,11 @@ Transform: AWS::Serverless-2016-10-31
 Description: Secure public Mettle workflow with Cognito, AgentCore, EventBridge Scheduler, Lambda, DynamoDB, S3, CloudFront, and WAF.
 
 Parameters:
+  NoticeOcrEnabled:
+    Type: String
+    Default: '0'
+    AllowedValues: ['0', '1']
+    Description: Explicitly enable authenticated, one-page notice OCR.
   AgentCoreRuntimeArn:
     Type: String
     AllowedPattern: '^arn:aws:bedrock-agentcore:[a-z0-9-]+:[0-9]{12}:runtime/[A-Za-z0-9_-]+$'
@@ -198,6 +203,14 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub '${WebFunctionLogGroup.Arn}:*'
+              - Sid: ReadOneNoticePage
+                Effect: Allow
+                Action: textract:DetectDocumentText
+                # Textract synchronous detection has no resource-level ARN.
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: !Ref AWS::Region
               - Sid: PersistWorkflowState
                 Effect: Allow
                 Action:
@@ -260,6 +273,7 @@ Resources:
       Environment:
         Variables:
           METTLE_AGENTCORE_ENABLED: '1'
+          METTLE_NOTICE_OCR_ENABLED: !Ref NoticeOcrEnabled
           METTLE_AGENTCORE_RUNTIME_ARN: !Ref AgentCoreRuntimeArn
           METTLE_AWS_REGION: !Ref AWS::Region
           METTLE_DYNAMODB_TABLE: !Ref WorkflowTable

@@ -122,6 +122,9 @@ const elements = {
   noticeForm: document.querySelector("#notice-form"),
   noticeText: document.querySelector("#notice-text"),
   noticeFile: document.querySelector("#notice-file"),
+  noticeOcr: document.querySelector("#notice-ocr"),
+  noticeOcrConfirm: document.querySelector("#notice-ocr-confirm"),
+  noticeOcrReview: document.querySelector("#notice-ocr-review"),
   noticeFileStatus: document.querySelector("#notice-file-status"),
   workflowAsOf: document.querySelector("#workflow-as-of"),
   workflowDateError: document.querySelector("#workflow-date-error"),
@@ -540,7 +543,11 @@ async function initializeAuth() {
   try {
     const response = await fetch("/api/config", { headers: { Accept: "application/json" } });
     authConfig = response.ok ? await response.json() : null;
+    document.querySelector("#notice-ocr-option").hidden = !authConfig?.notice_ocr;
+    if (authConfig?.notice_ocr) document.querySelector("#notice-photo-help").textContent = "For a photo or single-page scan, enable AWS OCR above, choose the file, then check the extracted text before continuing.";
     await finishLogin();
+    document.querySelector("#notice-ocr-signin").hidden = !authConfig?.notice_ocr || tokenIsCurrent(accessToken);
+    elements.noticeOcr.disabled = !tokenIsCurrent(accessToken);
   } catch (error) {
     showError(error);
   }
@@ -824,7 +831,9 @@ async function request(path, options = {}) {
   if (path.startsWith("/api/agentcore")) {
     if (!tokenIsCurrent(accessToken)) {
       clearAuth();
-      throw new Error("Sign in before using the live AgentCore runtime.");
+      const error = new Error("Sign in to resume your recovery.");
+      error.code = "sign_in_required";
+      throw error;
     }
     headers.Authorization = `Bearer ${accessToken}`;
   }
@@ -835,6 +844,12 @@ async function request(path, options = {}) {
     ...options,
     headers,
   });
+  if (response.status === 401 && path.startsWith("/api/agentcore")) {
+    clearAuth();
+    const error = new Error("Your session has expired. Sign in to resume your recovery.");
+    error.code = "sign_in_required";
+    throw error;
+  }
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("application/json")) {
     const requestError = new Error(
@@ -872,6 +887,18 @@ function startFreshRecoveryFromError() {
 function showError(error) {
   elements.loading.hidden = true;
   elements.error.hidden = false;
+  if (error.code === "sign_in_required") {
+    elements.errorTitle.textContent = "Sign in to resume your recovery";
+    elements.errorMessage.textContent = "Your session has ended. Sign in with the same account to reopen this recovery. This page has not started a replacement or sent any messages.";
+    elements.property.textContent = "Recovery awaiting sign-in";
+    elements.conditionLabel.textContent = "SIGN-IN REQUIRED";
+    elements.progressLabel.textContent = "SIGN IN TO LOAD PROGRESS";
+    elements.cadence.textContent = "SESSION ENDED · RECOVERY LINK PRESERVED";
+    elements.demoDriver.hidden = true;
+    elements.retry.textContent = "Sign in to resume";
+    retryHandler = () => beginLogin().catch(showError);
+    return;
+  }
   if (error.code === "workflow_not_found" && activeWorkflowTarget === "agentcore") {
     elements.errorTitle.textContent = "Recovery unavailable";
     elements.errorMessage.textContent = "This recovery could not be loaded. Older runs may not have a restorable checkpoint. Keep your report and contact the operator before starting again, so outreach is not duplicated.";
@@ -962,6 +989,12 @@ function validateSetupStep() {
   elements.workflowError.hidden = true;
   elements.workflowDateError.hidden = true;
   if (setupStep === 1) {
+    if (!elements.noticeOcrReview.hidden && !elements.noticeOcrConfirm.checked) {
+      elements.workflowError.textContent = "Check the extracted text against your original report, then confirm it above.";
+      elements.workflowError.hidden = false;
+      elements.noticeOcrConfirm.focus();
+      return false;
+    }
     if (!elements.noticeText.value.trim()) {
       elements.noticeText.setCustomValidity("Paste the failed-inspection report or comments.");
       elements.noticeText.reportValidity();
@@ -980,6 +1013,7 @@ function validateSetupStep() {
       return false;
     }
     elements.noticeText.removeAttribute("aria-invalid");
+    if (!completeNoticeDetails()) return false;
   }
   if (setupStep === 2) {
     const name = elements.primaryContactName.value.trim();
@@ -1032,6 +1066,40 @@ function validateSetupStep() {
       return false;
     }
   }
+  return true;
+}
+
+function completeNoticeDetails() {
+  const host = document.getElementById("notice-missing-details");
+  const text = elements.noticeText.value;
+  const fields = [
+    ["permit", "Permit or notice number", "Permit", /^(?:permit|notice id|record id|correction notice)\b/im, "text"],
+    ["address", "Job address or redacted job label", "Property", /^(?:property|project address|job address|address|location|site)\b/im, "text"],
+    ["inspection", "When was the inspection?", "Inspection date", /^(?:inspection date|issued on|issued|date of inspection)\b/im, "date"],
+    ["deadline", "What is the reinspection target date?", "Reinspection deadline", /(?:reinspection|re-inspection|correction deadline|correct by)/i, "date"],
+  ].filter(field => !field[3].test(text));
+  if (!fields.length) {host.hidden=true;host.replaceChildren();return true;}
+  const additions=[];
+  for (const [key,label,header,,type] of fields) {
+    let input = document.getElementById(`notice-detail-${key}`);
+    if (!input) {
+      const wrapper=node("label","field"); wrapper.append(node("span","",label));
+      input=node("input","");input.id=`notice-detail-${key}`;input.type=type;input.maxLength=180;input.required=true;
+      wrapper.append(input);host.append(wrapper);
+    }
+    if (input.value.trim()) additions.push(`${header}: ${input.value.trim()}`);
+  }
+  host.hidden=false;
+  if (!host.querySelector("p")) host.prepend(node("p","notice-dialog__intro","A few job details weren’t found in the report. Add them here; they will be marked as supplied by you, not by the inspector."));
+  if (additions.length !== fields.length) {
+    [...host.querySelectorAll("input")].find(input=>!input.value.trim())?.focus();
+    return false;
+  }
+  const enriched=`Contractor-supplied setup details\n${additions.join("\n")}\n\nOriginal report\n${text}`;
+  const error=recoveryDateError(enriched,recoveryWorkingDate());
+  if (error) {elements.workflowDateError.textContent=error;elements.workflowDateError.hidden=false;return false;}
+  elements.noticeText.value=enriched;
+  host.replaceChildren();host.hidden=true;
   return true;
 }
 
@@ -1157,6 +1225,9 @@ function openRecoverySetup({ returnToWelcome = false } = {}) {
 function resetRecoverySetup() {
   noticeImportVersion += 1;
   elements.noticeForm.reset();
+  elements.noticeOcrReview.hidden = true;
+  document.getElementById("notice-missing-details").replaceChildren();
+  document.getElementById("notice-missing-details").hidden = true;
   elements.workflowAsOf.value = currentLocalDate();
   elements.noticeText.value = "";
   elements.noticeFileStatus.textContent = "No file selected";
@@ -3273,16 +3344,18 @@ elements.noticeFile.addEventListener("change", async () => {
     elements.noticeFileStatus.textContent = "No file selected";
     return;
   }
-  if (file.size > 5_000_000) {
+  const fileLimit = elements.noticeOcr?.checked ? 3_500_000 : 5_000_000;
+  if (file.size > fileLimit) {
     elements.noticeFile.value = "";
-    elements.noticeFileStatus.textContent = "File is larger than 5 MB";
+    elements.noticeFileStatus.textContent = `File is larger than ${fileLimit / 1_000_000} MB`;
     return;
   }
   elements.workflowError.hidden = true;
   elements.noticeFile.disabled = true;
   elements.noticeFileStatus.textContent = `Reading ${file.name}…`;
   try {
-    const payload = await request("/api/notices/text", {
+    const useOcr = Boolean(elements.noticeOcr?.checked);
+    const payload = await request(useOcr ? "/api/agentcore/notices/ocr" : "/api/notices/text", {
       method: "POST",
       body: JSON.stringify({
         filename: file.name,
@@ -3295,6 +3368,10 @@ elements.noticeFile.addEventListener("change", async () => {
     }
     workflowCreateKey = null;
     elements.noticeText.value = payload.text;
+    if (elements.noticeOcrReview) {
+      elements.noticeOcrReview.hidden = !useOcr;
+      elements.noticeOcrConfirm.checked = false;
+    }
     elements.noticeFileStatus.textContent = `${file.name} · ${payload.text.split(/\r?\n/).filter(Boolean).length} lines ready`;
     elements.noticeText.focus();
   } catch (error) {
@@ -3305,6 +3382,14 @@ elements.noticeFile.addEventListener("change", async () => {
     elements.noticeFile.value = "";
   }
 });
+
+elements.noticeOcr.addEventListener("change", () => {
+  elements.noticeFile.accept = elements.noticeOcr.checked
+    ? "image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" : "application/pdf,text/plain,.pdf,.txt";
+  elements.noticeFile.value = "";
+  elements.noticeFileStatus.textContent = elements.noticeOcr.checked ? "Choose one photo or scanned page · sign-in required" : "No file selected";
+});
+document.querySelector("#notice-ocr-signin").addEventListener("click", () => beginLogin().catch(error => showInlineWorkflowError(error, elements.workflowError)));
 
 elements.setupBack.addEventListener("click", () => {
   setSetupStep(setupStep - 1);

@@ -9,6 +9,8 @@ from hashlib import sha256
 from pathlib import Path
 
 import boto3
+from botocore.config import Config as AWSClientConfig
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import FastAPI, Header, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
@@ -38,6 +40,7 @@ from mettle.workflow import WorkflowConfigurationError
 from mettle.photo_upload import MAX_UPLOAD_BYTES, PhotoUploadError, normalize_photo
 from mettle.request_identity import (
     AuthenticationRequired,
+    require_principal,
     reset_principal,
     set_principal,
 )
@@ -46,6 +49,7 @@ from mettle.notice_upload import (
     MAX_NOTICE_BYTES,
     NoticeUploadError,
     extract_notice_text,
+    extract_notice_ocr,
 )
 from mettle.workflow_registry import (
     ApprovePacketRequest,
@@ -108,6 +112,7 @@ class PublicConfigResponse(BaseModel):
 
     cognito_domain: str | None
     cognito_client_id: str | None
+    notice_ocr: bool = False
 
 
 class EncodedPhotoRequest(BaseModel):
@@ -492,6 +497,7 @@ def create_app(
         return PublicConfigResponse(
             cognito_domain=os.getenv("METTLE_COGNITO_DOMAIN") or None,
             cognito_client_id=os.getenv("METTLE_COGNITO_CLIENT_ID") or None,
+            notice_ocr=os.getenv("METTLE_NOTICE_OCR_ENABLED") == "1",
         )
 
     @app.get("/api/health")
@@ -511,6 +517,24 @@ def create_app(
             raw,
             filename=payload.filename,
         )
+        return NoticeTextResponse(text=text)
+
+    @app.post("/api/agentcore/notices/ocr", response_model=NoticeTextResponse)
+    async def notice_ocr(payload: EncodedNoticeRequest) -> NoticeTextResponse:
+        require_principal()
+        if os.getenv("METTLE_NOTICE_OCR_ENABLED") != "1":
+            raise NoticeUploadError("Photo reading is not enabled. Paste the inspection comments instead.")
+        try:
+            raw = base64.b64decode(payload.file_base64, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise NoticeUploadError("The report file encoding is invalid.") from exc
+        try:
+            client = boto3.client("textract", region_name=os.getenv("AWS_REGION", "us-east-1"),
+                                  config=AWSClientConfig(connect_timeout=3, read_timeout=20,
+                                                         retries={"total_max_attempts": 1}))
+            text = await run_in_threadpool(extract_notice_ocr, raw, filename=payload.filename, client=client)
+        except (BotoCoreError, ClientError) as exc:
+            raise NoticeUploadError("Photo reading could not finish. Your pasted text has not changed. Try again or paste the comments.") from exc
         return NoticeTextResponse(text=text)
 
     async def read_photo(request: Request) -> bytes:

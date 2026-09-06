@@ -40,10 +40,10 @@ test("extracts common municipal deadline formats", () => {
 
 test("rejects a working date on or after the reinspection deadline", () => {
   const notice = "Inspection date: 09/03/2026\nCorrections must be completed before reinspection on 09/14/2026.";
-  assert.match(recoveryDateError(notice, "2026-09-02"), /cannot be before/);
+  assert.match(recoveryDateError(notice, "2026-09-02"), /inspection date .* is after .*2026-09-02/);
   assert.equal(recoveryDateError(notice, "2026-09-13"), "");
-  assert.match(recoveryDateError(notice, "2026-09-14"), /must be before/);
-  assert.match(recoveryDateError(notice, "2026-09-15"), /must be before/);
+  assert.match(recoveryDateError(notice, "2026-09-14"), /deadline .* has been reached/);
+  assert.match(recoveryDateError(notice, "2026-09-15"), /deadline .* has been reached/);
 });
 
 test("normalizes the phone formats a US contractor is likely to type", () => {

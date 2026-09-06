@@ -15,6 +15,8 @@
   --green:#336348; --green-deep:#e9eee6; --blue:#365f85; --yellow:#7a5b0f; --shadow:none;
 }
 html {scroll-padding-top:24px;}
+#notice-ocr-option input,#notice-ocr-review input {width:18px;min-height:18px;height:18px;margin-right:8px;accent-color:var(--orange);}
+#notice-missing-details {padding:20px;border:1px solid var(--line);border-radius:10px;display:grid;gap:16px;}
 body {font-size:15px;line-height:1.55;}
 .mono-label {font-family:var(--sans);font-size:11px;letter-spacing:.1em;line-height:1.5;font-weight:650;}
 .command-stack {position:relative;backdrop-filter:none;background:var(--ink);}

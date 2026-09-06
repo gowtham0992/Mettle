@@ -20,6 +20,38 @@ DENVER_NOTICE = Path("examples/notices/denver-remodel.txt").read_text(encoding="
 WEB_TEMPLATE = Path("infra/web/template.yaml").read_text(encoding="utf-8")
 
 
+def test_notice_ocr_requires_verified_identity(monkeypatch):
+    monkeypatch.setenv("METTLE_NOTICE_OCR_ENABLED", "1")
+    with TestClient(create_app()) as browser:
+        response = browser.post("/api/agentcore/notices/ocr", json={"filename":"notice.png", "file_base64":"YWJjZA=="})
+    assert response.status_code == 401
+
+
+def test_notice_ocr_disabled_even_for_verified_identity(monkeypatch):
+    monkeypatch.delenv("METTLE_NOTICE_OCR_ENABLED", raising=False)
+    monkeypatch.setattr("mettle.web.app._verified_subject", lambda request: "test-subject")
+    with TestClient(create_app()) as browser:
+        response = browser.post("/api/agentcore/notices/ocr", json={"filename":"notice.png", "file_base64":"YWJjZA=="})
+    assert response.status_code == 422
+    assert "not enabled" in response.json()["error"]["message"]
+
+
+def test_notice_ocr_returns_reviewable_text(monkeypatch):
+    from unittest.mock import Mock
+    monkeypatch.setenv("METTLE_NOTICE_OCR_ENABLED", "1")
+    monkeypatch.setattr("mettle.web.app._verified_subject", lambda request: "test-subject")
+    aws = Mock()
+    aws.detect_document_text.return_value = {"Blocks":[{"BlockType":"LINE", "Text":"Permit REVIEW-1. Correct panel clearance."}]}
+    monkeypatch.setattr("mettle.web.app.boto3.client", lambda *args, **kwargs: aws)
+    image = BytesIO()
+    Image.new("RGB", (100,100), "white").save(image, format="PNG")
+    with TestClient(create_app()) as browser:
+        response = browser.post("/api/agentcore/notices/ocr", json={"filename":"notice.png", "file_base64":base64.b64encode(image.getvalue()).decode()})
+    assert response.status_code == 200
+    assert response.json()["text"] == "Permit REVIEW-1. Correct panel clearance."
+    aws.detect_document_text.assert_called_once()
+
+
 class FakeAgentCoreGateway:
     def __init__(self) -> None:
         self.registry = WorkflowRegistry(

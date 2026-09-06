@@ -50,11 +50,11 @@
     const deadline = noticeDeadline(noticeText);
     if (!workingDate) return "";
     if (issued && workingDate < issued) {
-      return `The working date cannot be before the ${issued} inspection date.`;
+      return `The inspection date (${issued}) is after the recovery start date (${workingDate}). Check the date in your report.`;
     }
     if (!deadline) return "";
     return workingDate >= deadline
-      ? `The working date must be before the ${deadline} reinspection deadline.`
+      ? `The reinspection deadline (${deadline}) has been reached for this recovery start date (${workingDate}). Check the deadline in your report.`
       : "";
   }
 

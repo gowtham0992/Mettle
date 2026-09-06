@@ -24,6 +24,15 @@ TEMPLATE = yaml.load(
 RESOURCES = TEMPLATE["Resources"]
 
 
+def test_ocr_is_opt_in_and_only_grants_synchronous_text_detection():
+    assert TEMPLATE["Parameters"]["NoticeOcrEnabled"]["Default"] == "0"
+    statements = RESOURCES["WebFunctionRole"]["Properties"]["Policies"][0]["PolicyDocument"]["Statement"]
+    ocr = next(s for s in statements if s["Sid"] == "ReadOneNoticePage")
+    assert ocr["Action"] == "textract:DetectDocumentText"
+    assert ocr["Condition"]["StringEquals"]["aws:RequestedRegion"] == {"Ref":"AWS::Region"}
+    assert not any("textract" in str(s) for s in RESOURCES["SchedulerFunctionRole"]["Properties"]["Policies"])
+
+
 def test_scoped_web_deployer_can_rollback_only_from_web_artifacts() -> None:
     policy = json.loads(
         Path("infra/web/iam/deployer-policy.json").read_text(encoding="utf-8")
