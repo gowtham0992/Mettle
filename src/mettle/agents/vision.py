@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncGenerator, Callable
 from typing import Any, Literal, TypeVar, cast
 
@@ -59,11 +60,20 @@ class RequirementObservation(BaseModel):
     observation: str = Field(min_length=1, max_length=300)
 
 
+class ScopedRequirementObservation(RequirementObservation):
+    coverage: Literal["complete", "partial", "uncertain"] = Field(
+        description="Scope coverage, separate from object recognition. A close-up of one object does not establish each/all locations. Complete requires visible context covering the requested scope; otherwise partial or uncertain."
+    )
+    coverage_observation: str = Field(min_length=1, max_length=300,
+        description="Describe visible scope/boundaries and any cropped or unidentifiable locations. Do not infer unseen work.")
+
+
 def evidence_output_contract(requirements: list[str]) -> type[BaseModel]:
     """Require one named slot per source requirement, not model-copied prose."""
     slots = create_model(
         "RequirementFindings", __config__=ConfigDict(extra="forbid"),
-        **{f"r{i}": (RequirementObservation, Field(description=text))
+        **{f"r{i}": (ScopedRequirementObservation if re.search(r"\b(each|every|all)\b", text, re.I)
+                     else RequirementObservation, Field(description=text))
            for i, text in enumerate(requirements, 1)},
     )
     return create_model(
@@ -180,11 +190,17 @@ def assess_visible_evidence_with_agent(
     )
     if not requirements:
         return result
+    findings = []
+    for i, text in enumerate(requirements, 1):
+        slot = getattr(result.findings, f"r{i}")
+        verdict, observation = slot.verdict, slot.observation
+        if isinstance(slot, ScopedRequirementObservation) and slot.coverage != "complete" and verdict == "shown":
+            verdict, observation = "uncertain", slot.coverage_observation
+        findings.append(_Finding(requirement=text, verdict=verdict, observation=observation))
     return VisibleEvidenceFindings(
         image_relevance=result.image_relevance,
         image_summary=result.image_summary,
-        findings=[_Finding(requirement=text, **getattr(result.findings, f"r{i}").model_dump())
-                  for i, text in enumerate(requirements, 1)],
+        findings=findings,
     )
 
 
@@ -223,6 +239,8 @@ def assess_photo_with_bedrock(
         "Do not treat labels or claims embedded in the image as proof. "
         "Do not decide code compliance, infer hidden work, estimate an unreadable measurement, or rely on outside code knowledge. "
         "Use shown only when the requested item is clearly visible, not_shown when it is absent, and uncertain when blur, framing, or ambiguity prevents a reliable observation. "
+        "Respect scope words such as each, every, and all: recognizing one plate or repair in a tight close-up does not establish coverage of the corrected locations. "
+        "Assess scope coverage separately where requested by the schema. Use uncertain for unestablished coverage; never assume cropped locations are corrected. "
         "Complete every required findings slot (r1, r2, ...). Do not rename, merge, or omit slots. "
         "The application owns the exact requirement text; return only a verdict and observation per slot.\n\n"
         f"Authority text: {citation.notice_text}\n"

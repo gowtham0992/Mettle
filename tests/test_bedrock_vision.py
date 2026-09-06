@@ -54,6 +54,33 @@ def test_fixed_slots_reject_missing_and_invented_requirement_keys():
             contract.model_validate({"image_relevance": "relevant", "image_summary": "Panel.", "findings": findings})
 
 
+@pytest.mark.parametrize("coverage, expected", [("complete", "shown"), ("partial", "uncertain"), ("uncertain", "uncertain")])
+def test_each_location_requires_explicit_coverage_even_if_model_says_shown(monkeypatch, coverage, expected):
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            pass
+
+        def structured_output(self, output_model, prompt):
+            return output_model.model_validate({
+                "image_relevance": "relevant", "image_summary": "One plate in a close view.",
+                "findings": {"r1": {"verdict": "shown", "observation": "A plate is visible.",
+                                     "coverage": coverage, "coverage_observation": "The wall boundaries are cropped."}},
+            })
+    monkeypatch.setattr(vision_module, "Agent", FakeAgent)
+    result = assess_visible_evidence_with_agent(model=object(), image=b"jpeg", prompt="inspect",
+                                               requirements=["Provide a photograph showing each corrected location."])
+    assert result.findings[0].verdict == expected
+    if coverage != "complete":
+        assert "wall boundaries" in result.findings[0].observation
+
+
+def test_each_location_contract_rejects_omitted_coverage():
+    contract = vision_module.evidence_output_contract(["Show each corrected location."])
+    with pytest.raises(ValidationError):
+        contract.model_validate({"image_relevance": "relevant", "image_summary": "A plate.",
+                                 "findings": {"r1": {"verdict": "shown", "observation": "Visible."}}})
+
+
 def _finding(requirement: str, verdict: str, observation: str):
     return {"requirement": requirement, "verdict": verdict, "observation": observation}
 

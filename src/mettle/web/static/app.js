@@ -1444,7 +1444,7 @@ function conditionFor(data) {
 const citationEvidenceImages = {
   ready: {
     "1": "/static/evidence/panel-wide-measured.png",
-    "2": "/static/evidence/framing-plates-complete.png",
+    "2": "/static/evidence/framing-plates-visible-v2.png",
     "3": "/static/evidence/mechanical-access-wide.png",
   },
   evidence_rejected: {
@@ -2120,7 +2120,7 @@ function createEvidenceComparison() {
     }),
     node("div", "tour-evidence-compare__handoff", "PRECISE RE-REQUEST → REPLACEMENT"),
     evidenceComparisonCard({
-      image: "/static/evidence/framing-plates-complete.png",
+      image: "/static/evidence/framing-plates-visible-v2.png",
       alt: "Synthetic wide view showing framing protection plates and their corrected wall location",
       status: "ACCEPTED",
       title: "Replacement connected the repair to its location",
@@ -2256,7 +2256,7 @@ function createTourAgentProof(data) {
 
 const packetEvidenceImages = {
   "1": "/static/evidence/panel-wide-measured.png",
-  "2": "/static/evidence/framing-plates-complete.png",
+  "2": "/static/evidence/framing-plates-visible-v2.png",
   "3": "/static/evidence/mechanical-access-wide.png",
 };
 

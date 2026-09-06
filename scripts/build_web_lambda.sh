@@ -29,8 +29,16 @@ docker run --rm --platform linux/amd64 \
 cp "${repo_dir}/lambda_handler.py" "${build_dir}/lambda_handler.py"
 cp "${repo_dir}/scheduler_handler.py" "${build_dir}/scheduler_handler.py"
 
+# Retired/unreferenced visuals remain in the static origin for old links, but
+# no packet or current page uses them. Keep them out of the limited Lambda ZIP.
+rm -f "${build_dir}/mettle/web/static/evidence/framing-plates-complete.png" \
+  "${build_dir}/mettle/web/static/mettle-lockup.png"
+
 find "${build_dir}" -type d -name '__pycache__' -prune -exec rm -rf '{}' +
 find "${build_dir}" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+# Immutable Lambda bundles are not pip install/uninstall environments. Preserve
+# package metadata and licenses; omit only the installer file inventories.
+find "${build_dir}" -type f -path '*.dist-info/RECORD' -delete
 
 if find "${build_dir}" -type f \( -name '.env' -o -name 'credentials' \) | grep -q .; then
   echo "Refusing to package a credential-shaped file" >&2

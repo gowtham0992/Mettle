@@ -50,7 +50,7 @@ class PacketRecord(BaseModel):
 _SAMPLE_FILES = {
     "panel_closeup_insufficient": "panel-closeup-insufficient.png",
     "panel_wide_measured": "panel-wide-measured.png",
-    "framing_plates_complete": "framing-plates-complete.png",
+    "framing_plates_complete": "framing-plates-visible-v2.png",
     "mechanical_access_wide": "mechanical-access-wide.png",
 }
 

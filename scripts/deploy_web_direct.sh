@@ -31,8 +31,14 @@ fi
 rm -f "${artifact}"
 (
   cd "${repo_dir}/build/web-lambda"
-  zip -qr "${artifact}" .
+  zip -9qr "${artifact}" .
 )
+
+artifact_bytes="$(wc -c < "${artifact}" | tr -d ' ')"
+if (( artifact_bytes >= 52428800 )); then
+  echo "Refusing direct upload: Lambda ZIP is ${artifact_bytes} bytes; limit is 52428800."
+  exit 1
+fi
 
 aws lambda update-function-code \
   --profile "${profile}" \

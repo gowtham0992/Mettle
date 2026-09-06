@@ -101,7 +101,7 @@ _SAMPLES = {
         ),
     ),
     "framing_plates_complete": _EvidenceSample(
-        image_url="/static/evidence/framing-plates-complete.png",
+        image_url="/static/evidence/framing-plates-visible-v2.png",
         capabilities=frozenset(
             {
                 "close_view",
