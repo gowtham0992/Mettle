@@ -220,7 +220,26 @@ def assess_photo_with_bedrock(
 
     by_requirement = {finding.requirement: finding for finding in result.findings}
     if len(result.findings) != len(requirements) or set(by_requirement) != set(requirements):
-        raise BedrockVisionError("Bedrock did not assess every notice requirement exactly once")
+        # A malformed requirement map is not evidence of sufficiency. Preserve
+        # the image for an explicit human decision instead of losing the upload.
+        return EvidenceAssessment(
+            assessment_id=assessment_id,
+            citation_id=citation.citation_id,
+            sample_id=f"upload_{assessment_id}",
+            image_url="",
+            status=EvidenceStatus.MANUAL_REVIEW,
+            matched_requirements=[],
+            missing_requirements=requirements,
+            explanation=(
+                "The automated assessment was incomplete: the model did not check every "
+                "notice requirement exactly once. No proof was accepted. Review the "
+                "photo against every requirement below, or request replacement proof."
+            ),
+            agent_run=[EvidenceAgentStep(
+                step="Validate requirement coverage", status="interrupted",
+                detail="Incomplete model output was held for contractor review; no requirement was marked satisfied.",
+            )],
+        )
 
     relevance = result.image_relevance
     if relevance == "not_relevant":

@@ -633,7 +633,8 @@ def test_dashboard_and_campaign_api_load() -> None:
     assert "models interpret language and visible evidence; they never decide deadlines, gates, or what Mettle may claim" in page.text
     assert "The browser never owns the agent runtime." in page.text
     assert "Explore mode" not in page.text
-    assert "JUDGE WALKTHROUGH · LIVE PRODUCT" in page.text
+    assert "JUDGE WALKTHROUGH · RECORDED SAMPLE" in page.text
+    assert 'id="revise-source-button"' in page.text
     assert "YOUR RECOVERY PATH" in page.text
     assert 'id="workflow-journey"' in page.text
     assert 'id="judge-lens-impact"' in page.text

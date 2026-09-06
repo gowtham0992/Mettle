@@ -345,9 +345,14 @@ class DurableAgentCoreWorkflowGateway:
                     "payload": payload.model_dump(mode="json"),
                 },
             )
-            if checkpointed and result.get("error", {}).get("code") in {
+            error_code = result.get("error", {}).get("code")
+            # This specific error is raised by the photo assessor before the
+            # registry appends evidence or performs any outreach. Unknown and
+            # transport failures must retain the uncertain-outcome hold.
+            safe_vision_failure = operation == "submit_photo_evidence" and error_code == "bedrock_vision_failed"
+            if checkpointed and (safe_vision_failure or error_code in {
                 "invalid_request", "invalid_evidence_submission", "packet_not_ready", "packet_not_approved", "workflow_conflict",
-            }:
+            }):
                 self._table.update_item(
                     Key={"pk": workflow_key}, UpdateExpression="REMOVE checkpoint_pending",
                     ConditionExpression="lock_token = :token",
@@ -657,6 +662,8 @@ class DurableAgentCoreWorkflowGateway:
             raise WorkflowConfigurationError(safe_message)
         if code == "bedrock_intake_failed":
             raise BedrockIntakeError(safe_message)
+        if code == "bedrock_vision_failed":
+            raise AgentCoreGatewayError(safe_message + ". No proof was accepted; you can retry the photo assessment.")
         if code == "invalid_evidence_submission":
             raise EvidenceSubmissionError(safe_message)
         if code == "packet_not_ready":

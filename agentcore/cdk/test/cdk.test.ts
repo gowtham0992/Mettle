@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { AgentCoreStack } from '../lib/cdk-stack';
+import * as path from 'path';
 
 test('AgentCoreStack synthesizes with empty spec', () => {
   const app = new cdk.App();
@@ -42,7 +43,8 @@ test('Mettle runtime allows only the two approved Nova models', () => {
           name: 'MettleRecovery',
           build: 'CodeZip',
           entrypoint: 'agentcore_app.py',
-          codeLocation: '.',
+          // This test verifies IAM synthesis, not workstation build contents.
+          codeLocation: path.join(__dirname, 'fixtures', 'runtime'),
           runtimeVersion: 'PYTHON_3_12',
           networkMode: 'PUBLIC',
           protocol: 'HTTP',

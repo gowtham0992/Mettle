@@ -4,6 +4,17 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const source = fs.readFileSync("src/mettle/web/static/app.js", "utf8");
 
+test("sample packet failure remains in the recovery and shows a retryable error", async () => {
+  let reported;
+  const context = vm.createContext({
+    fetch: async () => ({ok:false}),
+    showError: error => {reported = error.message;},
+  });
+  vm.runInContext(source.slice(source.indexOf("async function downloadDemoPacket("), source.indexOf("async function resolveDeadlineAndContinue(")), context);
+  await context.downloadDemoPacket();
+  assert.match(reported, /approved recovery is still saved/);
+});
+
 function element(tag, className, text) {
   return {
     tag, className, text, children: [], dataset: {}, value: "",

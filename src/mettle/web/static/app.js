@@ -2455,6 +2455,36 @@ function renderJudgeTour(data) {
     stop.dataset.state = state;
   }
   renderTourVisual(data, phase);
+  const sceneProof = document.querySelector("#tour-visible-proof");
+  sceneProof.replaceChildren();
+  if (phase.key === "boundary") {
+    sceneProof.append(node("p", "mono-label", "REVIEW THE SAMPLE ROUTES · ZERO OUTREACH SO FAR"));
+    for (const citation of data.citations) {
+      const route = node("p", "tour-route-summary");
+      route.append(node("strong", "", `C${citation.citation_id} · ${titleCase(citation.trade)} — `),
+        document.createTextNode(citation.evidence_requirements?.join("; ") || "Contractor-defined: wide photo showing the equipment and measured service clearance"));
+      sceneProof.append(route);
+    }
+    sceneProof.append(node("p", "", "This walkthrough uses a prepared contractor decision. A real recovery requires reviewing each recipient and proof request."));
+  } else if (["deadline", "finish"].includes(phase.key) && data.citations.find(c => c.citation_id === "2")?.stage !== "ready") {
+    sceneProof.append(node("p", "mono-label", "RECORDED EVIDENCE RESULT · REPLACEMENT STILL NEEDED"),
+      evidenceComparisonCard({
+        image: "/static/evidence/framing-closeup-insufficient.png",
+        alt: "Synthetic close-up missing the corrected wall location",
+        status: "RE-REQUESTED", title: "The photo did not identify the wall location",
+        detail: "Mettle requested a wider photo. The incomplete proof did not close this correction.", tone: "rejected",
+      }));
+  } else if (["finish", "approval", "complete"].includes(phase.key)) {
+    sceneProof.append(node("p", "mono-label", "RECORDED EVIDENCE HISTORY · REJECTION TO ACCEPTED REPLACEMENT"), createEvidenceComparison());
+  }
+  sceneProof.hidden = !sceneProof.children.length;
+  if (phase.complete) {
+    const previewLink = node("a", "button button--outline", "View approved PDF in browser");
+    previewLink.href = "/api/demo/packet/preview.pdf";
+    previewLink.target = "_blank";
+    previewLink.rel = "noopener";
+    sceneProof.append(previewLink);
+  }
   for (const target of document.querySelectorAll(".is-guide-target")) target.classList.remove("is-guide-target");
   const guideTargetSelector = {
     boundary: ".citation--needs-action",
@@ -2513,12 +2543,24 @@ function inspectAgentRun() {
   window.setTimeout(() => document.querySelector(".agent-run-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
 }
 
-function downloadDemoPacket() {
-  const link = document.createElement("a");
-  link.href = "/api/demo/packet.pdf";
-  link.target = "_blank";
-  link.rel = "noopener";
-  link.click();
+async function downloadDemoPacket() {
+  try {
+    const response = await fetch("/api/demo/packet.pdf");
+    if (!response.ok || !response.headers.get("content-type")?.includes("application/pdf")) {
+      throw new Error("The packet could not be downloaded. Your approved recovery is still saved. Try again.");
+    }
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "mettle-guided-reinspection-packet.pdf";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    showToast("Packet download requested. If your browser blocks downloads, your recovery remains here.");
+  } catch (error) {
+    showError(error);
+  }
 }
 
 async function resolveDeadlineAndContinue() {
@@ -3397,6 +3439,19 @@ elements.setupBack.addEventListener("click", () => {
   pane?.querySelector("input, textarea, button")?.focus();
 });
 
+document.querySelector("#revise-source-button").addEventListener("click", () => {
+  // Never mutate authority text inside an existing recovery or release its gate.
+  // A corrected source starts a distinct run; retain the user's report/contacts.
+  workflowCreateKey = null;
+  workflowCreateProvider = null;
+  correctionReviewKey = null;
+  elements.outreachConsent.checked = false;
+  elements.workflowError.hidden = true;
+  setSetupStep(1);
+  elements.noticeText.focus();
+  showToast("Recheck the source report. Building again creates a replacement; the previous plan stays paused.");
+});
+
 elements.loadNotice.addEventListener("click", () => {
   resetRecoverySetup();
   openRecoverySetup();
@@ -3582,7 +3637,7 @@ elements.clockAction.addEventListener("click", async () => {
 elements.packetAction.addEventListener("click", async () => {
   if (!activeWorkflowId) {
     if (campaign?.packet_status === "approved") {
-      window.location.assign("/api/demo/packet.pdf");
+      await downloadDemoPacket();
     }
     return;
   }
@@ -3590,11 +3645,15 @@ elements.packetAction.addEventListener("click", async () => {
     ? "/api/agentcore/workflows"
     : "/api/workflows";
   if (campaign?.packet_status === "approved") {
-    if (activeWorkflowTarget === "agentcore") {
+    try {
+      if (activeWorkflowTarget === "agentcore") {
       const link = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/packet-url`);
       window.location.assign(link.download_url);
-    } else {
+      } else {
       window.location.assign(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/packet.pdf`);
+      }
+    } catch (error) {
+      showError(error);
     }
     return;
   }

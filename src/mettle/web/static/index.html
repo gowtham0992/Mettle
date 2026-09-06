@@ -93,7 +93,7 @@
       <section class="judge-tour" id="judge-tour" aria-labelledby="tour-title" aria-modal="false" hidden>
         <header class="judge-tour__header">
           <div>
-            <p class="mono-label">JUDGE WALKTHROUGH · LIVE PRODUCT</p>
+            <p class="mono-label">JUDGE WALKTHROUGH · RECORDED SAMPLE</p>
             <strong id="tour-progress-label">SCENE 1 OF 5</strong>
           </div>
           <div class="tour-header-actions">
@@ -117,7 +117,8 @@
             <p id="tour-copy">Mettle derives the work from the authority’s own language and stops where professional interpretation begins.</p>
           </div>
 
-          <aside class="judge-lens" aria-labelledby="judge-lens-title">
+          <details class="judge-lens" aria-labelledby="judge-lens-title">
+            <summary>Why this step matters · agents and human control</summary>
             <div class="judge-lens__title">
               <span class="judge-lens__marker" aria-hidden="true">◎</span>
               <div><p class="mono-label">WHAT TO NOTICE</p><strong id="judge-lens-title">Why this step matters</strong></div>
@@ -125,7 +126,7 @@
             <div class="judge-lens__item judge-lens__item--impact"><span>OUTCOME</span><strong id="judge-lens-impact">Mettle turns one notice into a bounded recovery campaign.</strong></div>
             <div class="judge-lens__item judge-lens__item--agent"><span>AGENT HANDLED</span><strong id="judge-lens-agent">Two Strands agents handle extraction and visible-evidence assessment.</strong></div>
             <div class="judge-lens__item judge-lens__item--human"><span>HUMAN KEPT</span><strong id="judge-lens-human">Code interpretation and release remain with the contractor.</strong></div>
-          </aside>
+          </details>
 
           <aside class="tour-stage__control" aria-labelledby="tour-control-title">
             <p class="mono-label">DO THIS NEXT</p>
@@ -137,6 +138,7 @@
           </aside>
         </div>
 
+        <section id="tour-visible-proof" aria-label="Work shown in this scene"></section>
         <div class="tour-stage__visual" id="tour-visual" aria-live="polite" hidden></div>
         <footer class="tour-outcome">
           <p id="tour-outcome-copy"><span aria-hidden="true">◆</span><strong>Same product, staged for evaluation.</strong> Every step drives the real sample workspace below.</p>
@@ -347,7 +349,7 @@
       <div class="welcome-dialog__brand">
         <img src="/static/mettle-mark.png" alt="" width="54" height="54">
         <span>METTLE / FAILED-INSPECTION RECOVERY</span>
-        <span class="welcome-dialog__mode">SAMPLE READY · SECURE RECOVERY REQUIRES SIGN-IN</span>
+        <span class="welcome-dialog__mode">SAMPLE READY · CONTRACTOR PREVIEW IS INVITE-ONLY</span>
         <button class="theme-toggle theme-toggle--compact" type="button" data-theme-toggle aria-label="Switch to light mode" title="Switch to light mode">
           <span class="theme-toggle__icon" aria-hidden="true">☼</span>
           <span class="theme-toggle__label">Light</span>
@@ -494,6 +496,8 @@
 
         <section class="setup-pane" data-setup-pane="4" hidden>
           <p class="notice-dialog__intro">Confirm who owns each correction and what proof is required. Mettle keeps the original report wording read-only.</p>
+          <p class="notice-dialog__intro">Missing a correction or seeing incorrect source details? Do not approve this plan. Recheck the report and build a replacement; this unapproved recovery will remain paused.</p>
+          <button class="button button--outline" id="revise-source-button" type="button">Recheck report & rebuild</button>
           <div class="correction-review" id="correction-review-list" aria-live="polite"></div>
           <label class="outreach-consent">
             <input id="outreach-consent" type="checkbox">

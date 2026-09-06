@@ -184,11 +184,30 @@ body {font-size:15px;line-height:1.55;}
 /* Guided evaluation lives in the page, never a floating coach mark. */
 .judge-tour {position:relative!important;inset:auto!important;width:100%!important;max-width:none!important;transform:none!important;background:var(--panel)!important;border:1px solid var(--line)!important;border-radius:14px!important;margin:0 0 28px!important;padding:24px!important;box-shadow:none!important;}
 .judge-tour__header {padding:0 0 16px!important;margin-bottom:16px;}
-.judge-guide__grid {display:grid!important;grid-template-columns:minmax(0,1fr) minmax(220px,.6fr)!important;gap:24px!important;}
+.judge-guide__grid {display:grid!important;grid-template-columns:minmax(0,1fr) minmax(220px,.6fr)!important;gap:12px!important;padding:0!important;}
+.judge-tour .tour-stage__copy p {margin:8px 0!important;}
+.judge-tour .tour-stage__control .mono-label {color:var(--muted)!important;}
 .tour-stage__copy {padding:0!important;}
 .tour-stage__copy h1 {font-size:24px!important;font-weight:650;line-height:1.25!important;letter-spacing:-.6px!important;margin:10px 0!important;}
 .tour-stage__copy>p:last-child {font-size:14px!important;line-height:1.6;}
-.judge-lens {grid-column:1/-1;grid-row:2;padding:16px 0 0!important;border:0!important;border-top:1px solid var(--line)!important;border-radius:0!important;background:none!important;display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:16px!important;}
+.judge-lens {grid-column:1/-1;grid-row:2;padding:8px 0 0!important;border:0!important;border-top:1px solid var(--line)!important;border-radius:0!important;background:none!important;display:block!important;}
+.judge-lens summary {cursor:pointer;color:var(--muted);font-size:12px;padding:4px 0;}
+.judge-lens[open] .judge-lens__item {margin-top:12px;}
+#tour-visible-proof {border-top:1px solid var(--line);margin-top:16px;padding-top:12px;font-size:13px;}
+#tour-visible-proof[hidden] {display:none;}
+#tour-visible-proof .tour-evidence-compare__media {height:150px;min-height:0;}
+#tour-visible-proof .tour-evidence-compare__media img {height:100%;width:100%;object-fit:contain;}
+#tour-visible-proof>.tour-evidence-compare__card {display:grid;grid-template-columns:minmax(140px,1fr) 2fr;max-width:760px;}
+#tour-visible-proof .tour-evidence-compare {display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+#tour-visible-proof .tour-evidence-compare__handoff {display:none;}
+#tour-visible-proof figure {margin:8px 0;gap:16px;}
+#tour-visible-proof figcaption span,#tour-visible-proof figcaption strong {display:block;margin-bottom:8px;}
+#tour-visible-proof figcaption span {font-size:11px;color:var(--orange);}
+#tour-visible-proof figcaption p {color:var(--muted);line-height:1.5;}
+@media(max-width:600px) {
+  #tour-visible-proof .tour-evidence-compare,#tour-visible-proof>.tour-evidence-compare__card {grid-template-columns:1fr;}
+}
+.tour-route-summary {margin:8px 0;line-height:1.5;}
 .judge-lens__title {display:none!important;}
 .judge-lens__item {border:0!important;padding:0!important;}
 .judge-lens__item strong {font-size:12px!important;line-height:1.5!important;font-weight:500!important;}

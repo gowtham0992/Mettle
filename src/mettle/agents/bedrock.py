@@ -11,6 +11,7 @@ from strands.models import BedrockModel
 
 from mettle.agents.intake import extract_notice_with_agent
 from mettle.domain import InspectionNotice
+from mettle.notice_parser import NoticeParseError
 
 
 class BedrockIntakeError(RuntimeError):
@@ -115,6 +116,12 @@ def extract_notice_with_bedrock(
         ) from exc
     except BedrockIntakeError:
         raise
+    except NoticeParseError as exc:
+        raise BedrockIntakeError(
+            "Mettle could not identify a complete source report. Keep the permit, "
+            "job label and dates, and put each correction on a separate numbered "
+            "line. Your text is preserved; no recovery or outreach was started."
+        ) from exc
     except Exception as exc:
         raise BedrockIntakeError(
             "Bedrock returned output that did not satisfy Mettle's notice contract"

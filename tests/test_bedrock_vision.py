@@ -171,14 +171,30 @@ def test_vision_fails_closed_if_model_changes_or_omits_requirements() -> None:
         _finding(CITATION.evidence_requirements[0], "shown", "Visible."),
     ]
 
-    with pytest.raises(BedrockVisionError, match="every notice requirement"):
-        assess_photo_with_bedrock(
+    result = assess_photo_with_bedrock(
             citation=CITATION,
             image=b"safe-jpeg",
             assessment_id="evidence-4",
             model_factory=lambda _settings: object(),
             agent_assessor=_run_agent(findings),
+    )
+    assert result.status is EvidenceStatus.MANUAL_REVIEW
+    assert result.matched_requirements == []
+    assert result.missing_requirements == CITATION.evidence_requirements
+    assert "incomplete" in result.explanation.lower()
+
+
+def test_changed_or_duplicate_requirements_never_auto_accept():
+    for findings in [
+        [_finding("Model paraphrased the notice", "shown", "Visible.")],
+        [_finding(CITATION.evidence_requirements[0], "shown", "Visible.")] * 2,
+    ]:
+        result = assess_photo_with_bedrock(
+            citation=CITATION, image=b"safe-jpeg", assessment_id="evidence-invalid-map",
+            model_factory=lambda _settings: object(), agent_assessor=_run_agent(findings),
         )
+        assert result.status is EvidenceStatus.MANUAL_REVIEW
+        assert result.matched_requirements == []
 
 
 def test_vision_settings_reject_more_expensive_or_text_only_models() -> None:
