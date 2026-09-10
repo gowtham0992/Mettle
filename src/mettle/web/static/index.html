@@ -44,7 +44,7 @@
     <section class="campaign-strip" aria-label="Campaign status">
       <div>
         <span class="campaign-strip__dot"></span>
-        <span id="cadence-label">NORMAL FOLLOW-UP · DAILY CHECK-INS</span>
+        <span id="cadence-label">CHECKING RECOVERY STATUS</span>
       </div>
       <div class="progress-block">
         <span id="progress-label">Loading progress</span>
@@ -212,7 +212,7 @@
               <form class="photo-evidence" id="photo-evidence-form">
                 <div class="photo-evidence__copy">
                   <strong>Assess a job-site photo against the notice</strong>
-                  <span>JPEG or PNG · 5 MB max · ambiguous proof returns to the contractor</span>
+                  <span>JPEG or PNG · 3.5 MB max on the hosted app · ambiguous proof returns to the contractor</span>
                 </div>
                 <label class="photo-evidence__file"><span>Photo</span><input id="photo-file" type="file" accept="image/jpeg,image/png"></label>
                 <button class="button button--orange" id="photo-submit" type="submit" disabled>Assess with Bedrock Vision</button>
@@ -443,7 +443,7 @@
               <span>Choose a PDF or text report</span>
               <input id="notice-file" type="file" accept="application/pdf,text/plain,.pdf,.txt">
             </label>
-            <div><strong id="notice-file-status">No file selected</strong><span>5 MB max · selectable text required · file is not stored</span></div>
+            <div><strong id="notice-file-status">No file selected</strong><span>3.5 MB max · selectable text required · file is not stored. Larger report? Paste the inspection comments below.</span></div>
           </div>
           <label class="field" id="notice-ocr-option" hidden><span><input type="checkbox" id="notice-ocr"> Read a photo or single-page scan with AWS OCR (sign-in required)</span><small>One page, 3.5 MB maximum. AWS processing is used only when you select a file with this option checked.</small></label>
           <button type="button" class="button button--outline" id="notice-ocr-signin" hidden>Sign in to read a photo · choose the file after sign-in</button>

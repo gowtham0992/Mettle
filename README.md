@@ -33,7 +33,7 @@ The result is not another dashboard to babysit. Mettle works between events and 
 
 ## See it work
 
-Open the **[live guided demo](https://d1ytth8asjpes8.cloudfront.net)** and select **Take the guided tour**. The public journey stages the real sample endpoints into five focused scenes, using synthetic contractor, property, notice, and evidence data so judges can experience the complete product without credentials or cloud spend. Every result remains inspectable afterward in the full workspace.
+Open the **[live guided demo](https://d1ytth8asjpes8.cloudfront.net)** and select **Judge walkthrough**. The public journey stages the real sample endpoints into five focused scenes, using synthetic contractor, property, notice, and evidence data so judges can experience the complete product without credentials or cloud spend. Every result remains inspectable afterward in the full workspace. Choose **Start my recovery** for the invite-only authenticated contractor path.
 
 The compressed run demonstrates:
 
@@ -47,7 +47,7 @@ The **Agent run** panel makes the orchestration inspectable: judges can see spec
 
 The browser playback is clearly labeled as a guided demonstration. The repository also includes the working Strands workflow, opt-in Bedrock execution, and deployed AgentCore boundary used by the live cloud path.
 
-The unauthenticated Strands route keeps workflow state in one warm Lambda instance, so shared `?workflow=` links are demonstration conveniences rather than durable records. New authenticated recoveries save private, versioned checkpoints and restore a fresh AgentCore runtime for each operation. DynamoDB owns caller-scoped records and EventBridge schedules use stale-event rejection and a dead-letter queue. Cold recovery is tested locally through approved PDF generation and in the deployed runtime through contractor review; authenticated browser-to-storage acceptance and overnight cloud scheduling remain pending. Legacy runs without checkpoints are still session-bound. See [checkpoint guarantees and limits](docs/recovery-checkpoints.md).
+The unauthenticated Strands route keeps workflow state in one warm Lambda instance, so shared `?workflow=` links are demonstration conveniences rather than durable records. New authenticated recoveries save private, versioned checkpoints and restore a fresh AgentCore runtime for each operation. DynamoDB owns caller-scoped records and EventBridge schedules use stale-event rejection and a dead-letter queue. Cold recovery is tested locally through approved PDF generation. The September 9 browser review verified authenticated intake, restoration after refresh, route approval, and autonomous checkpoint advancement using the then-deployed accelerated clock. That does not establish overnight real-date operation or complete the fresh browser photo-to-PDF acceptance run. Legacy runs without checkpoints are still session-bound. See [checkpoint guarantees and limits](docs/recovery-checkpoints.md).
 
 ## Architecture
 
@@ -107,7 +107,7 @@ uv run mettle ingest examples/notices/uncoded-field-report.txt --as-of 2026-08-2
 uv run mettle serve
 ```
 
-Open [http://127.0.0.1:4310](http://127.0.0.1:4310), then select **Take the guided tour**, **Explore the sample freely**, or **Start a recovery**. The server binds only to the local machine. The included communication adapter records proposed messages but sends nothing externally.
+Open [http://127.0.0.1:4310](http://127.0.0.1:4310), then select **Judge walkthrough** or **Start my recovery**. You can leave the walkthrough to explore the workspace freely. The server binds only to the local machine. The included communication adapter records proposed messages but sends nothing externally.
 
 The default path is deterministic, reproducible, and free. It accepts several common municipal header, date, and numbering styles. When a numbered correction omits a code reference or observable proof requirement, Mettle preserves the authority's text as a review candidate and asks the contractor instead of inventing either field. It uses the same domain contracts, Strands graphs, interrupts, retry rules, packet gate, and UI as the cloud path without invoking a model.
 
@@ -155,7 +155,7 @@ npx agentcore validate --json
 
 `npm run verify` is the single local release gate. It runs the Python application suite, infrastructure-template assertions, browser-flow logic tests, JavaScript syntax checks, TypeScript build, and AgentCore CDK tests. GitHub Actions runs the same command on every push to `main` and every pull request. The offline suite exercises notice parsing, campaign policy, Strands node tracing, interruptions and resume, failed-review retry safety, multimodal evidence-agent contracts, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, schedule creation and stale-event rejection, one-way delivery guardrails, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
 
-[`scripts/web_scheduler_smoke.py`](scripts/web_scheduler_smoke.py) provides the paid deployment acceptance path. It creates a synthetic authenticated workflow, confirms schedule version 1 exists, waits for the private worker to advance the workflow and arm version 2, then cancels the follow-on smoke schedule. The final deployment acceptance passed with an empty DLQ and no SMS permission or send.
+[`scripts/web_scheduler_smoke.py`](scripts/web_scheduler_smoke.py) provides a paid, accelerated-clock deployment test. It creates a synthetic authenticated workflow, confirms schedule version 1 exists, waits for the private worker to advance the workflow and arm version 2, then cancels the follow-on smoke schedule. Earlier accelerated deployment acceptance passed with an empty DLQ and no SMS send. This script is not an overnight real-date acceptance result and must not enable an accelerated clock on the shared contractor deployment.
 
 ## Security and cost boundaries
 
@@ -168,7 +168,7 @@ npx agentcore validate --json
 - **No open messaging channel:** SMS is outbound-only and disabled by default. Enabling Amazon SNS requires a server-side SHA-256 allowlist for one demo phone; all other recipients remain recorded simulations.
 - **Safe uploads:** image bodies are capped, decoded, stripped of metadata, dimension-bounded, and re-encoded before model use.
 - **Private artifacts:** approved PDFs are integrity-checked, encrypted in private S3, and delivered through a 60-second presigned URL. Recovery artifacts become eligible for deletion after 31 days; workflow records after 30 days from their last update.
-- **Explicit limitations:** uncertain operation outcomes hold recovery for operator reconciliation rather than risking duplicate outreach. Legacy runs are session-bound; full cloud gateway and overnight acceptance for the new checkpoint path remain pending.
+- **Explicit limitations:** uncertain operation outcomes hold recovery for operator reconciliation rather than risking duplicate outreach. Legacy runs are session-bound. Fresh browser photo-to-PDF and overnight real-date acceptance remain release checks, not implied by the accelerated test.
 
 For the full permission model and teardown procedure, see [`docs/aws-access.md`](docs/aws-access.md).
 
@@ -192,9 +192,9 @@ docs/                    Architecture, scope, research, and operations
 
 ## Scope
 
-Mettle begins after an inspection fails. It is not a permitting suite, a construction management platform, or an authority on building code. The current hackathon slice handles one project at a time, several common pasted-notice shapes, a bounded trade roster with general-contractor fallback, outbound-only communication, and a compressed deadline clock. Communication records safely by default; an Amazon SNS adapter can deliver only to one pre-approved personal demo number after account enrollment and explicit server-side opt-in.
+Mettle begins after an inspection fails. It is not a permitting suite, a construction management platform, or an authority on building code. The current hackathon slice handles one project at a time, several common pasted-notice shapes, a bounded trade roster with general-contractor fallback, and outbound-only communication. The checked-in contractor deployment uses real-date checkpoints; only the recorded judge walkthrough compresses time. Communication records safely by default; an Amazon SNS adapter can deliver only to one pre-approved personal demo number after account enrollment and explicit server-side opt-in.
 
-Those constraints preserve the single workflow that matters: **notice in, recovery out**. Production expansion would add jurisdiction-specific notice adapters, consent and opt-out operations for messaging, and durable campaign persistence without changing the authority boundary.
+Those constraints preserve the single workflow that matters: **notice in, recovery out**. Production expansion would add jurisdiction-specific notice adapters, consent and opt-out operations for messaging, and operator tooling for uncertain-outcome reconciliation without changing the authority boundary.
 
 Read [`docs/product-scope.md`](docs/product-scope.md) and [`docs/contractor-operator-research.md`](docs/contractor-operator-research.md) for the product decisions and domain evidence behind that scope.
 

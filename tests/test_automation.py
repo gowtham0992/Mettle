@@ -76,6 +76,22 @@ def test_eventbridge_schedule_is_exact_ephemeral_and_contains_no_phone_or_sessio
     assert "session" not in request["Target"]["Input"].lower()
 
 
+def test_default_contractor_clock_uses_actual_checkpoint_date():
+    client = FakeSchedulerClient()
+    real = EventBridgeCampaignScheduler(
+        client=client,
+        target_arn="arn:aws:lambda:us-east-1:123456789012:function:mettle-scheduler",
+        execution_role_arn="arn:aws:iam::123456789012:role/MettleSchedulerInvoke",
+        schedule_group="mettle-recovery",
+        dlq_arn="arn:aws:sqs:us-east-1:123456789012:mettle-scheduler-dlq",
+        clock=lambda: datetime(2026, 9, 9, 18, 0, tzinfo=UTC),
+    )
+    result = real.schedule(owner_hash="a" * 64, workflow_id="real-date-test", logical_check_on=date(2026, 9, 11), schedule_version=1, previous=None)
+    assert result.accelerated_demo_clock is False
+    assert result.next_check_at.date() == date(2026, 9, 11)
+    assert result.next_check_at > datetime(2026, 9, 10, tzinfo=UTC)
+
+
 def test_reschedule_cancels_only_the_previous_deterministic_schedule() -> None:
     client = FakeSchedulerClient()
     previous = CampaignAutomation(

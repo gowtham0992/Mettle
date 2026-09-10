@@ -4,6 +4,32 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const source = fs.readFileSync("src/mettle/web/static/app.js", "utf8");
 
+test("oversized photo gives actionable feedback before a paid request", () => {
+  let change;
+  const elements = {photoFile: {files: [{size: 3_500_001}], addEventListener: (_, fn) => {change=fn;}}, photoError: {}, photoSubmit: {}};
+  const context = vm.createContext({elements, maxPhotoBytes:3_500_000, activePhotoEnabled:()=>true});
+  vm.runInContext(source.slice(source.indexOf('elements.photoFile.addEventListener("change"'), source.indexOf('elements.photoCitation.addEventListener("change"')), context);
+  change();
+  assert.equal(elements.photoSubmit.disabled, true);
+  assert.equal(elements.photoError.hidden, false);
+  assert.match(elements.photoError.textContent, /3.5 MB/);
+  elements.photoFile.files[0].size = 3_500_000;
+  change();
+  assert.equal(elements.photoSubmit.disabled, false);
+  assert.equal(elements.photoError.hidden, true);
+});
+
+test("cadence label follows actual scheduling state without invented frequency", () => {
+  const elements = {cadence:{}};
+  const context = vm.createContext({elements, data:{packet_status:"blocked", automation_status:"scheduled"}});
+  const start = source.indexOf('  elements.cadence.textContent = data.packet_status');
+  vm.runInContext(source.slice(start, source.indexOf('  if (data.packet_status', start)), context);
+  assert.match(elements.cadence.textContent, /FOLLOW-UP SCHEDULED/);
+  context.data.automation_status = "paused";
+  vm.runInContext(source.slice(start, source.indexOf('  if (data.packet_status', start)), context);
+  assert.match(elements.cadence.textContent, /FOLLOW-UP PAUSED/);
+});
+
 test("sample packet failure remains in the recovery and shows a retryable error", async () => {
   let reported;
   const context = vm.createContext({

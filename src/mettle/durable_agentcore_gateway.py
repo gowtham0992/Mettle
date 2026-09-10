@@ -140,8 +140,8 @@ class DurableAgentCoreWorkflowGateway:
         envelope = self._parse_result(result)
         checkpoint_key = self._save_checkpoint(owner, envelope, result)
         workflow_key = self._workflow_key(owner, envelope.workflow_id)
-        try:
-            self._table.put_item(
+        workflow_commit = dict(
+                TableName=self._table.name,
                 Item={
                     "pk": workflow_key,
                     "kind": "workflow",
@@ -155,14 +155,9 @@ class DurableAgentCoreWorkflowGateway:
                     "attribute_not_exists(pk) OR session_id = :session_id"
                 ),
                 ExpressionAttributeValues={":session_id": session_id},
-            )
-        except ClientError as exc:
-            if _is_conditional_failure(exc):
-                raise AgentCoreGatewayError(
-                    "AgentCore returned a workflow identifier owned by another session"
-                ) from exc
-            raise
-        self._table.update_item(
+        )
+        attempt_commit = dict(
+            TableName=self._table.name,
             Key={"pk": attempt_key},
             UpdateExpression=(
                 "SET #status = :completed, envelope = :envelope, "
@@ -175,6 +170,9 @@ class DurableAgentCoreWorkflowGateway:
                 ":workflow_id": envelope.workflow_id,
                 ":expires_at": self._expires_at(),
             },
+        )
+        self._table.meta.client.transact_write_items(
+            TransactItems=[{"Put": workflow_commit}, {"Update": attempt_commit}],
         )
         return envelope.model_copy(deep=True), (not created) or bool(result.get("replayed"))
 
@@ -373,7 +371,8 @@ class DurableAgentCoreWorkflowGateway:
                 envelope=envelope,
                 previous=previous_envelope.automation,
             )
-            self._table.update_item(
+            workflow_commit = dict(
+                TableName=self._table.name,
                 Key={"pk": workflow_key},
                 UpdateExpression=(
                     "SET envelope = :envelope, expires_at = :expires_at "
@@ -388,7 +387,8 @@ class DurableAgentCoreWorkflowGateway:
                     **({":checkpoint_key": checkpoint_key} if checkpoint_key else {}),
                 },
             )
-            self._table.update_item(
+            attempt_commit = dict(
+                TableName=self._table.name,
                 Key={"pk": attempt_key},
                 UpdateExpression=(
                     "SET #status = :completed, envelope = :envelope, "
@@ -400,6 +400,12 @@ class DurableAgentCoreWorkflowGateway:
                     ":envelope": envelope.model_dump(mode="json"),
                     ":expires_at": self._expires_at(),
                 },
+            )
+            # Both records commit or neither does. If the transaction outcome is
+            # unknown, the pre-existing checkpoint hold prevents replaying side
+            # effects. The resource client serializes native Python values.
+            self._table.meta.client.transact_write_items(
+                TransactItems=[{"Update": workflow_commit}, {"Update": attempt_commit}],
             )
             return envelope.model_copy(deep=True)
         except Exception:

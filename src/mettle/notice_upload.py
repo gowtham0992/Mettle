@@ -7,7 +7,7 @@ from pypdf.errors import PdfReadError
 from mettle.photo_upload import normalize_photo
 
 
-MAX_NOTICE_BYTES = 5_000_000
+MAX_NOTICE_BYTES = 3_500_000  # Leave room for base64 and the Lambda request envelope.
 MAX_NOTICE_PAGES = 25
 MAX_NOTICE_TEXT = 100_000
 MAX_OCR_BYTES = 3_500_000  # Fits the Lambda request limit after base64 encoding.
@@ -44,7 +44,7 @@ def extract_notice_text(raw: bytes, *, filename: str) -> str:
     if not raw:
         raise NoticeUploadError("Choose a non-empty PDF or text file.")
     if len(raw) > MAX_NOTICE_BYTES:
-        raise NoticeUploadError("The report must be 5 MB or smaller.")
+        raise NoticeUploadError("The report must be 3.5 MB or smaller. Export a smaller PDF or paste the inspection comments.")
 
     lowered = filename.lower()
     if raw.startswith(b"%PDF-"):

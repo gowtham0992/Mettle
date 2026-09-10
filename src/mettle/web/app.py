@@ -511,7 +511,7 @@ def create_app(
         except (binascii.Error, ValueError) as exc:
             raise NoticeUploadError("The report file encoding is invalid.") from exc
         if len(raw) > MAX_NOTICE_BYTES:
-            raise NoticeUploadError("The report must be 5 MB or smaller.")
+            raise NoticeUploadError("The report must be 3.5 MB or smaller. Export a smaller PDF or paste the inspection comments.")
         text = await run_in_threadpool(
             extract_notice_text,
             raw,

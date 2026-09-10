@@ -98,7 +98,8 @@ def test_scheduler_is_one_time_bounded_and_has_a_dead_letter_path() -> None:
     assert "ReservedConcurrentExecutions" not in worker
     assert worker["Handler"] == "scheduler_handler.handler"
     assert web_env["METTLE_SCHEDULER_ENABLED"] == "1"
-    assert web_env["METTLE_SCHEDULER_DEMO_DELAY_SECONDS"] == "90"
+    assert "METTLE_SCHEDULER_DEMO_DELAY_SECONDS" not in web_env
+    assert "METTLE_SCHEDULER_DEMO_DELAY_SECONDS" not in worker["Environment"]["Variables"]
     assert queue["SqsManagedSseEnabled"] is True
     assert queue["MessageRetentionPeriod"] == 1209600
     trust = invoke_role["AssumeRolePolicyDocument"]["Statement"][0]

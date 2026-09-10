@@ -58,7 +58,26 @@ def conditional_failure() -> ClientError:
 
 class MemoryTable:
     def __init__(self) -> None:
+        from types import SimpleNamespace
+        self.name = "test-workflows"
+        self.meta = SimpleNamespace(client=self)
         self.items: dict[str, dict] = {}
+
+    def transact_write_items(self, *, TransactItems):
+        from copy import deepcopy
+        before = deepcopy(self.items)
+        try:
+            for operation in TransactItems:
+                kind = next(iter(operation))
+                update = dict(operation[kind])
+                assert update.pop("TableName") == self.name
+                if kind == "Put":
+                    self.put_item(**update)
+                else:
+                    self.update_item(**update)
+        except Exception:
+            self.items = before
+            raise
 
     def put_item(self, *, Item, ConditionExpression=None, ExpressionAttributeValues=None):
         current = self.items.get(Item["pk"])

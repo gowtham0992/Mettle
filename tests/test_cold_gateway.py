@@ -12,6 +12,85 @@ from mettle.workflow_registry import WorkflowRegistry, ResumeWorkflowRequest, Wo
 from mettle.agentcore_gateway import AgentCoreGatewayError
 from test_durable_agentcore_gateway import MemoryTable, payload, review_request, RUNTIME_ARN, FakeCampaignScheduler
 from mettle.automation import ScheduledCheckEvent
+from mettle.workflow_registry import RunNextCheckRequest
+
+
+def test_creation_completion_failure_cannot_publish_an_orphan_workflow():
+    class FailingTable(MemoryTable):
+        def update_item(self, **kwargs):
+            if "#status" in kwargs["UpdateExpression"]:
+                raise RuntimeError("creation completion failed")
+            return super().update_item(**kwargs)
+
+    table = FailingTable()
+    gateway = DurableAgentCoreWorkflowGateway(client=RuntimeClient(), runtime_arn=RUNTIME_ARN, table=table, packet_bucket=PrivateBucket())
+    token = set_principal("creation-review")
+    try:
+        with pytest.raises(RuntimeError, match="creation completion failed"):
+            gateway.create(payload(), idempotency_key="creation_commit")
+        assert not any(item.get("kind") == "workflow" for item in table.items.values())
+    finally:
+        reset_principal(token)
+
+
+def test_failed_completion_write_cannot_advance_same_check_twice():
+    class FailingTable(MemoryTable):
+        fail_completion = False
+
+        def update_item(self, **kwargs):
+            if self.fail_completion and "#status" in kwargs["UpdateExpression"]:
+                self.fail_completion = False
+                raise RuntimeError("completion write failed")
+            return super().update_item(**kwargs)
+
+    table, client = FailingTable(), RuntimeClient()
+    gateway = DurableAgentCoreWorkflowGateway(client=client, runtime_arn=RUNTIME_ARN, table=table, packet_bucket=PrivateBucket())
+    token = set_principal("retry-review")
+    try:
+        first, _ = gateway.create(payload(), idempotency_key="atomic_create")
+        reviewed = gateway.review(first.workflow_id, review_request(first), idempotency_key="atomic_review")
+        if reviewed.snapshot.interrupts:
+            reviewed = gateway.resume(first.workflow_id, ResumeWorkflowRequest(interrupt_id=reviewed.snapshot.interrupts[0].interrupt_id, decision="Show the entire equipment service access area"), idempotency_key="atomic_resume")
+        table.fail_completion = True
+        with pytest.raises(RuntimeError, match="completion write failed"):
+            gateway.run_next_check(first.workflow_id, RunNextCheckRequest(), idempotency_key="atomic_check")
+        # A failed commit must hold the operation, not expose a new checkpoint
+        # whose same-key retry advances time and sends follow-up again.
+        with pytest.raises(WorkflowConflict, match="uncertain outcome"):
+            gateway.run_next_check(first.workflow_id, RunNextCheckRequest(), idempotency_key="atomic_check")
+    finally:
+        reset_principal(token)
+
+
+def test_committed_transaction_with_lost_response_replays_without_advancing():
+    class LostResponseTable(MemoryTable):
+        lose_response = False
+
+        def transact_write_items(self, **kwargs):
+            result = super().transact_write_items(**kwargs)
+            if self.lose_response:
+                self.lose_response = False
+                raise RuntimeError("transaction response lost")
+            return result
+
+    table, client = LostResponseTable(), RuntimeClient()
+    gateway = DurableAgentCoreWorkflowGateway(client=client, runtime_arn=RUNTIME_ARN, table=table, packet_bucket=PrivateBucket())
+    token = set_principal("lost-response-review")
+    try:
+        first, _ = gateway.create(payload(), idempotency_key="lost_create")
+        reviewed = gateway.review(first.workflow_id, review_request(first), idempotency_key="lost_review")
+        if reviewed.snapshot.interrupts:
+            gateway.resume(first.workflow_id, ResumeWorkflowRequest(interrupt_id=reviewed.snapshot.interrupts[0].interrupt_id, decision="Show the entire equipment service access area"), idempotency_key="lost_resume")
+        table.lose_response = True
+        with pytest.raises(RuntimeError, match="response lost"):
+            gateway.run_next_check(first.workflow_id, RunNextCheckRequest(), idempotency_key="lost_check")
+        committed = gateway.get(first.workflow_id)
+        sent = sum(len(m.deliveries) for m in client.messengers)
+        replay = gateway.run_next_check(first.workflow_id, RunNextCheckRequest(), idempotency_key="lost_check")
+        assert replay == committed
+        assert sum(len(m.deliveries) for m in client.messengers) == sent
+    finally:
+        reset_principal(token)
 
 
 class PrivateBucket:

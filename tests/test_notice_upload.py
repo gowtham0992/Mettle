@@ -47,6 +47,17 @@ def test_accepts_utf8_text_report() -> None:
     )
 
 
+def test_report_limit_fits_encoded_lambda_request():
+    with pytest.raises(NoticeUploadError, match="3.5 MB"):
+        extract_notice_text(b"Report: repair framing.\n" + b" " * 3_500_000, filename="report.txt")
+
+
+def test_report_at_limit_is_accepted():
+    content = b"Report: repair framing.\n"
+    raw = content + b" " * (3_500_000 - len(content))
+    assert extract_notice_text(raw, filename="report.txt") == content.decode().strip()
+
+
 def test_rejects_disguised_and_binary_files() -> None:
     with pytest.raises(NoticeUploadError, match="PDF or .txt"):
         extract_notice_text(b"not an image", filename="notice.jpg")

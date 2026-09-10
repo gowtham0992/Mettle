@@ -288,7 +288,6 @@ Resources:
           METTLE_SCHEDULER_GROUP: !Ref RecoveryScheduleGroup
           METTLE_SCHEDULER_DLQ_ARN: !GetAtt SchedulerDeadLetterQueue.Arn
           METTLE_SCHEDULER_TIMEZONE: America/Denver
-          METTLE_SCHEDULER_DEMO_DELAY_SECONDS: '90'
       Tags:
         Project: Mettle
 
@@ -390,7 +389,6 @@ Resources:
           METTLE_SCHEDULER_GROUP: !Ref RecoveryScheduleGroup
           METTLE_SCHEDULER_DLQ_ARN: !GetAtt SchedulerDeadLetterQueue.Arn
           METTLE_SCHEDULER_TIMEZONE: America/Denver
-          METTLE_SCHEDULER_DEMO_DELAY_SECONDS: '90'
       Tags:
         Project: Mettle
 

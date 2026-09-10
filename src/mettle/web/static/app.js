@@ -216,6 +216,7 @@ let activeWorkflowTarget = "local";
 let toastTimer = null;
 let bedrockEnabled = false;
 let agentCoreEnabled = false;
+let maxPhotoBytes = 3_500_000;
 let workflowCreateKey = null;
 let workflowCreateProvider = null;
 let demoRunning = false;
@@ -2868,7 +2869,9 @@ function render(data) {
   elements.campaignStrip.classList.toggle("campaign-strip--critical", criticalRecovery);
   elements.cadence.textContent = data.packet_status === "approved"
     ? "STANDING DOWN · PACKET APPROVED"
-    : criticalRecovery ? "CRITICAL RECOVERY · CHECK-INS EVERY 4H" : "NORMAL FOLLOW-UP · DAILY CHECK-INS";
+    : data.automation_status === "scheduled"
+      ? "FOLLOW-UP SCHEDULED · SEE NEXT CHECK BELOW"
+      : "FOLLOW-UP PAUSED · REVIEW NEXT ACTION";
   if (data.packet_status === "approved") {
     elements.workspaceAgentState.innerHTML = '<i aria-hidden="true"></i> METTLE STOOD DOWN';
     elements.workspaceAgentTitle.textContent = "Packet approved. Follow-up stopped.";
@@ -3048,6 +3051,7 @@ async function loadCapabilities() {
     const capabilities = await request("/api/capabilities");
     bedrockEnabled = capabilities.bedrock_intake === true;
     agentCoreEnabled = capabilities.agentcore_runtime === true;
+    maxPhotoBytes = Math.min(3_500_000, capabilities.max_photo_bytes || 3_500_000);
   } catch (_error) {
     bedrockEnabled = false;
     agentCoreEnabled = false;
@@ -3069,7 +3073,13 @@ async function loadCapabilities() {
 
 elements.photoFile.addEventListener("change", () => {
   elements.photoError.hidden = true;
-  elements.photoSubmit.disabled = !activePhotoEnabled() || !elements.photoFile.files?.length;
+  const file = elements.photoFile.files?.[0];
+  const oversized = file && file.size > maxPhotoBytes;
+  if (oversized) {
+    elements.photoError.textContent = `Choose a photo no larger than ${maxPhotoBytes / 1_000_000} MB. Export a smaller JPEG and try again.`;
+    elements.photoError.hidden = false;
+  }
+  elements.photoSubmit.disabled = !activePhotoEnabled() || !file || Boolean(oversized);
 });
 
 elements.photoCitation.addEventListener("change", () => {
@@ -3168,6 +3178,11 @@ elements.photoForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!activeWorkflowId || !elements.photoFile.files?.length || !activePhotoEnabled()) return;
   const file = elements.photoFile.files[0];
+  if (file.size > maxPhotoBytes) {
+    elements.photoError.textContent = `Choose a photo no larger than ${maxPhotoBytes / 1_000_000} MB.`;
+    elements.photoError.hidden = false;
+    return;
+  }
   elements.photoError.hidden = true;
   setBusy(elements.photoSubmit, true);
   try {
@@ -3440,7 +3455,7 @@ elements.noticeFile.addEventListener("change", async () => {
     elements.noticeFileStatus.textContent = "No file selected";
     return;
   }
-  const fileLimit = elements.noticeOcr?.checked ? 3_500_000 : 5_000_000;
+  const fileLimit = 3_500_000;
   if (file.size > fileLimit) {
     elements.noticeFile.value = "";
     elements.noticeFileStatus.textContent = `File is larger than ${fileLimit / 1_000_000} MB`;
