@@ -931,10 +931,16 @@ async function downloadApprovedPacket(path) {
   const link = document.createElement("a");
   link.href = url;
   link.download = "mettle-reinspection-packet.pdf";
-  document.body.append(link);
+  link.className = "button button--ghost";
+  link.textContent = "Save PDF if the download didn’t start";
+  elements.packetNote.replaceChildren(link);
   link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url);
+    if (link.isConnected) {
+      elements.packetNote.textContent = "Your approved packet is saved. Use Download approved PDF to download another copy.";
+    }
+  }, 60000);
   showToast("Packet download requested. Your approved recovery remains here.");
 }
 

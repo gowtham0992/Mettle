@@ -12,7 +12,8 @@ function harness(response, current = true) {
     URL: {createObjectURL: () => 'blob:test', revokeObjectURL() {}},
     document: {body: {append() {}}, createElement: () => {
       const link = {click() {links.push(this);}, remove() {}}; return link;
-    }}, window: {setTimeout() {}}, showToast() {},
+    }}, elements: {packetNote: {replaceChildren(link) {this.link = link;}}},
+    window: {setTimeout() {}}, showToast() {},
   });
   vm.runInContext(source.slice(source.indexOf('async function request('), source.indexOf('function startFreshRecoveryFromError(')), context);
   return {context, calls, links, cleared};
@@ -25,6 +26,8 @@ test('approved PDF downloads with authorization without leaving the recovery', a
   assert.equal(h.calls[0].options.cache, 'no-store');
   assert.equal(h.links[0].download, 'mettle-reinspection-packet.pdf');
   assert.equal(h.links[0].href, 'blob:test');
+  assert.equal(h.context.elements.packetNote.link, h.links[0]);
+  assert.match(h.links[0].textContent, /Save PDF/);
 });
 test('expired session does not start a packet download', async () => {
   const h = harness({}, false);
