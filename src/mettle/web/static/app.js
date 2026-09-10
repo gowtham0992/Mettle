@@ -875,7 +875,7 @@ function workflowCampaign(envelope, executionTarget = "local") {
   };
 }
 
-async function request(path, options = {}) {
+async function request(path, options = {}, responseType = "json") {
   const headers = { ...(options.headers || {}) };
   if (path.startsWith("/api/agentcore")) {
     if (!tokenIsCurrent(accessToken)) {
@@ -900,6 +900,9 @@ async function request(path, options = {}) {
     throw error;
   }
   const contentType = response.headers.get("content-type") || "";
+  if (response.ok && responseType === "pdf" && contentType.toLowerCase().includes("application/pdf")) {
+    return response.blob();
+  }
   if (!contentType.toLowerCase().includes("application/json")) {
     const requestError = new Error(
       response.ok
@@ -918,7 +921,21 @@ async function request(path, options = {}) {
     requestError.status = response.status;
     throw requestError;
   }
+  if (responseType === "pdf") throw new Error("Mettle did not return a PDF. Your approved recovery is still saved. Try again.");
   return payload;
+}
+
+async function downloadApprovedPacket(path) {
+  const blob = await request(path, { cache: "no-store" }, "pdf");
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "mettle-reinspection-packet.pdf";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  showToast("Packet download requested. Your approved recovery remains here.");
 }
 
 function startFreshRecoveryFromError() {
@@ -3771,15 +3788,13 @@ elements.packetAction.addEventListener("click", async () => {
     ? "/api/agentcore/workflows"
     : "/api/workflows";
   if (campaign?.packet_status === "approved") {
+    setBusy(elements.packetAction, true);
     try {
-      if (activeWorkflowTarget === "agentcore") {
-      const link = await request(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/packet-url`);
-      window.location.assign(link.download_url);
-      } else {
-      window.location.assign(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/packet.pdf`);
-      }
+      await downloadApprovedPacket(`${workflowRoot}/${encodeURIComponent(activeWorkflowId)}/packet.pdf`);
     } catch (error) {
       showError(error);
+    } finally {
+      setBusy(elements.packetAction, false);
     }
     return;
   }

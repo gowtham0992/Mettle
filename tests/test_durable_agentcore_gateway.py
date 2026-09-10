@@ -177,6 +177,47 @@ class UnusedBucket:
     pass
 
 
+def test_cached_packet_download_is_approved_owner_scoped_and_integrity_checked():
+    from types import SimpleNamespace
+    from mettle.workflow_registry import PacketNotApproved
+
+    table = MemoryTable()
+    durable = gateway(table, QueueClient([created_result()]))
+    pdf = b"%PDF-1.4 synthetic packet"
+    key = f"test/{sha256(pdf).hexdigest()}.pdf"
+    durable._packet_bucket = SimpleNamespace(Object=lambda requested: SimpleNamespace(
+        get=lambda: {"Body": io.BytesIO(pdf if requested == key else b"corrupt")}
+    ))
+    alice = set_principal("synthetic-alice")
+    try:
+        envelope, _ = durable.create(payload(), idempotency_key="packet_test_create")
+        record = table.items[durable._workflow_key(durable._owner(), envelope.workflow_id)]
+        record["packet_key"] = key
+        with pytest.raises(PacketNotApproved):
+            durable.render_packet(envelope.workflow_id)
+        record["envelope"]["packet"] = {
+            "packet_id":"test-packet", "status":"approved", "prepared_on":"2026-08-10",
+            "citations_total":3, "citations_ready":3, "approval_id":"test-approval",
+            "approval_decision":"Synthetic test approval",
+        }
+        assert durable.render_packet(envelope.workflow_id) == pdf
+        record["packet_key"] = "test/invalid.pdf"
+        with pytest.raises(AgentCoreGatewayError, match="integrity"):
+            durable.render_packet(envelope.workflow_id)
+        record["packet_key"] = key
+        pdf = b"%PDF-" + b"x" * 4_000_000
+        with pytest.raises(AgentCoreGatewayError, match="too large"):
+            durable.render_packet(envelope.workflow_id)
+    finally:
+        reset_principal(alice)
+    bob = set_principal("synthetic-bob")
+    try:
+        with pytest.raises(WorkflowNotFound):
+            durable.render_packet(envelope.workflow_id)
+    finally:
+        reset_principal(bob)
+
+
 def gateway(
     table: MemoryTable,
     client: QueueClient,

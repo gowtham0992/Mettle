@@ -40,6 +40,7 @@ from mettle.workflow_registry import (
     WorkflowConflict,
     WorkflowEnvelope,
     WorkflowNotFound,
+    PacketNotApproved,
     CreateWorkflowRequest,
 )
 
@@ -509,9 +510,12 @@ class DurableAgentCoreWorkflowGateway:
         )
         return envelope.model_copy(update={"automation": automation}, deep=True)
 
-    def packet_download_url(self, workflow_id: str) -> str:
+    def _approved_packet_key(self, workflow_id: str) -> str:
         owner = self._owner()
         workflow = self._workflow(owner, workflow_id)
+        packet = self._envelope(workflow.get("envelope")).packet
+        if packet is None or packet.status != "approved":
+            raise PacketNotApproved("contractor approval is required before download")
         key = workflow.get("packet_key")
         if not isinstance(key, str):
             result = self._invoke(
@@ -547,6 +551,21 @@ class DurableAgentCoreWorkflowGateway:
                 UpdateExpression="SET packet_key = :key, expires_at = :expires_at",
                 ExpressionAttributeValues={":key": key, ":expires_at": self._expires_at()},
             )
+        return key
+
+    def render_packet(self, workflow_id: str) -> bytes:
+        key = self._approved_packet_key(workflow_id)
+        # Leave room for Lambda's base64 response envelope.
+        limit = 4_000_000
+        pdf = self._packet_bucket.Object(key).get()["Body"].read(limit + 1)
+        if len(pdf) > limit:
+            raise AgentCoreGatewayError("This packet is too large for an in-app download. Your approved packet remains saved.")
+        if not pdf.startswith(b"%PDF-") or key.rsplit("/", 1)[-1] != f"{sha256(pdf).hexdigest()}.pdf":
+            raise AgentCoreGatewayError("Stored packet integrity check failed")
+        return pdf
+
+    def packet_download_url(self, workflow_id: str) -> str:
+        key = self._approved_packet_key(workflow_id)
         return self._packet_bucket.meta.client.generate_presigned_url(
             "get_object",
             Params={

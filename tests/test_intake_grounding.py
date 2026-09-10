@@ -52,6 +52,13 @@ def test_absent_codes_are_not_invented(monkeypatch):
     assert all(c.code_reference == "Not stated in notice" for c in extract(monkeypatch).citations)
 
 
+def test_document_as_a_verb_does_not_override_explicit_photo_proof(monkeypatch):
+    source = SOURCE.split("Original report")[0] + "1. Document the installed metal protection plate. Provide a close photograph showing the plate attached to the wood stud."
+    result = extract(monkeypatch, source)
+    assert result.citations[0].closure_route == "photo_evidence"
+    assert result.citations[0].evidence_requirements == ["Provide a close photograph showing the plate attached to the wood stud."]
+
+
 def test_explicit_photo_requirements_survive_model_omission(monkeypatch):
     result = extract(monkeypatch)
     assert result.citations[-1].evidence_requirements == ["Provide a photograph showing each corrected location."]

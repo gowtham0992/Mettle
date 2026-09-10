@@ -65,7 +65,7 @@ def ground_notice_in_source(
         candidate = candidates[0] if len(candidates) == 1 else None
         requirements = explicit_proof(original, source_text)
         route = ClosureRoute.PHOTO_EVIDENCE
-        proof_text = " ".join(requirements).lower()
+        proof_text = " ".join(_proof_object_text(item) for item in requirements).lower()
         if re.search(r"\b(?:on[- ]site|physical)\s+(?:inspector\s+)?(?:verification|reinspection|inspection)\b", proof_text):
             route = ClosureRoute.PHYSICAL_REINSPECTION
         elif re.search(r"\b(?:documents?|certificates?|certification|reports?)\b", proof_text):
@@ -93,6 +93,12 @@ def ground_notice_in_source(
     )
 
 
+def _proof_object_text(text: str) -> str:
+    # "Document the installation" uses a verb, not a required document artifact.
+    # Keep the source unchanged; normalize only the text used for route detection.
+    return re.sub(r"^\s*document\s+(?=(?:the|each|all|every|this|that|these|those|any)\b)", "record ", text, flags=re.I)
+
+
 def explicit_proof(citation: Citation, source_text: str) -> list[str]:
     """Keep quoted proof instructions; do not inherit code-based demo defaults."""
     block = re.search(
@@ -110,7 +116,7 @@ def explicit_proof(citation: Citation, source_text: str) -> list[str]:
         sentence, re.I,
     ) and re.search(
         r"\b(?:photo(?:graph)?s?|images?|documents?|certificates?|reports?|on[- ]site|inspector|reinspection)\b",
-        sentence, re.I,
+        _proof_object_text(sentence), re.I,
     )]
     return instructions
 
