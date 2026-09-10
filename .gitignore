@@ -19,9 +19,21 @@ infra/web/.aws-sam/
 .devpost-hackathon-state.json
 devpost-submission.md
 docs/hackathon-build/
+docs/demo-script.md
+docs/demo-evidence-pack.md
+docs/builder-post*.md
+docs/judge-access.md
+docs/reviews/
+docs/prompts/
+docs/*-review.md
+docs/*-notes.md
+docs/fable*
+private-notes/
+assets/submission/
 
 # Local design-source export; production assets are imported under web/static
 Logo file and HTML usage.zip
+*.zip
 
 # Credentials and local runtime artifacts
 .aws/

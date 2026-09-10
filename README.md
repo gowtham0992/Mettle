@@ -21,7 +21,7 @@ Mettle is a bounded-autonomy recovery agent for small residential contractors. I
 
 ## One workflow, end to end
 
-Mettle starts with the event contractors already receive: a failed-inspection notice. It does not require them to configure a new project, author evidence rules, or maintain another punch list first.
+Mettle starts with the event contractors already receive: a failed-inspection notice. There is no project template or punch list to build first. Mettle preserves explicit proof instructions from the notice; when those instructions are missing, the contractor defines the proof before outreach. It does not infer inspection requirements from a code citation alone.
 
 1. **Understand the notice.** A Strands intake agent converts unstructured municipal language into a validated correction docket while preserving the source text.
 2. **Pause before outreach.** The contractor confirms the responsible trade, closure route, and proof request for every citation. Until then, Mettle records zero outreach.
@@ -35,6 +35,8 @@ The result is not another dashboard to babysit. Mettle works between events and 
 
 Open the **[live guided demo](https://d1ytth8asjpes8.cloudfront.net)** and select **Judge walkthrough**. The public journey stages the real sample endpoints into five focused scenes, using synthetic contractor, property, notice, and evidence data so judges can experience the complete product without credentials or cloud spend. Every result remains inspectable afterward in the full workspace. Choose **Start my recovery** for the invite-only authenticated contractor path.
 
+**Trying the live agents?** Use an invited Mettle account, not an AWS account. Contact the project owner for access. The walkthrough and unsigned notice preview do not invoke models. Never publish account credentials in this repository.
+
 The compressed run demonstrates:
 
 - a raw failed-inspection notice becoming three grounded corrections;
@@ -47,7 +49,7 @@ The **Agent run** panel makes the orchestration inspectable: judges can see spec
 
 The browser playback is clearly labeled as a guided demonstration. The repository also includes the working Strands workflow, opt-in Bedrock execution, and deployed AgentCore boundary used by the live cloud path.
 
-The unauthenticated Strands route keeps workflow state in one warm Lambda instance, so shared `?workflow=` links are demonstration conveniences rather than durable records. New authenticated recoveries save private, versioned checkpoints and restore a fresh AgentCore runtime for each operation. DynamoDB owns caller-scoped records and EventBridge schedules use stale-event rejection and a dead-letter queue. Cold recovery is tested locally through approved PDF generation. The September 9 browser review verified authenticated intake, restoration after refresh, route approval, and autonomous checkpoint advancement using the then-deployed accelerated clock. That does not establish overnight real-date operation or complete the fresh browser photo-to-PDF acceptance run. Legacy runs without checkpoints are still session-bound. See [checkpoint guarantees and limits](docs/recovery-checkpoints.md).
+The unauthenticated Strands route keeps workflow state in one warm Lambda instance, so shared `?workflow=` links are demonstration conveniences rather than durable records. New authenticated recoveries save private, versioned checkpoints and restore a fresh AgentCore runtime for each operation. DynamoDB owns caller-scoped records and EventBridge schedules use stale-event rejection and a dead-letter queue. A fresh September 9 signed-in browser run verified intake, rejection of an unrelated image, acceptance of two appropriate photographs, final approval, restoration after reload, and download of a visually checked four-page PDF. Earlier accelerated-clock acceptance verified checkpoint advancement; neither result establishes overnight real-date operation. Legacy runs without checkpoints are still session-bound. See [checkpoint guarantees and limits](docs/recovery-checkpoints.md).
 
 ## Architecture
 
@@ -167,8 +169,8 @@ npx agentcore validate --json
 - **Bounded scheduling:** each checkpoint is a one-time EventBridge schedule with a versioned payload, two retries, a dead-letter queue, and automatic deletion; stale events cannot advance the workflow.
 - **No open messaging channel:** SMS is outbound-only and disabled by default. Enabling Amazon SNS requires a server-side SHA-256 allowlist for one demo phone; all other recipients remain recorded simulations.
 - **Safe uploads:** image bodies are capped, decoded, stripped of metadata, dimension-bounded, and re-encoded before model use.
-- **Private artifacts:** approved PDFs are integrity-checked, encrypted in private S3, and delivered through a 60-second presigned URL. Recovery artifacts become eligible for deletion after 31 days; workflow records after 30 days from their last update.
-- **Explicit limitations:** uncertain operation outcomes hold recovery for operator reconciliation rather than risking duplicate outreach. Legacy runs are session-bound. Fresh browser photo-to-PDF and overnight real-date acceptance remain release checks, not implied by the accelerated test.
+- **Private artifacts:** approved PDFs are integrity-checked and encrypted in private S3. The browser downloads through the authenticated gateway, with an explicit save link if the automatic download does not start. In-app downloads are capped at 4 MB; the separate private-link endpoint remains available. Recovery artifacts become eligible for deletion after 31 days; workflow records after 30 days from their last update.
+- **Explicit limitations:** uncertain operation outcomes hold recovery for operator reconciliation rather than risking duplicate outreach. Legacy runs are session-bound. Overnight real-date acceptance remains a release check, not implied by the completed photo-to-PDF or accelerated-clock tests.
 
 For the full permission model and teardown procedure, see [`docs/aws-access.md`](docs/aws-access.md).
 
@@ -186,13 +188,15 @@ agentcore_app.py         Amazon Bedrock AgentCore entrypoint
 infra/web/template.yaml  Secure public AWS stack
 examples/                Representative synthetic notice
 tests/                   Offline and boundary-focused test suite
-assets/submission/       Devpost-ready product screenshots
+assets/architecture/     Product and AWS architecture diagrams
 docs/                    Architecture, scope, research, and operations
 ```
 
 ## Scope
 
 Mettle begins after an inspection fails. It is not a permitting suite, a construction management platform, or an authority on building code. The current hackathon slice handles one project at a time, several common pasted-notice shapes, a bounded trade roster with general-contractor fallback, and outbound-only communication. The checked-in contractor deployment uses real-date checkpoints; only the recorded judge walkthrough compresses time. Communication records safely by default; an Amazon SNS adapter can deliver only to one pre-approved personal demo number after account enrollment and explicit server-side opt-in.
+
+The public deployment accepts pasted text and PDFs with selectable text. Paper notices and image-only scans need transcription: notice OCR is not enabled in this release. This is separate from the live vision agent that assesses job-site evidence photos after intake.
 
 Those constraints preserve the single workflow that matters: **notice in, recovery out**. Production expansion would add jurisdiction-specific notice adapters, consent and opt-out operations for messaging, and operator tooling for uncertain-outcome reconciliation without changing the authority boundary.
 

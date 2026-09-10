@@ -1,6 +1,6 @@
 # Cold recovery checkpoints
 
-Implementation status: runtime, web gateway, scheduler, and storage prerequisites deployed. The live runtime passed a fresh-session restore and recorded-only outreach check. Authenticated browser-to-storage acceptance and an overnight cloud soak remain pending.
+Implementation status: runtime, web gateway, scheduler, and storage prerequisites deployed. The live runtime passed a fresh-session restore and recorded-only outreach check. September 9 authenticated browser acceptance completed intake, two photo assessments, final approval, reload restoration, and a downloaded four-page PDF with both photos intact. An overnight real-date cloud soak remains pending.
 
 New authenticated recoveries can resume without keeping an AgentCore process alive. After each successful operation, the runtime exports a versioned JSON checkpoint. The gateway writes it to encrypted private S3 and commits its content-addressed key with the public workflow envelope in DynamoDB. Checkpoints never enter HTTP responses or presigned download links.
 
@@ -21,4 +21,4 @@ DynamoDB records expire 30 days after their last update. Private recovery artifa
 
 Deploy the compatible runtime, storage/worker policy, and gateway together; do not advertise multi-day operation until a deployed cold-runtime test passes. An old runtime response without a checkpoint remains readable, but does not acquire durable restoration. Do not roll back the runtime to a version that cannot restore already-created checkpoints.
 
-Local tests discard runtime instances between operations, advance the clock by two days, resume contractor review, preserve photo evidence through approved PDF generation, execute a background check without a signed-in browser, reject cross-owner reads, and hold uncertain sends. Remaining release checks: real S3/DynamoDB/AgentCore integration, deployed restart, and an overnight scheduled run. Administrative resolution of uncertain outcomes is not yet exposed as a self-service UI.
+Local tests discard runtime instances between operations, advance the clock by two days, resume contractor review, preserve photo evidence through approved PDF generation, execute a background check without a signed-in browser, reject cross-owner reads, and hold uncertain sends. The completed signed-in browser test exercises deployed S3/DynamoDB/AgentCore integration. An overnight scheduled run is still unverified. Administrative resolution of uncertain outcomes is not yet exposed as a self-service UI.
