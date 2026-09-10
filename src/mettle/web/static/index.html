@@ -368,7 +368,7 @@
               <span class="entry-choice__index">01</span>
               <span class="entry-choice__badge">FOR CONTRACTORS</span>
               <strong>Start my recovery</strong>
-              <span>Add a redacted correction report and the people responsible. Mettle saves your setup if sign-in is needed.</span>
+              <span>Preview a redacted notice without signing in. To save a recovery and run the agents, use an invited account.</span>
               <span class="entry-choice__action" id="recovery-entry-action">START →</span>
             </button>
             <button class="entry-choice" id="start-tour-entry" type="button">
@@ -454,6 +454,9 @@
             <span>FAILED-INSPECTION REPORT · REDACTED TEXT</span>
             <textarea id="notice-text" name="notice_text" required maxlength="100000" spellcheck="false" placeholder="Paste the permit number, job address, inspection date, reinspection deadline, and numbered correction comments."></textarea>
           </label>
+          <button type="button" class="button button--outline" id="notice-preview-button">Preview my correction list · no sign-in</button>
+          <p class="notice-dialog__intro">Free rules-based preview for supported text notices. No AI calls, saved job, or outreach. Live agent execution still requires an invited account.</p>
+          <section id="notice-preview" aria-live="polite" hidden></section>
           <div class="run-settings">
             <div id="notice-missing-details" hidden></div>
             <input id="workflow-as-of" name="as_of" type="hidden">

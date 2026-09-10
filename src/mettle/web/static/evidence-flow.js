@@ -24,25 +24,28 @@
     if (!line) return "";
     const match = line.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b|\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
     if (!match) return "";
-    if (match[1]) {
-      return `${match[1]}-${String(match[2]).padStart(2, "0")}-${String(match[3]).padStart(2, "0")}`;
-    }
-    const year = Number(match[6]) < 100 ? 2000 + Number(match[6]) : Number(match[6]);
-    return `${year}-${String(match[4]).padStart(2, "0")}-${String(match[5]).padStart(2, "0")}`;
+    const year = match[1] || (Number(match[6]) < 100 ? 2000 + Number(match[6]) : Number(match[6]));
+    const iso = `${year}-${String(match[2] || match[4]).padStart(2, "0")}-${String(match[3] || match[5]).padStart(2, "0")}`;
+    const parsed = new Date(`${iso}T00:00:00Z`);
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === iso ? iso : "";
   }
 
   function noticeDeadline(noticeText) {
-    const line = String(noticeText || "").split(/\r?\n/).find(
-      (value) => /reinspection|correction deadline/i.test(value),
-    );
-    return dateFromLine(line);
+    const text = String(noticeText || "");
+    // Match after the deadline label, never an unrelated date earlier on its line.
+    const explicit = text.match(/(?:re[- ]?inspection\s+(?:required by|deadline|target|date|due|on)|correction deadline|correct by)\s*:?\s*([^\n]+)/i);
+    if (explicit) return dateFromLine(explicit[1]);
+    const relative = text.match(/re[- ]?inspection\s+(?:required\s+)?within\s+(\d{1,3})\s+(?:calendar\s+)?days\b/i);
+    const issued = noticeInspectionDate(text);
+    if (!relative || !issued || Number(relative[1]) < 1 || Number(relative[1]) > 365) return "";
+    const result = new Date(`${issued}T00:00:00Z`);
+    result.setUTCDate(result.getUTCDate() + Number(relative[1]));
+    return result.toISOString().slice(0, 10);
   }
 
   function noticeInspectionDate(noticeText) {
-    const line = String(noticeText || "").split(/\r?\n/).find(
-      (value) => /inspection date|issued(?: on)?/i.test(value) && !/reinspection/i.test(value),
-    );
-    return dateFromLine(line);
+    const match = String(noticeText || "").match(/^(?:inspection date|date of inspection|inspection performed|date issued|issued(?: on)?|date)\s*:?\s*([^\n]+)/im);
+    return dateFromLine(match?.[1]);
   }
 
   function recoveryDateError(noticeText, workingDate) {

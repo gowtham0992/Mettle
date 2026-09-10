@@ -10,6 +10,20 @@ def approve_routes(store: DemoStore) -> None:
     )
 
 
+def test_resolution_keys_survive_checkpoint_and_reset_with_the_session():
+    store = DemoStore()
+    decision = "Approve the prepared routes"
+    first = store.resolve_judgment("route-review", decision=decision, idempotency_key="resolution-1")
+    assert "resolution_keys" not in store.dump_state().model_dump()
+    assert all(isinstance(value, str) for value in store.dump_state().resolved_decisions.values())
+    restored = DemoStore.from_state(store.dump_state())
+    assert restored.resolve_judgment("route-review", decision=decision, idempotency_key="resolution-1") == first
+    with pytest.raises(DemoConflict, match="different decision"):
+        restored.resolve_judgment("deadline-choice", decision=decision, idempotency_key="resolution-1")
+    restored.reset()
+    assert restored.resolve_judgment("route-review", decision="New route approval", idempotency_key="resolution-1").metrics.contractor_decisions == 1
+
+
 def test_demo_opening_state_has_zero_outreach_before_contractor_approval() -> None:
     campaign = DemoStore().snapshot()
 
@@ -86,8 +100,9 @@ def test_demo_escalates_and_interrupts_near_deadline() -> None:
     assert campaign.days_remaining == 2
     assert any(item.judgment_id == "deadline-choice" for item in campaign.judgments)
 
-    blocked = store.advance(idempotency_key="four")
-    assert blocked.scenario_step == campaign.scenario_step
+    with pytest.raises(DemoConflict, match="blocked"):
+        store.advance(idempotency_key="four")
+    assert store.snapshot().scenario_step == campaign.scenario_step
 
     resumed = store.resolve_judgment(
         "deadline-choice",
@@ -145,7 +160,9 @@ def test_final_packet_gate_appears_only_after_all_citations_are_ready() -> None:
 def test_demo_cannot_advance_before_route_approval() -> None:
     store = DemoStore()
 
-    campaign = store.advance(idempotency_key="blocked-before-route-approval")
+    with pytest.raises(DemoConflict, match="blocked"):
+        store.advance(idempotency_key="blocked-before-route-approval")
+    campaign = store.snapshot()
 
     assert campaign.scenario_step == 0
     assert campaign.metrics.messages_handled == 0

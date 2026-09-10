@@ -6,6 +6,19 @@ from mettle.domain import Trade
 from mettle.notice_parser import NoticeParseError, parse_notice
 
 
+def test_relative_deadline_and_contractor_target_preserve_finding():
+    text = "Permit: TEST-REL\nProperty: Redacted job\nDate 08/07/2026 … Reinspection required within 10 days\n1. Install protection plates at each bored location."
+    notice = parse_notice(text)
+    assert notice.issued_on == date(2026, 8, 7)
+    assert notice.reinspection_due_on == date(2026, 8, 17)
+    enriched = "Contractor-supplied setup details\nReinspection deadline: 2026-09-20\n\nOriginal report\n" + text
+    amended = parse_notice(enriched)
+    assert amended.reinspection_due_on == date(2026, 9, 20)
+    assert amended.citations == notice.citations
+    with pytest.raises(NoticeParseError, match="missing notice fields"):
+        parse_notice(text.replace("10 days", "10 business days"))
+
+
 def test_parse_notice_preserves_citation_language_and_evidence() -> None:
     notice = parse_notice(
         """

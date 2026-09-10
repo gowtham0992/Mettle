@@ -21,13 +21,17 @@ test("oversized photo gives actionable feedback before a paid request", () => {
 
 test("cadence label follows actual scheduling state without invented frequency", () => {
   const elements = {cadence:{}};
-  const context = vm.createContext({elements, data:{packet_status:"blocked", automation_status:"scheduled"}});
+  const context = vm.createContext({elements, criticalRecovery:false, data:{packet_status:"blocked", automation_status:"scheduled", judgments:[]}});
   const start = source.indexOf('  elements.cadence.textContent = data.packet_status');
   vm.runInContext(source.slice(start, source.indexOf('  if (data.packet_status', start)), context);
   assert.match(elements.cadence.textContent, /FOLLOW-UP SCHEDULED/);
   context.data.automation_status = "paused";
   vm.runInContext(source.slice(start, source.indexOf('  if (data.packet_status', start)), context);
   assert.match(elements.cadence.textContent, /FOLLOW-UP PAUSED/);
+  context.criticalRecovery = true;
+  context.data.judgments = [{status:"pending"}];
+  vm.runInContext(source.slice(start, source.indexOf('  if (data.packet_status', start)), context);
+  assert.match(elements.cadence.textContent, /CRITICAL .* DECISION PENDING/);
 });
 
 test("sample packet failure remains in the recovery and shows a retryable error", async () => {
@@ -123,7 +127,9 @@ test("record drafts do not bleed across corrections and accepted records are rea
     elements.recordConfirmed.checked = false;
   };
   let shown;
-  const context = vm.createContext({elements, activeWorkflowId: "test", renderEvidenceAssessment: (a) => {shown = a;}});
+  elements.photoSubmit = {};
+  elements.photoFile = {};
+  const context = vm.createContext({elements, activePhotoEnabled:()=>true, activeWorkflowId: "test", renderEvidenceAssessment: (a) => {shown = a;}});
   vm.runInContext(source.slice(source.indexOf("const recordDrafts ="), source.indexOf("let recordSubmission =")), context);
   const data = {source_mode: "workflow", citations: [
     {citation_id: "1", closure_route: "document_evidence", stage: "awaiting_evidence"},

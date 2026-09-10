@@ -20,6 +20,36 @@ DENVER_NOTICE = Path("examples/notices/denver-remodel.txt").read_text(encoding="
 WEB_TEMPLATE = Path("infra/web/template.yaml").read_text(encoding="utf-8")
 
 
+def test_anonymous_notice_preview_is_bounded_and_stateless(monkeypatch):
+    registry = WorkflowRegistry()
+    def forbidden(*args, **kwargs):
+        raise AssertionError("preview must not create a workflow or AWS client")
+    monkeypatch.setattr(registry, "create", forbidden)
+    monkeypatch.setattr("mettle.web.app.boto3.client", forbidden)
+    with TestClient(create_app(workflows=registry)) as browser:
+        result = browser.post("/api/notices/preview", json={"notice_text": NOTICE})
+        assert result.status_code == 200
+        assert result.json()["mode"] == "local_parser_preview"
+        assert len(result.json()["notice"]["citations"]) == 3
+        plain = "Permit: PREVIEW-1\nProperty: Redacted job\nDate: 2026-09-09\nReinspection deadline: 2026-09-20\n1. NEC 110.26 Clear the electrical panel area."
+        grounded = browser.post("/api/notices/preview", json={"notice_text": plain}).json()
+        assert grounded["notice"]["citations"][0]["evidence_requirements"] == []
+        assert browser.post("/api/notices/preview", json={"notice_text": NOTICE, "provider": "bedrock"}).status_code == 422
+        assert browser.post("/api/notices/preview", json={"notice_text": "x" * 100001}).status_code == 422
+
+
+def test_demo_gate_conflict_and_resolution_idempotency():
+    with TestClient(create_app()) as browser:
+        assert browser.post("/api/demo/advance", json={"idempotency_key":"blocked-1"}).status_code == 409
+        payload = {"decision":"Review and approve the prepared routes", "idempotency_key":"resolution-1"}
+        first = browser.post("/api/judgments/route-review/resolve", json=payload)
+        assert first.status_code == 200
+        replay = browser.post("/api/judgments/route-review/resolve", json=payload)
+        assert replay.json() == first.json()
+        assert browser.post("/api/judgments/route-review/resolve", json={**payload, "decision":"A different decision"}).status_code == 409
+        assert browser.post("/api/demo/advance", json={"idempotency_key":"blocked-1"}).status_code == 200
+
+
 def test_notice_ocr_requires_verified_identity(monkeypatch):
     monkeypatch.setenv("METTLE_NOTICE_OCR_ENABLED", "1")
     with TestClient(create_app()) as browser:

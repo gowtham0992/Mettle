@@ -52,3 +52,15 @@ test("normalizes the phone formats a US contractor is likely to type", () => {
   assert.equal(normalizedPhone("1 303 555 0100"), "+13035550100");
   assert.equal(normalizedPhone("+44 20 7946 0958"), "+442079460958");
 });
+
+test("relative deadlines use the issue date, never the first date on the reinspection line", () => {
+  const notice = "Date 08/07/2026 … Reinspection required within 10 days";
+  assert.equal(noticeInspectionDate(notice), "2026-08-07");
+  assert.equal(noticeDeadline(notice), "2026-08-17");
+  assert.equal(noticeDeadline("Date: 12/29/2026\nRe-inspection required within 10 calendar days"), "2027-01-08");
+  assert.equal(noticeDeadline("Date: 08/07/2026\nReinspection within 10 business days"), "");
+  assert.equal(noticeDeadline("Date: 08/07/2026 … Reinspection required by 08/20/2026"), "2026-08-20");
+  assert.equal(noticeDeadline(`Reinspection deadline: 2026-09-20\nOriginal report\n${notice}`), "2026-09-20");
+  assert.equal(noticeDeadline("Date: 02/31/2026\nReinspection required within 10 days"), "");
+  assert.equal(noticeDeadline("Reinspection deadline: 2026-13-01"), "");
+});

@@ -44,7 +44,8 @@ from mettle.request_identity import (
     reset_principal,
     set_principal,
 )
-from mettle.notice_parser import NoticeParseError
+from mettle.notice_parser import NoticeParseError, parse_notice
+from mettle.agents.intake import ground_notice_in_source
 from mettle.notice_upload import (
     MAX_NOTICE_BYTES,
     NoticeUploadError,
@@ -88,6 +89,7 @@ class ResolveJudgmentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: str = Field(min_length=3, max_length=500)
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
 
     @field_validator("decision")
     @classmethod
@@ -105,6 +107,12 @@ class CapabilitiesResponse(BaseModel):
     agentcore_runtime: bool
     photo_evidence: bool
     max_photo_bytes: int
+
+
+class NoticePreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    notice_text: str = Field(min_length=1, max_length=100_000)
 
 
 class PublicConfigResponse(BaseModel):
@@ -504,6 +512,13 @@ def create_app(
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.post("/api/notices/preview")
+    async def preview_notice(payload: NoticePreviewRequest):
+        # Stateless deterministic parsing only. No model, workflow, or outreach.
+        notice = await run_in_threadpool(parse_notice, payload.notice_text)
+        notice = ground_notice_in_source(notice, notice, payload.notice_text)
+        return {"mode": "local_parser_preview", "notice": notice.model_dump(mode="json")}
+
     @app.post("/api/notices/text", response_model=NoticeTextResponse)
     async def notice_text(payload: EncodedNoticeRequest) -> NoticeTextResponse:
         try:
@@ -640,6 +655,7 @@ def create_app(
             request.state.demo_session_key,
             judgment_id,
             decision=payload.decision,
+            idempotency_key=payload.idempotency_key,
         )
 
     @app.post("/api/workflows", response_model=WorkflowEnvelope)

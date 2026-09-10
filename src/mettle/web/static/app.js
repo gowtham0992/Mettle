@@ -1,6 +1,8 @@
 const {
   evidenceOptionLabel,
   normalizedPhone,
+  noticeDeadline,
+  noticeInspectionDate,
   recoveryDateError,
   selectEvidenceCitation,
 } = globalThis.MettleEvidenceFlow;
@@ -1048,6 +1050,7 @@ function validateSetupStep() {
       elements.noticeText.setCustomValidity("");
       return false;
     }
+    if (!completeNoticeDetails()) return false;
     const dateError = recoveryDateError(
       elements.noticeText.value,
       recoveryWorkingDate(),
@@ -1060,7 +1063,6 @@ function validateSetupStep() {
       return false;
     }
     elements.noticeText.removeAttribute("aria-invalid");
-    if (!completeNoticeDetails()) return false;
   }
   if (setupStep === 2) {
     const name = elements.primaryContactName.value.trim();
@@ -1122,9 +1124,11 @@ function completeNoticeDetails() {
   const fields = [
     ["permit", "Permit or notice number", "Permit", /^(?:permit|notice id|record id|correction notice)\b/im, "text"],
     ["address", "Job address or redacted job label", "Property", /^(?:property|project address|job address|address|location|site)\b/im, "text"],
-    ["inspection", "When was the inspection?", "Inspection date", /^(?:inspection date|issued on|issued|date of inspection)\b/im, "date"],
-    ["deadline", "What is the reinspection target date?", "Reinspection deadline", /(?:reinspection|re-inspection|correction deadline|correct by)/i, "date"],
-  ].filter(field => !field[3].test(text));
+    ["inspection", "When was the inspection?", "Inspection date", null, "date"],
+    ["deadline", "Set a future reinspection target · supplied by you", "Reinspection deadline", null, "date"],
+  ].filter(field => field[0] === "inspection" ? !noticeInspectionDate(text)
+    : field[0] === "deadline" ? !noticeDeadline(text) || noticeDeadline(text) <= recoveryWorkingDate()
+      : !field[3].test(text));
   if (!fields.length) {host.hidden=true;host.replaceChildren();return true;}
   const additions=[];
   for (const [key,label,header,,type] of fields) {
@@ -1137,7 +1141,7 @@ function completeNoticeDetails() {
     if (input.value.trim()) additions.push(`${header}: ${input.value.trim()}`);
   }
   host.hidden=false;
-  if (!host.querySelector("p")) host.prepend(node("p","notice-dialog__intro","A few job details weren’t found in the report. Add them here; they will be marked as supplied by you, not by the inspector."));
+  if (!host.querySelector("p")) host.prepend(node("p","notice-dialog__intro","Some details are missing or the report’s deadline has passed. Supply a future planning target below; this does not extend an authority’s deadline. Confirm any changed date with the authority. Your additions are labelled separately and the original report is preserved."));
   if (additions.length !== fields.length) {
     [...host.querySelectorAll("input")].find(input=>!input.value.trim())?.focus();
     return false;
@@ -1149,6 +1153,47 @@ function completeNoticeDetails() {
   host.replaceChildren();host.hidden=true;
   return true;
 }
+
+const noticePreviewButton = document.getElementById("notice-preview-button");
+const noticePreview = document.getElementById("notice-preview");
+let noticePreviewVersion = 0;
+elements.noticeText.addEventListener("input", () => {
+  noticePreviewVersion += 1;
+  noticePreview.hidden = true;
+  noticePreview.replaceChildren();
+});
+noticePreviewButton.addEventListener("click", async () => {
+  if (!validateSetupStep()) return;
+  const version = ++noticePreviewVersion;
+  setBusy(noticePreviewButton, true);
+  noticePreview.hidden = false;
+  noticePreview.replaceChildren(node("p", "", "Reading supported notice fields…"));
+  try {
+    const result = await request("/api/notices/preview", {
+      method: "POST", body: JSON.stringify({ notice_text: elements.noticeText.value }),
+    });
+    if (version !== noticePreviewVersion) return;
+    const notice = result.notice;
+    noticePreview.replaceChildren(
+      node("strong", "", `${notice.citations.length} corrections · review-only preview`),
+      node("p", "", "Local rules-based parser · no model calls, no saved recovery, no outreach. Supported text formats only; not the signed-in Strands extraction."),
+      node("p", "", `Inspection: ${notice.issued_on} · Planning target: ${notice.reinspection_due_on}`),
+    );
+    for (const citation of notice.citations) {
+      const card = node("article", "notice-preview__citation");
+      card.append(node("strong", "", `C${citation.citation_id} · ${citation.code_reference}`),
+        node("p", "", citation.notice_text),
+        node("small", "", `Proof to review: ${citation.evidence_requirements.join("; ") || "Not specified — contractor must define it."}`));
+      noticePreview.append(card);
+    }
+    noticePreview.append(node("p", "", "To save a recovery and run the agents, continue to contacts and sign in with an invited account. Nothing is sent before your route review."));
+  } catch (error) {
+    if (version !== noticePreviewVersion) return;
+    noticePreview.replaceChildren(node("p", "", "This preview could not read the report. Include a permit, property, inspection date, deadline, and numbered or bulleted corrections. Both paths require identifiable source corrections; sign-in does not bypass that check. Your text is unchanged."));
+  } finally {
+    setBusy(noticePreviewButton, false);
+  }
+});
 
 function renderCorrectionReview(data) {
   pendingCorrectionReview = data;
@@ -1271,6 +1316,9 @@ function openRecoverySetup({ returnToWelcome = false } = {}) {
 
 function resetRecoverySetup() {
   noticeImportVersion += 1;
+  noticePreviewVersion += 1;
+  noticePreview.hidden = true;
+  noticePreview.replaceChildren();
   elements.noticeForm.reset();
   elements.noticeOcrReview.hidden = true;
   document.getElementById("notice-missing-details").replaceChildren();
@@ -1987,7 +2035,7 @@ function tourPhase(data) {
     return {
       key: "complete", scene: 5, stopIndex: 4, complete: true,
       eyebrow: "RECOVERY COMPLETE · CONTRACTOR APPROVED",
-      title: "Five pages. All of it earned.",
+      title: "15 actions handled. 3 decisions kept.",
       copy: "Each citation carries its authority language, accepted photograph, communication trail, and contractor decision. Nothing was written that the evidence did not support.",
       controlTitle: "The packet is real. So is the restraint behind it.",
       controlCopy: "Download the approved artifact, then inspect the Strands run that coordinated the work without taking the contractor’s authority.",
@@ -2432,22 +2480,22 @@ async function resolveTourJudgment(judgmentId, decision, successMessage) {
 const judgeLensByPhase = {
   boundary: {
     impact: "Zero-configuration intake: the failed-inspection notice becomes a reviewable recovery plan.",
-    agent: "The Nova Micro intake agent extracts bounded citations; deterministic policy prepares routes but records zero outreach.",
+    agent: "This sample replays bounded intake and route preparation. The live path uses Nova Micro; this preview makes no model calls or outreach.",
     human: "The contractor approves every assignee and proof request, including the mechanical boundary Mettle refuses to invent.",
   },
   recovery: {
     impact: "This is background autonomy, not a chat response: the campaign continues while the contractor is away.",
-    agent: "The Nova Lite evidence agent checks visible proof; the recovery graph accepts, rejects, re-requests, and follows up across trades.",
+    agent: "Recorded evidence outcomes show acceptance, rejection, and a re-request. Live photo assessment uses Nova Lite; these sample outcomes are scripted.",
     human: "Routine evidence handling creates no interrupt. The contractor returns only when the deadline creates a real tradeoff.",
   },
   deadline: {
     impact: "The campaign replans against time and removes completed work instead of restarting a generic checklist.",
-    agent: "EventBridge wakes the graph; open-only policy escalates the unresolved trade and preserves accepted evidence.",
+    agent: "This recording replays a deadline checkpoint. The live path uses EventBridge to resume open-only follow-up; no scheduler runs in this sample.",
     human: "Whether to keep or move the reinspection date remains a business and professional decision.",
   },
   finish: {
     impact: "One decision resumes the same checkpointed campaign—closed citations remain closed.",
-    agent: "Evidence assessment finishes the remaining citations and deterministic packet assembly prepares the handoff.",
+    agent: "Recorded replacement evidence completes the remaining citations. The sample then assembles a real PDF from those synthetic records.",
     human: "Mettle can prepare the artifact, but it cannot release or send it for reinspection.",
   },
   approval: {
@@ -2457,7 +2505,7 @@ const judgeLensByPhase = {
   },
   complete: {
     impact: "The full loop ends with a usable contractor artifact, not a dashboard or a generated summary.",
-    agent: "Fifteen background actions and two model-agent lanes are visible in the execution receipts.",
+    agent: "The recorded scenario contains 15 automated actions and 3 contractor decisions. Its trace illustrates the live graph topology, not live model invocations.",
     human: "Three explicit contractor decisions form the authority trail behind the approved packet.",
   },
 };
@@ -2488,6 +2536,7 @@ function renderJudgeTour(data) {
   elements.tourAction.disabled = demoRunning;
   elements.tourAction.setAttribute("aria-busy", String(demoRunning));
   elements.tourSecondary.hidden = !phase.complete;
+  document.getElementById("tour-packet-preview")?.remove();
   elements.tourSecondary.disabled = demoRunning;
   elements.tourOutcomeCopy.replaceChildren();
   if (phase.complete) {
@@ -2511,6 +2560,7 @@ function renderJudgeTour(data) {
   }
   renderTourVisual(data, phase);
   const sceneProof = document.querySelector("#tour-visible-proof");
+  elements.judgeTour.querySelector(".judge-guide__grid").append(sceneProof);
   sceneProof.replaceChildren();
   if (phase.key === "boundary") {
     sceneProof.append(node("p", "mono-label", "REVIEW THE SAMPLE ROUTES · ZERO OUTREACH SO FAR"));
@@ -2538,7 +2588,8 @@ function renderJudgeTour(data) {
     previewLink.href = "/api/demo/packet/preview.pdf";
     previewLink.target = "_blank";
     previewLink.rel = "noopener";
-    sceneProof.append(previewLink);
+    elements.judgeTour.querySelector(".tour-stage__control").append(previewLink);
+    previewLink.id = "tour-packet-preview";
   }
   for (const target of document.querySelectorAll(".is-guide-target")) target.classList.remove("is-guide-target");
   const guideTargetSelector = {
@@ -2869,6 +2920,8 @@ function render(data) {
   elements.campaignStrip.classList.toggle("campaign-strip--critical", criticalRecovery);
   elements.cadence.textContent = data.packet_status === "approved"
     ? "STANDING DOWN · PACKET APPROVED"
+    : criticalRecovery && data.judgments.some(item => item.status === "pending")
+      ? "CRITICAL · UNRESOLVED WORK · DECISION PENDING"
     : data.automation_status === "scheduled"
       ? "FOLLOW-UP SCHEDULED · SEE NEXT CHECK BELOW"
       : "FOLLOW-UP PAUSED · REVIEW NEXT ACTION";
@@ -3116,6 +3169,8 @@ function renderEvidenceRoute(data) {
   }
   elements.recordForm.hidden = !record || citation.stage === "ready";
   elements.photoForm.hidden = Boolean(record) || citation?.stage === "ready";
+  elements.photoSubmit.hidden = !activePhotoEnabled() || !activeWorkflowId;
+  elements.photoFile.disabled = !activePhotoEnabled() || !activeWorkflowId;
   if (data.source_mode === "workflow") {
     const assessment = [...(data.evidence || [])].reverse().find((item) => String(item.citation_id) === elements.photoCitation.value);
     elements.evidenceResult.hidden = !assessment;
@@ -3232,6 +3287,8 @@ async function runSampleUntilPause() {
       if (judgeTourActive && updated.scenario_step >= 3) tourClockOverride = null;
       campaign = updated;
       render(updated);
+      // A gate is the end of this run, not another round trip and animation beat.
+      if (updated.judgments.some(item => item.status === "pending")) break;
       if (updated.scenario_step === previousStep) {
         showToast("Mettle paused the campaign for your judgment.");
         if (judgeTourActive) elements.tourAction.focus();

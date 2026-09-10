@@ -193,7 +193,11 @@ body {font-size:15px;line-height:1.55;}
 .judge-lens {grid-column:1/-1;grid-row:2;padding:8px 0 0!important;border:0!important;border-top:1px solid var(--line)!important;border-radius:0!important;background:none!important;display:block!important;}
 .judge-lens summary {cursor:pointer;color:var(--muted);font-size:12px;padding:4px 0;}
 .judge-lens[open] .judge-lens__item {margin-top:12px;}
-#tour-visible-proof {border-top:1px solid var(--line);margin-top:16px;padding-top:12px;font-size:13px;}
+#tour-visible-proof {grid-column:1/-1;grid-row:2;border-top:1px solid var(--line);margin-top:0;padding-top:12px;font-size:13px;}
+.judge-guide__grid .judge-lens {grid-row:3;}
+#notice-preview {margin-top:16px;padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--white);}
+.notice-preview__citation {padding:12px 0;border-top:1px solid var(--line);}
+#tour-packet-preview {margin-top:8px;}
 #tour-visible-proof[hidden] {display:none;}
 #tour-visible-proof .tour-evidence-compare__media {height:150px;min-height:0;}
 #tour-visible-proof .tour-evidence-compare__media img {height:100%;width:100%;object-fit:contain;}
@@ -212,6 +216,8 @@ body {font-size:15px;line-height:1.55;}
 .judge-lens__item {border:0!important;padding:0!important;}
 .judge-lens__item strong {font-size:12px!important;line-height:1.5!important;font-weight:500!important;}
 .tour-stage__control {grid-column:2;grid-row:1;background:none!important;border:0!important;padding:0!important;}
+.judge-guide__grid .tour-stage__control {color:var(--white);}
+.judge-guide__grid .tour-stage__control .tour-secondary {color:var(--white);border-color:var(--line);background:var(--panel);}
 .tour-stage__control>strong,.tour-stage__control>p:not(.mono-label) {display:none;}
 .tour-stage__control .button {width:100%;margin-top:12px;}
 .tour-stage__control>span {font-size:10px!important;}
@@ -281,6 +287,34 @@ body[data-source-mode="workflow"] .demo-driver {display:none;}
 .workflow-journey li::after,.workflow-journey li::before {display:none!important;}
 .evidence-panel > .photo-evidence:not(form) {display:none;}
 @media(max-width:760px) {
+  /* The walkthrough has one navigation system; do not stack the full app chrome above it. */
+  body.tour-mode .workspace-nav {display:none!important;}
+  body.tour-mode .job-identity {display:none;}
+  body.tour-mode .workspace-content {padding:12px 12px 32px;}
+  body.tour-mode .command-band {grid-template-columns:1fr auto auto auto;min-height:60px;}
+  body.tour-mode .brand {min-height:60px;padding:12px;}
+  body.tour-mode .condition {display:flex!important;grid-row:2;grid-column:1/-1;min-height:28px;padding:4px 12px;border-top:1px solid var(--line);justify-content:flex-start;}
+  body.tour-mode .campaign-strip>div:first-child {display:flex;font-size:9px;line-height:1.4;}
+  body.tour-mode .campaign-strip #cadence-label {display:inline;}
+  body.tour-mode .campaign-strip>div:first-child {border:0;padding:0;}
+  body.tour-mode .campaign-strip .progress-block,body.tour-mode #as-of-date {display:none;}
+  body.tour-mode .judge-tour {padding:16px!important;}
+  body.tour-mode .judge-guide__grid {gap:12px;}
+  body.tour-mode .tour-stage__copy {display:contents;}
+  body.tour-mode #tour-eyebrow {display:none;}
+  body.tour-mode #tour-title {grid-row:2;margin:0!important;}
+  body.tour-mode #tour-visible-proof {grid-row:3;}
+  body.tour-mode .tour-stage__control {grid-column:1;grid-row:4;}
+  body.tour-mode .judge-tour[data-phase="complete"] .tour-stage__control {grid-row:3;}
+  body.tour-mode .judge-tour[data-phase="complete"] #tour-visible-proof {grid-row:4;}
+  body.tour-mode #tour-copy {grid-row:5;}
+  body.tour-mode #tour-agent-receipt {grid-row:6;}
+  body.tour-mode .judge-lens {grid-row:7;}
+  body.tour-mode #tour-visible-proof>.tour-evidence-compare__card {grid-template-columns:90px minmax(0,1fr);gap:10px;padding:10px;}
+  body.tour-mode #tour-visible-proof .tour-evidence-compare__media {height:90px;}
+  body.tour-mode #tour-visible-proof figcaption p {font-size:12px;}
+  body.tour-mode .tour-route-summary {font-size:12px;}
+  body.tour-mode .tour-stage__control .mono-label {display:none;}
   .command-band {grid-template-columns:1fr auto auto auto;min-height:72px;}.brand {border:0;min-height:72px;}.brand span{font-size:24px;}
   .job-identity {grid-row:2;grid-column:1/-1;padding:12px 20px;border-top:1px solid var(--line);}.job-identity .mono-label {display:none;}
   .countdown {min-width:70px;padding:10px;}.countdown__copy{font-size:8px;}.countdown__number{font-size:25px;}

@@ -46,9 +46,9 @@ class InMemoryDemoSessions:
         return self._store(session_key).reset()
 
     def resolve_judgment(
-        self, session_key: str, judgment_id: str, *, decision: str
+        self, session_key: str, judgment_id: str, *, decision: str, idempotency_key: str | None = None
     ) -> DemoCampaign:
-        return self._store(session_key).resolve_judgment(judgment_id, decision=decision)
+        return self._store(session_key).resolve_judgment(judgment_id, decision=decision, idempotency_key=idempotency_key)
 
     def render_packet(self, session_key: str, *, evidence_dir: Any) -> bytes:
         return self._store(session_key).render_packet(evidence_dir=evidence_dir)
@@ -138,11 +138,11 @@ class DynamoDemoSessions:
         return self._mutate(session_key, lambda store: store.reset())
 
     def resolve_judgment(
-        self, session_key: str, judgment_id: str, *, decision: str
+        self, session_key: str, judgment_id: str, *, decision: str, idempotency_key: str | None = None
     ) -> DemoCampaign:
         return self._mutate(
             session_key,
-            lambda store: store.resolve_judgment(judgment_id, decision=decision),
+            lambda store: store.resolve_judgment(judgment_id, decision=decision, idempotency_key=idempotency_key),
         )
 
     def render_packet(self, session_key: str, *, evidence_dir: Any) -> bytes:

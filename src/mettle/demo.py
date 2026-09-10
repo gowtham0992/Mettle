@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
 from threading import Lock
@@ -141,6 +142,7 @@ class DemoStore:
         self._lock = Lock()
         self._seen_keys: set[str] = set()
         self._resolved_decisions: dict[str, str] = {}
+        self._resolution_keys: dict[str, tuple[str, str]] = {}
         self._reset_unlocked()
 
     def snapshot(self) -> DemoCampaign:
@@ -157,7 +159,12 @@ class DemoStore:
                 contractor_decisions=self._contractor_decisions,
                 packet_status=self._packet_status,
                 seen_keys=set(self._seen_keys),
-                resolved_decisions=dict(self._resolved_decisions),
+                # Keep the existing string map so prior releases can still load
+                # these sessions during a rollback. Judgment IDs never use '@'.
+                resolved_decisions={
+                    **self._resolved_decisions,
+                    **{f"@replay:{key}": json.dumps(value) for key, value in self._resolution_keys.items()},
+                },
                 citations=[item.model_copy(deep=True) for item in self._citations],
                 events=[item.model_copy(deep=True) for item in self._events],
                 judgments=[item.model_copy(deep=True) for item in self._judgments],
@@ -175,7 +182,8 @@ class DemoStore:
             store._contractor_decisions = state.contractor_decisions
             store._packet_status = state.packet_status
             store._seen_keys = set(state.seen_keys)
-            store._resolved_decisions = dict(state.resolved_decisions)
+            store._resolved_decisions = {key: value for key, value in state.resolved_decisions.items() if not key.startswith("@replay:")}
+            store._resolution_keys = {key.removeprefix("@replay:"): tuple(json.loads(value)) for key, value in state.resolved_decisions.items() if key.startswith("@replay:")}
             store._citations = [item.model_copy(deep=True) for item in state.citations]
             store._events = [item.model_copy(deep=True) for item in state.events]
             store._judgments = [item.model_copy(deep=True) for item in state.judgments]
@@ -190,10 +198,9 @@ class DemoStore:
         with self._lock:
             if idempotency_key in self._seen_keys:
                 return self._snapshot_unlocked()
+            if any(item.status is GateStatus.PENDING for item in self._judgments):
+                raise DemoConflict("campaign is blocked: resolve the pending contractor judgment first")
             self._seen_keys.add(idempotency_key)
-
-            if self._pending("route-review"):
-                return self._snapshot_unlocked()
 
             handlers = (
                 self._accept_electrical_evidence,
@@ -273,8 +280,12 @@ class DemoStore:
                 evidence_dir=evidence_dir,
             )
 
-    def resolve_judgment(self, judgment_id: str, *, decision: str) -> DemoCampaign:
+    def resolve_judgment(self, judgment_id: str, *, decision: str, idempotency_key: str | None = None) -> DemoCampaign:
         with self._lock:
+            if idempotency_key and idempotency_key in self._resolution_keys:
+                if self._resolution_keys[idempotency_key] != (judgment_id, decision):
+                    raise DemoConflict("idempotency key was already used for a different decision")
+                return self._snapshot_unlocked()
             judgment = next(
                 (item for item in self._judgments if item.judgment_id == judgment_id),
                 None,
@@ -284,11 +295,15 @@ class DemoStore:
             if judgment.status is GateStatus.RESOLVED:
                 if self._resolved_decisions[judgment_id] != decision:
                     raise DemoConflict("this judgment was already resolved differently")
+                if idempotency_key:
+                    self._resolution_keys[idempotency_key] = (judgment_id, decision)
                 return self._snapshot_unlocked()
 
             judgment.status = GateStatus.RESOLVED
             judgment.decision = decision
             self._resolved_decisions[judgment_id] = decision
+            if idempotency_key:
+                self._resolution_keys[idempotency_key] = (judgment_id, decision)
             self._contractor_decisions += 1
             self._events.append(
                 self._event(
@@ -339,6 +354,7 @@ class DemoStore:
         self._packet_status = "blocked"
         self._seen_keys = set()
         self._resolved_decisions = {}
+        self._resolution_keys = {}
         self._citations = [
             DemoCitation(
                 citation_id=item.citation_id,

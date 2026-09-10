@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from mettle.domain import Citation, InspectionNotice, Trade
 
@@ -133,6 +133,16 @@ def _extract_header(normalized: str) -> dict[str, str]:
             if match:
                 header[field_name] = match.group(1).strip()
                 break
+    # Some municipal notices put a calendar-day deadline after the issue date.
+    # Extract only that date, not the remaining prose on the same line.
+    if "issued_on" in header:
+        numeric_date = re.match(r"(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}/\d{1,2}/\d{2,4})\b", header["issued_on"])
+        if numeric_date:
+            header["issued_on"] = numeric_date.group(1)
+    if "reinspection_due_on" not in header:
+        relative = re.search(r"re[- ]?inspection\s+(?:required\s+)?within\s+(\d{1,3})\s+(?:calendar\s+)?days\b", normalized, re.I)
+        if relative and "issued_on" in header and 1 <= int(relative.group(1)) <= 365:
+            header["reinspection_due_on"] = (_parse_date(header["issued_on"]) + timedelta(days=int(relative.group(1)))).isoformat()
     missing = [field for field in _HEADER_PATTERNS if field not in header]
     if missing:
         raise NoticeParseError(f"missing notice fields: {', '.join(missing)}")
