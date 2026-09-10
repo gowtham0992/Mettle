@@ -2098,7 +2098,7 @@ function tourPhase(data) {
       key: "boundary", scene: 1, stopIndex: 0,
       eyebrow: "FOR THE CONTRACTOR HANDED A DISAPPROVED ROUGH-IN",
       title: "The notice is the only input.",
-      copy: "Mettle derives a proposed recovery from the authority’s exact language, then stops before a single trade is contacted.",
+      copy: "Mettle preserves the notice’s explicit proof instructions. When proof is not specified, it asks the contractor. Every route is reviewed before a trade is contacted.",
       controlTitle: "Zero outreach until the contractor approves every route.",
       controlCopy: "The graph prepared assignees and proof requests, held the ambiguous mechanical boundary, and paused with zero messages recorded.",
       actionLabel: "Approve routes & begin recovery",
