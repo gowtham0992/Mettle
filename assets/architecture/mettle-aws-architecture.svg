@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1160" viewBox="0 0 1600 1160" role="img" aria-labelledby="title desc">
+<title id="title">Mettle AWS architecture</title><desc id="desc">Authenticated browser operations restore private recovery checkpoints into a fresh AgentCore runtime. Two Strands agents handle intake and visible evidence. Versioned EventBridge checks resume open work, with contractor approval boundaries.</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L8 3L0 6" fill="none" stroke="#cf5225" stroke-width="1.5"/></marker></defs>
+<rect width="1600" height="1160" fill="#f5f3ec"/>
+<g font-family="Arial, sans-serif" fill="#202923">
+<text x="60" y="55" font-size="16" font-weight="700" fill="#c24c20" letter-spacing="3">METTLE / AWS ARCHITECTURE</text>
+<text x="60" y="110" font-size="44" font-weight="700">A fresh runtime. The same recovery.</text>
+<text x="60" y="145" font-size="20" fill="#58645d">Models interpret the input. Durable state carries the work. The contractor controls release.</text>
+<text x="60" y="195" font-size="15" font-weight="700" letter-spacing="2">01 / AUTHENTICATED REQUEST</text>
+<rect x="60" y="215" width="320" height="140" rx="14" fill="#fffefa" stroke="#c8cfc8"/><text x="82" y="252" font-size="22" font-weight="700" fill="#202923">Browser + Cognito</text>
+<text x="82" y="284" font-size="17" fill="#58645d">PKCE sign-in · Mettle account</text>
+<text x="82" y="309" font-size="17" fill="#58645d">JWT accompanies protected requests</text>
+<text x="82" y="334" font-size="17" fill="#58645d">No AWS credentials in the client</text>
+<rect x="420" y="215" width="320" height="140" rx="14" fill="#fffefa" stroke="#c8cfc8"/><text x="442" y="252" font-size="22" font-weight="700" fill="#202923">CloudFront + WAF</text>
+<text x="442" y="284" font-size="17" fill="#58645d">Private S3 static application</text>
+<text x="442" y="309" font-size="17" fill="#58645d">Protected API request path</text>
+<text x="442" y="334" font-size="17" fill="#58645d">API Gateway validates Cognito JWT</text>
+<rect x="780" y="215" width="760" height="140" rx="14" fill="#fffefa" stroke="#c8cfc8"/><text x="802" y="252" font-size="22" font-weight="700" fill="#202923">Lambda gateway</text>
+<text x="802" y="284" font-size="17" fill="#58645d">Check caller ownership · validate operation · lock mutations</text>
+<text x="802" y="309" font-size="17" fill="#58645d">Load the private checkpoint and invoke a fresh AgentCore session</text>
+<text x="802" y="334" font-size="17" fill="#58645d">Return the result; keep runtime identifiers and private state server-side</text>
+<path d="M382 285 L412 285" stroke="#cf5225" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M742 285 L772 285" stroke="#cf5225" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+<text x="60" y="410" font-size="15" font-weight="700" letter-spacing="2">02 / AMAZON BEDROCK AGENTCORE RUNTIME</text>
+<rect x="60" y="430" width="450" height="160" rx="14" fill="#202f29" stroke="#c8cfc8"/><text x="82" y="467" font-size="22" font-weight="700" fill="#fffefa">Strands intake agent</text>
+<text x="82" y="499" font-size="17" fill="#d7e5da">Amazon Nova Micro</text>
+<text x="82" y="524" font-size="17" fill="#d7e5da">Notice language → structured corrections</text>
+<text x="82" y="549" font-size="17" fill="#d7e5da">Preserve the source; do not invent proof</text>
+<rect x="550" y="430" width="450" height="160" rx="14" fill="#202f29" stroke="#c8cfc8"/><text x="572" y="467" font-size="22" font-weight="700" fill="#fffefa">Strands evidence agent</text>
+<text x="572" y="499" font-size="17" fill="#d7e5da">Amazon Nova Lite</text>
+<text x="572" y="524" font-size="17" fill="#d7e5da">Normalized photograph → visible findings</text>
+<text x="572" y="549" font-size="17" fill="#d7e5da">Bounded evidence, not code certification</text>
+<rect x="1040" y="430" width="500" height="160" rx="14" fill="#fffefa" stroke="#c8cfc8"/><text x="1062" y="467" font-size="22" font-weight="700" fill="#202923">Strands graphs + hooks</text>
+<text x="1062" y="499" font-size="17" fill="#58645d">Deterministic recovery and deadline policy</text>
+<text x="1062" y="524" font-size="17" fill="#58645d">Evidence transitions · retries · packet gate</text>
+<text x="1062" y="549" font-size="17" fill="#58645d">Interrupt for contractor judgment</text>
+<path d="M1160 358 L1160 419" stroke="#cf5225" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+<rect x="60" y="610" width="1480" height="55" rx="10" fill="#f7dfd1"/><text x="82" y="645" font-size="19" fill="#913b19" font-weight="700">HUMAN AUTHORITY / Review before outreach · resolve ambiguity · decide deadline tradeoffs · approve the packet</text>
+<text x="60" y="714" font-size="15" font-weight="700" letter-spacing="2">03 / CHECKPOINT AFTER MUTATION — RESTORE BEFORE THE NEXT OPERATION</text>
+<rect x="60" y="735" width="450" height="140" rx="14" fill="#fffefa" stroke="#c8cfc8"/><text x="82" y="772" font-size="22" font-weight="700" fill="#202923">Runtime checkpoint</text>
+<text x="82" y="804" font-size="17" fill="#58645d">Versioned JSON: graph, evidence, decisions</text>
+<text x="82" y="829" font-size="17" fill="#58645d">Approval and communication history</text>
+<text x="82" y="854" font-size="17" fill="#58645d">Exported through the gateway</text>
+<rect x="550" y="735" width="450" height="140" rx="14" fill="#fffefa" stroke="#c8cfc8"/><text x="572" y="772" font-size="22" font-weight="700" fill="#202923">Private S3</text>
+<text x="572" y="804" font-size="17" fill="#58645d">Encrypted, content-addressed checkpoint</text>
+<text x="572" y="829" font-size="17" fill="#58645d">Hash and identity checked on restore</text>
+<text x="572" y="854" font-size="17" fill="#58645d">Private evidence and approved PDF</text>
+<rect x="1040" y="735" width="500" height="140" rx="14" fill="#fffefa" stroke="#c8cfc8"/><text x="1062" y="772" font-size="22" font-weight="700" fill="#202923">DynamoDB</text>
+<text x="1062" y="804" font-size="17" fill="#58645d">Caller-scoped record and checkpoint pointer</text>
+<text x="1062" y="829" font-size="17" fill="#58645d">Version + mutation ownership + replay record</text>
+<text x="1062" y="854" font-size="17" fill="#58645d">Next request restores the committed state</text>
+<path d="M513 805 L542 805" stroke="#cf5225" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+<path d="M1003 805 L1032 805" stroke="#cf5225" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+<text x="60" y="925" font-size="15" font-weight="700" letter-spacing="2">04 / THE BROWSER CAN CLOSE — OPEN WORK STILL GETS CHECKED</text>
+<rect x="60" y="945" width="1480" height="125" rx="14" fill="#fffefa" stroke="#c8cfc8"/><text x="82" y="982" font-size="22" font-weight="700" fill="#202923">EventBridge Scheduler → private Lambda worker → durable gateway → Strands deadline check</text>
+<text x="82" y="1014" font-size="17" fill="#58645d">Versioned one-time checks · stale events do nothing · re-arm open work or stop when complete</text>
+<text x="82" y="1039" font-size="17" fill="#58645d">Bounded retries with an SQS dead-letter queue; uncertain mutations pause for operator reconciliation</text>
+<text x="60" y="1105" font-size="16" fill="#58645d">Recorded outreach by default · SNS limited to one approved demo destination · CloudWatch logs · Least-privilege service roles</text><text x="60" y="1132" font-size="16" fill="#58645d">Workflow records: 30-day expiry from update · Recovery artifacts: 31-day lifecycle eligibility · No automatic inspector submission</text></g></svg>

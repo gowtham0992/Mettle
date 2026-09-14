@@ -37,6 +37,13 @@ Logo file and HTML usage.zip
 
 # Credentials and local runtime artifacts
 .aws/
+# Local credential exports and infrastructure state
+*.pem
+*.key
+*.p12
+*.pfx
+*.tfstate
+*.tfstate.*
 artifacts/
 data/private/
 output/

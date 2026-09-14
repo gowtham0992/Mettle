@@ -1,207 +1,153 @@
-<p align="center">
-  <img src="assets/brand/mettle-devpost-logo.png" width="180" alt="Mettle logo">
-</p>
-
+<p align="center"><img src="assets/brand/mettle-readme-banner.png" width="100%" alt="Failed inspection? Meet Mettle. A pixel-art contractor holding a correction checklist."></p>
 <h1 align="center">Mettle</h1>
-
-<p align="center"><strong>From failed inspection to reinspection-ready.</strong></p>
-
+<p align="center"><strong>Less chasing. More building.</strong></p>
 <p align="center">
-  <a href="https://d1ytth8asjpes8.cloudfront.net">Live guided demo</a> ·
-  <a href="assets/architecture/mettle-product-architecture.png">Product architecture</a> ·
-  <a href="assets/architecture/mettle-aws-architecture.png">AWS architecture</a> ·
+  <a href="https://d1ytth8asjpes8.cloudfront.net/">Try Mettle</a> ·
+  <a href="https://youtu.be/ZB3yRfWh8XE">Watch the demo</a> ·
+  <a href="#run-locally">Run locally</a> ·
+  <a href="#architecture">Architecture</a> ·
   <a href="LICENSE">MIT license</a>
 </p>
 
-**Agents for Humans Hackathon · Professional Agents track**
+Mettle helps small residential contractors organize the work after a failed inspection. It turns a correction notice into assignments, follows up on unresolved work, checks submitted photographs against the requested proof, and assembles a reinspection packet for the contractor to approve.
 
-Mettle is a bounded-autonomy recovery agent for small residential contractors. It turns a municipal failed-inspection notice into a citation-by-citation campaign, follows the reinspection clock, reviews visible evidence, and assembles an approved recovery packet—while reserving code interpretation and irreversible decisions for the licensed contractor.
+The contractor stays responsible for interpreting requirements and approving the handoff. Mettle handles the coordination around those decisions; it does not certify code compliance.
 
-> **The person and the repetitive work:** Small contractors are stuck repeatedly translating failed-inspection notices into assignments, chasing trades for proof, watching the reinspection deadline, and rebuilding the same evidence trail by hand.
+Built by **Gowtham Sarveswaran** for **Agents for Humans · Professional Agents**.
 
-## One workflow, end to end
+## Try it
 
-Mettle starts with the event contractors already receive: a failed-inspection notice. There is no project template or punch list to build first. Mettle preserves explicit proof instructions from the notice; when those instructions are missing, the contractor defines the proof before outreach. It does not infer inspection requirements from a code citation alone.
+| Start here | What to expect |
+| --- | --- |
+| **Judge walkthrough** in the [public app](https://d1ytth8asjpes8.cloudfront.net/) | A guided, recorded sample of one recovery. No sign-in or model calls. |
+| **Start my recovery** in the app | The authenticated contractor workflow, using deployed Strands agents. An invited Mettle account is required. |
+| [Watch the demo](https://youtu.be/ZB3yRfWh8XE) | A 4½-minute walkthrough of the product and its AWS architecture. |
 
-1. **Understand the notice.** A Strands intake agent converts unstructured municipal language into a validated correction docket while preserving the source text.
-2. **Pause before outreach.** The contractor confirms the responsible trade, closure route, and proof request for every citation. Until then, Mettle records zero outreach.
-3. **Run the recovery.** A Strands graph assigns open corrections, records replay-safe follow-ups, and changes urgency at server-selected T−7, T−3, T−2, T−1, and deadline checkpoints. EventBridge Scheduler wakes the authenticated workflow for the next bounded check; the contractor does not have to keep the dashboard open.
-4. **Review visible proof.** A dedicated multimodal Strands Evidence Agent uses Nova Lite to check only whether a submitted photo shows the notice-specific requirements. Insufficient photos receive a precise re-request; ambiguity returns to the contractor.
-5. **Close with consent.** Mettle maps each citation to its evidence and communication history, then blocks the final PDF until the contractor approves it.
+Use a Mettle account, **not an AWS account**, for the signed-in experience. Use redacted notices and photographs without personal information. Sample names, properties, notices, and photographs are synthetic.
 
-The result is not another dashboard to babysit. Mettle works between events and surfaces when professional judgment is actually required.
+The video includes live model operations with synthetic inputs. Outreach is recorded rather than sent to real trades; scheduling a future check is not the same as demonstrating that it has fired.
 
-## See it work
+## From notice to approved packet
 
-Open the **[live guided demo](https://d1ytth8asjpes8.cloudfront.net)** and select **Judge walkthrough**. The public journey stages the real sample endpoints into five focused scenes, using synthetic contractor, property, notice, and evidence data so judges can experience the complete product without credentials or cloud spend. Every result remains inspectable afterward in the full workspace. Choose **Start my recovery** for the invite-only authenticated contractor path.
+1. **Add the notice.** Paste the correction report or upload a PDF with selectable text. Mettle extracts the corrections while preserving the authority’s wording.
+2. **Review the plan.** Confirm the responsible trades, closure routes, and proof requests before any outreach. When the notice does not specify enough proof, Mettle asks instead of inventing a requirement.
+3. **Let the recovery run.** Open corrections get deadline-aware follow-ups. Background checks resume the recovery without requiring an open browser; a deadline tradeoff returns to the contractor.
+4. **Add the proof.** Submit a photograph for a correction. The evidence agent checks what is visible against the approved request. Insufficient evidence gets a specific re-request; ambiguity requires human review.
+5. **Approve the handoff.** Review the evidence trail and release the PDF packet. Nothing is submitted to the inspector automatically.
 
-**Trying the live agents?** Use an invited Mettle account, not an AWS account. Contact the project owner for access. The walkthrough and unsigned notice preview do not invoke models. Never publish account credentials in this repository.
+For example, a photograph of an electrical panel may show the equipment but not the clearance requested in the notice. Mettle can request a wider photograph showing that proof. It cannot conclude that a hidden dimension is correct or that the installation passes inspection.
 
-The compressed run demonstrates:
+## Run locally
 
-- a raw failed-inspection notice becoming three grounded corrections;
-- accepted evidence and an inadequate photo receiving a specific re-request;
-- deadline-aware escalation for an unresolved trade;
-- meaningful human pauses rather than constant supervision; and
-- a contractor-approved, citation-to-evidence PDF packet.
-
-The **Agent run** panel makes the orchestration inspectable: judges can see specialist handoffs, graph-node execution, evidence-agent work, and exactly where Mettle paused for professional judgment. Sample playback is labeled `SAMPLE TRACE`; real workflow runs are labeled `LIVE · STRANDS` or `LIVE · AGENTCORE`.
-
-The browser playback is clearly labeled as a guided demonstration. The repository also includes the working Strands workflow, opt-in Bedrock execution, and deployed AgentCore boundary used by the live cloud path.
-
-The unauthenticated Strands route keeps workflow state in one warm Lambda instance, so shared `?workflow=` links are demonstration conveniences rather than durable records. New authenticated recoveries save private, versioned checkpoints and restore a fresh AgentCore runtime for each operation. DynamoDB owns caller-scoped records and EventBridge schedules use stale-event rejection and a dead-letter queue. A fresh September 9 signed-in browser run verified intake, rejection of an unrelated image, acceptance of two appropriate photographs, final approval, restoration after reload, and download of a visually checked four-page PDF. Earlier accelerated-clock acceptance verified checkpoint advancement; neither result establishes overnight real-date operation. Legacy runs without checkpoints are still session-bound. See [checkpoint guarantees and limits](docs/recovery-checkpoints.md).
-
-## Architecture
-
-### Product architecture: autonomy with visible stopping points
-
-![Mettle product architecture showing the recovery campaign and three human judgment gates](assets/architecture/mettle-product-architecture.png)
-
-This view explains the product contract: Mettle runs one correction-recovery campaign, but it stops for trade routing, ambiguous notice interpretation, and final schedule or packet approval.
-
-### AWS architecture: one authenticated path to a bounded runtime
-
-![Mettle AWS architecture showing the authenticated request path, private resources, and security guardrails](assets/architecture/mettle-aws-architecture.png)
-
-This view explains the deployment boundary: the browser passes through CloudFront, WAF, Cognito, API Gateway, and a Lambda gateway before reaching the Strands workflow on Amazon Bedrock AgentCore. Model access, state, and evidence remain server-side.
-
-Both submission-ready PNGs are 1920×1080. The editable Pencil source is [`untitled.pen`](untitled.pen); deterministic HTML render sources live beside the PNGs, and the deeper design rationale lives in [`docs/architecture.md`](docs/architecture.md).
-
-## Why this is genuinely agentic
-
-Mettle is event-driven work across time, not a prompt-response wrapper. It keeps explicit campaign state around Strands recovery graphs, invokes bounded operations, pauses through native interrupts, and resumes the same workflow after a contractor decision.
-
-| Capability | Implementation | Source |
-| --- | --- | --- |
-| Notice understanding | A real `strands.Agent` using a bounded Nova Micro model and validated structured output | [`src/mettle/agents/intake.py`](src/mettle/agents/intake.py) |
-| Campaign orchestration | Two Strands `GraphBuilder` graphs: intake-to-coordination and deadline chase | [`src/mettle/workflow.py`](src/mettle/workflow.py) |
-| Human judgment | Strands hooks interrupt before outreach, at ambiguous requirements, and at the deadline tradeoff | [`src/mettle/workflow.py`](src/mettle/workflow.py) |
-| Visible-evidence assessment | A dedicated multimodal `strands.Agent` on Nova Lite, followed by deterministic accept, re-request, or a contractor-resolved manual-review gate | [`src/mettle/agents/vision.py`](src/mettle/agents/vision.py), [`src/mettle/workflow_registry.py`](src/mettle/workflow_registry.py) |
-| Inspectable autonomy | Safe Strands graph hooks and evidence-agent traces rendered as a visible Run receipt without exposing prompts or private payloads | [`src/mettle/workflow.py`](src/mettle/workflow.py), [`src/mettle/web/static/app.js`](src/mettle/web/static/app.js) |
-| Managed agent runtime | The same typed workflow operations run behind an Amazon Bedrock AgentCore entrypoint | [`agentcore_app.py`](agentcore_app.py) |
-| Work across time | One-time EventBridge schedules wake the next deadline checkpoint; schedule versions and idempotency keys make stale or replayed events safe | [`src/mettle/automation.py`](src/mettle/automation.py), [`src/mettle/scheduler_runtime.py`](src/mettle/scheduler_runtime.py) |
-| One-way trade updates | Communication records by default; opt-in Amazon SNS delivery is restricted to one pre-approved, hashed demo destination and never accepts inbound messages | [`src/mettle/communication.py`](src/mettle/communication.py) |
-| Secure public product | CloudFront, private S3, Cognito PKCE, API Gateway, Lambda, DynamoDB, WAF, and short-lived packet delivery | [`infra/web/template.yaml`](infra/web/template.yaml) |
-
-This division is deliberate. Language models are useful where inputs are unstructured or visual; deterministic policy is safer where a deadline, retry, permission, or compliance claim must be exact.
-
-## Bounded autonomy
-
-| Mettle handles autonomously | The contractor decides | Mettle never does |
-| --- | --- | --- |
-| Extract and quote correction language | Confirm correction routing before outreach | Certify that work complies with code |
-| Track open citations against the deadline | Interpret an ambiguous citation | Invent missing municipal requirements |
-| Re-plan only unresolved work | Keep the date or reschedule at T−2 | Contact an inspector without approval |
-| Re-request insufficient visible evidence | Resolve evidence that is not visually decidable | Expose AWS credentials to the browser |
-| Assemble the evidence trail | Approve the final packet | Release the packet without consent |
-
-The authority boundary is the product: autonomy absorbs coordination, while accountability stays with the professional.
-
-## Run locally—no AWS account required
-
-Use Python 3.12 and [`uv`](https://docs.astral.sh/uv/):
+Use Python 3.12 or 3.13 and [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv sync --extra dev
-uv run mettle ingest examples/notices/failed-rough-in.txt --as-of 2026-08-10
-uv run mettle ingest examples/notices/denver-remodel.txt --as-of 2026-08-21
-uv run mettle ingest examples/notices/uncoded-field-report.txt --as-of 2026-08-21
+git clone https://github.com/gowtham0992/Mettle.git
+cd Mettle
+uv sync --frozen --extra dev
 uv run mettle serve
 ```
 
-Open [http://127.0.0.1:4310](http://127.0.0.1:4310), then select **Judge walkthrough** or **Start my recovery**. You can leave the walkthrough to explore the workspace freely. The server binds only to the local machine. The included communication adapter records proposed messages but sends nothing externally.
+Open [http://127.0.0.1:4310](http://127.0.0.1:4310). The default local path uses deterministic fixtures and recorded communication: no AWS account, model calls, or external messages are required.
 
-The default path is deterministic, reproducible, and free. It accepts several common municipal header, date, and numbering styles. When a numbered correction omits a code reference or observable proof requirement, Mettle preserves the authority's text as a review candidate and asks the contractor instead of inventing either field. It uses the same domain contracts, Strands graphs, interrupts, retry rules, packet gate, and UI as the cloud path without invoking a model.
-
-### Opt in to live Bedrock intake
+To inspect a sample notice from the terminal:
 
 ```bash
-uv run mettle serve \
-  --enable-bedrock \
-  --aws-profile mettle-dev \
-  --aws-region us-east-1
+uv run mettle ingest examples/notices/failed-rough-in.txt --as-of 2026-08-10
 ```
 
-This exposes **Ground with Bedrock** and enables real-photo assessment. Model ID, region, token ceilings, retry limits, and timeouts remain server-side; the browser cannot override them. A Strands intake agent on Nova Micro handles notice extraction, while a separate Strands Evidence Agent on Nova Lite receives normalized JPEG/PNG evidence and returns pixel-grounded structured findings—not a code-compliance opinion.
+The offline path uses the same domain contracts, Strands graphs, human interrupts, and packet approval rules. It does **not** substitute for testing live model behavior.
 
-### Run through AgentCore
+For live AWS setup, see [access and permissions](docs/aws-access.md), [AgentCore deployment](docs/agentcore-deployment.md), and the [architecture reference](docs/architecture.md). Model calls and deployed infrastructure can incur AWS charges.
 
-The AgentCore app accepts a small, discriminated operation contract covering `start`, `review`, `resume`, evidence, deadline checks, packet assembly, and final approval.
+## Architecture
+
+### The product: work continues, authority stays human
+
+![Mettle product architecture: notice intake, open-work recovery, evidence review, and contractor-approved handoff](assets/architecture/mettle-product-architecture.png)
+
+The recovery has explicit stopping points: review before outreach, professional judgment when evidence or requirements are ambiguous, and approval before releasing the packet.
+
+### AWS: a fresh runtime restores the same recovery
+
+![Mettle AWS architecture: authenticated requests, Strands agents, durable checkpoints, and background scheduling](assets/architecture/mettle-aws-architecture.svg)
+
+The browser reaches a protected gateway, not AWS credentials or the agent runtime directly. New authenticated recoveries save private, versioned checkpoints in S3 with caller-scoped records in DynamoDB. Subsequent operations restore that state into a fresh AgentCore runtime. EventBridge Scheduler wakes a private worker for the next deadline check.
+
+See [checkpoint guarantees and limitations](docs/recovery-checkpoints.md) for concurrency, retry, restoration, and retention behavior. [Diagram files](assets/architecture/README.md) identify the current views and older render sources.
+
+## Where the agents do the work
+
+Mettle uses **two model-driven Strands agents**, with deterministic operations around them. It does not present every graph node as another AI agent.
+
+| Responsibility | Implementation |
+| --- | --- |
+| Understand the notice | [Intake agent](src/mettle/agents/intake.py): Amazon Nova Micro extracts structured corrections from the source language. |
+| Assess visible proof | [Evidence agent](src/mettle/agents/vision.py): Amazon Nova Lite returns bounded findings from normalized photographs. |
+| Coordinate the recovery | [Strands graphs and hooks](src/mettle/workflow.py): orchestration, human interrupts, and resume. |
+| Apply exact rules | [Campaign policy](src/mettle/campaign.py) and [workflow registry](src/mettle/workflow_registry.py): deadline decisions, evidence transitions, and approval gates. |
+| Wake background work | [Automation](src/mettle/automation.py) and [scheduler worker](src/mettle/scheduler_runtime.py): versioned, one-time deadline checks. |
+| Prepare the handoff | [Packet generation](src/mettle/packet.py): a citation-to-evidence PDF released only after approval. |
+
+The activity view exposes safe execution receipts and human stops, not private reasoning. Recorded sample traces and live runs are labeled separately.
+
+This division is intentional: models handle unstructured language and images; code enforces permissions, retries, dates, and state transitions.
+
+## Safety and operational boundaries
+
+- **Authenticated model access.** The public walkthrough does not invoke models. Credit-metered routes require an invited account; public hosting still has infrastructure costs.
+- **Caller-owned recoveries.** The gateway checks ownership and keeps AWS credentials, private checkpoints, and runtime session identifiers server-side.
+- **Bounded evidence checks.** Uploads are size-limited, decoded, stripped of metadata, and normalized. Evidence acceptance is not code certification.
+- **Recorded communication by default.** Optional outbound Amazon SNS delivery is limited to one pre-approved demo destination. There is no two-way SMS conversation or open recipient list.
+- **Replay-aware operations.** Idempotency and schedule versions guard retries and stale events. An uncertain mutation outcome pauses recovery for operator reconciliation rather than risking duplicate outreach.
+- **Private packets.** Approved PDFs are delivered through the authenticated gateway. Recovery artifacts become eligible for deletion after 31 days; workflow records expire after 30 days from their last update.
+- **Human release.** Mettle never files a packet with an inspector or declares that corrected work complies with building code.
+
+Deployment permissions and teardown instructions are in [AWS access](docs/aws-access.md). Infrastructure is defined in the [public web stack](infra/web/template.yaml).
+
+## Development and tests
+
+After the Python setup above, install the JavaScript development dependencies and run the repository’s verification gate:
 
 ```bash
-npm ci
-npx agentcore dev --runtime MettleRecovery --port 8081 --logs --skip-deploy
-```
-
-To connect the local command center to the deployed runtime:
-
-```bash
-uv run mettle serve \
-  --enable-agentcore \
-  --agentcore-runtime-arn "$METTLE_AGENTCORE_RUNTIME_ARN" \
-  --aws-profile mettle-agentcore \
-  --aws-region us-east-1
-```
-
-The gateway owns the AgentCore session identifier, reuses it for safe retries and resume, and never exposes the runtime ARN or AWS credentials to the browser. See [`docs/agentcore-deployment.md`](docs/agentcore-deployment.md) for packaging, deployment, smoke testing, and rollback.
-
-## Test the working implementation
-
-```bash
-uv sync --frozen --extra dev
 npm ci
 npm --prefix agentcore/cdk ci
 npm run verify
-npx agentcore validate --json
 ```
 
-`npm run verify` is the single local release gate. It runs the Python application suite, infrastructure-template assertions, browser-flow logic tests, JavaScript syntax checks, TypeScript build, and AgentCore CDK tests. GitHub Actions runs the same command on every push to `main` and every pull request. The offline suite exercises notice parsing, campaign policy, Strands node tracing, interruptions and resume, failed-review retry safety, multimodal evidence-agent contracts, evidence decisions, upload normalization, replay protection, packet gating, AgentCore contracts, schedule creation and stale-event rejection, one-way delivery guardrails, the durable gateway, web routes, and infrastructure assertions. It runs without AWS credentials or model spend.
+The gate runs Python application tests, infrastructure assertions, browser-flow logic tests, JavaScript syntax checks, the TypeScript build, and AgentCore CDK tests. GitHub Actions runs the same gate on pushes to `main` and pull requests. These checks run without model spend; live deployment acceptance is separate.
 
-[`scripts/web_scheduler_smoke.py`](scripts/web_scheduler_smoke.py) provides a paid, accelerated-clock deployment test. It creates a synthetic authenticated workflow, confirms schedule version 1 exists, waits for the private worker to advance the workflow and arm version 2, then cancels the follow-on smoke schedule. Earlier accelerated deployment acceptance passed with an empty DLQ and no SMS send. This script is not an overnight real-date acceptance result and must not enable an accelerated clock on the shared contractor deployment.
+## Current scope
 
-## Security and cost boundaries
+Mettle is a working prototype for **one failed-inspection recovery at a time**, not a permitting platform or a replacement for a contractor’s judgment.
 
-- **No public cloud spending path:** the guided demo is deterministic; credit-metered routes require an admin-created Cognito account.
-- **No credentials in the client:** all AWS profiles, regions, model IDs, runtime identifiers, and session IDs remain server-side.
-- **Least privilege:** checked-in IAM policies restrict model access to Nova Micro and Nova Lite and runtime invocation to Mettle's resource.
-- **Replay safety:** workflow creation, follow-ups, evidence submission, evidence review, and resume operations use idempotency controls.
-- **Evidence integrity:** accepted proof is locked against accidental replacement; ambiguous proof pauses the chase until the contractor accepts it or requests a clearer image.
-- **Bounded scheduling:** each checkpoint is a one-time EventBridge schedule with a versioned payload, two retries, a dead-letter queue, and automatic deletion; stale events cannot advance the workflow.
-- **No open messaging channel:** SMS is outbound-only and disabled by default. Enabling Amazon SNS requires a server-side SHA-256 allowlist for one demo phone; all other recipients remain recorded simulations.
-- **Safe uploads:** image bodies are capped, decoded, stripped of metadata, dimension-bounded, and re-encoded before model use.
-- **Private artifacts:** approved PDFs are integrity-checked and encrypted in private S3. The browser downloads through the authenticated gateway, with an explicit save link if the automatic download does not start. In-app downloads are capped at 4 MB; the separate private-link endpoint remains available. Recovery artifacts become eligible for deletion after 31 days; workflow records after 30 days from their last update.
-- **Explicit limitations:** uncertain operation outcomes hold recovery for operator reconciliation rather than risking duplicate outreach. Legacy runs are session-bound. Overnight real-date acceptance remains a release check, not implied by the completed photo-to-PDF or accelerated-clock tests.
+- Notice intake supports pasted text and PDFs with selectable text. Image-only notices need transcription; notice OCR is not enabled.
+- Evidence photographs can establish visible proof, not hidden work, exact measurements absent from the image, or compliance.
+- New authenticated recoveries use durable checkpoints. Older runs without checkpoints remain session-bound.
+- Overnight real-date acceptance and a self-service interface for uncertain-outcome reconciliation remain outstanding operational work.
+- A field pilot with contractors is still needed. The project does not claim measured customer savings or real-world adoption.
 
-For the full permission model and teardown procedure, see [`docs/aws-access.md`](docs/aws-access.md).
+The next product steps are contractor validation, broader notice formats, and consent-aware messaging. Read the [product scope](docs/product-scope.md) and [contractor research](docs/contractor-operator-research.md) for the reasoning behind the current boundaries.
 
-## Repository map
+## Project map
 
 ```text
-src/mettle/agents/       Strands intake and Bedrock model adapters
+src/mettle/agents/       Model-driven intake and evidence agents
 src/mettle/workflow.py   Strands graphs, hooks, interrupts, and resume
-src/mettle/campaign.py   Deterministic deadline and recovery policy
-src/mettle/automation.py One-time EventBridge scheduling and stale-event policy
-src/mettle/evidence.py   Evidence contracts and decision boundary
+src/mettle/campaign.py   Deterministic recovery and deadline policy
+src/mettle/automation.py Background scheduling and stale-event policy
 src/mettle/packet.py     Approval-gated PDF generation
-src/mettle/web/          Contractor command center and local API
-agentcore_app.py         Amazon Bedrock AgentCore entrypoint
-infra/web/template.yaml  Secure public AWS stack
-examples/                Representative synthetic notice
-tests/                   Offline and boundary-focused test suite
-assets/architecture/     Product and AWS architecture diagrams
-docs/                    Architecture, scope, research, and operations
+src/mettle/web/          Contractor workspace and API
+agentcore_app.py         AgentCore runtime entrypoint
+infra/                  Deployment infrastructure
+examples/               Synthetic notices and fixtures
+tests/                  Application and boundary tests
+assets/architecture/    Product and AWS diagrams
+docs/                   Technical and operational documentation
 ```
-
-## Scope
-
-Mettle begins after an inspection fails. It is not a permitting suite, a construction management platform, or an authority on building code. The current hackathon slice handles one project at a time, several common pasted-notice shapes, a bounded trade roster with general-contractor fallback, and outbound-only communication. The checked-in contractor deployment uses real-date checkpoints; only the recorded judge walkthrough compresses time. Communication records safely by default; an Amazon SNS adapter can deliver only to one pre-approved personal demo number after account enrollment and explicit server-side opt-in.
-
-The public deployment accepts pasted text and PDFs with selectable text. Paper notices and image-only scans need transcription: notice OCR is not enabled in this release. This is separate from the live vision agent that assesses job-site evidence photos after intake.
-
-Those constraints preserve the single workflow that matters: **notice in, recovery out**. Production expansion would add jurisdiction-specific notice adapters, consent and opt-out operations for messaging, and operator tooling for uncertain-outcome reconciliation without changing the authority boundary.
-
-Read [`docs/product-scope.md`](docs/product-scope.md) and [`docs/contractor-operator-research.md`](docs/contractor-operator-research.md) for the product decisions and domain evidence behind that scope.
 
 ## License
 
-Mettle is released under the [MIT License](LICENSE).
+Mettle is open source under the [MIT License](LICENSE).
+
+Copyright © 2026 **Gowtham Sarveswaran**.
