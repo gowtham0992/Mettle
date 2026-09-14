@@ -1,6 +1,9 @@
-# Checkpoint release: administrator handoff
+# Upgrade an existing deployment to durable checkpoints
 
-Status: the owner-approved permission and retention changes are applied. Runtime, web, and scheduler deployment completed using scoped deployer roles. Authenticated end-to-end and overnight continuation checks remain pending.
+This migration guide applies to installations created before durable checkpoints.
+New installations should use the current web template. The hosted deployment
+has completed this migration and signed-in end-to-end acceptance; an overnight
+real-date continuation test remains outstanding. See [verification scope](recovery-checkpoints.md).
 
 The existing `MettleWebDeployer` can publish web code and static assets. It cannot update infrastructure. Do not solve this by attaching AdministratorAccess or granting IAM-policy editing to that deployer.
 

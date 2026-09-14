@@ -4,12 +4,12 @@ Mettle is a modular Python application with one durable domain model. Strands ag
 
 ## Constraints
 
-- Development must work before AWS credits arrive.
+- Local development must work without model calls or AWS credentials.
 - The demo uses synthetic contractor, property, trade, and inspection data.
 - No model output may certify code compliance.
 - Ambiguous code interpretation and final packet submission require a human decision.
 - A failed or unavailable model must not corrupt campaign state.
-- The first demo handles one project, one notice format, and three trades.
+- The sample illustrates one recovery; live intake accepts pasted text and selectable-text PDFs.
 
 ## Recommended boundaries
 
@@ -101,10 +101,10 @@ It carries only an owner hash, workflow identifier, logical date, schedule
 name, and version. The worker reloads the caller-scoped mapping from DynamoDB
 and rejects stale versions before restoring the committed checkpoint in a fresh AgentCore session. Legacy runs without checkpoints still use their original session.
 Schedules delete after completion, retry twice, and send exhausted events to
-an encrypted dead-letter queue. An uncertain operation leaves a durable hold marker to prevent duplicate outreach, requiring operator reconciliation. Cold runtime restoration has passed cloud acceptance; authenticated gateway and overnight scheduling acceptance remain pending.
+an encrypted dead-letter queue. An uncertain operation leaves a durable hold marker to prevent duplicate outreach, requiring operator reconciliation. Cold runtime restoration and authenticated browser acceptance have passed; overnight real-date scheduling acceptance remains outstanding. See [verification scope](recovery-checkpoints.md).
 
-Generated PDFs are integrity-checked, stored encrypted with 31-day lifecycle expiry,
-and returned through a 60-second presigned download. Internet photo bodies are
+Generated PDFs are integrity-checked and stored encrypted with 31-day lifecycle expiry.
+The signed-in browser downloads the PDF through the authenticated gateway. Internet photo bodies are
 capped at 3.5 MB before the existing decode, pixel-bound, metadata-strip, and
 JPEG re-encode boundary. Tight route-level API Gateway throttling and WAF rate
 limiting cap both abuse and accidental model spend. Reserved concurrency is
@@ -129,32 +129,17 @@ Putting all behavior inside agent prompts would produce an impressive but untest
 - Unclear evidence creates a contractor judgment item and pauses scheduled recovery. Acceptance or a clearer-photo request is recorded idempotently; it never certifies completion.
 - A missed deadline moves the campaign to critical review instead of silently rescheduling.
 
-## Risk-ordered build slices
+## Verification scope
 
-1. **Notice to campaign plan:** prove traceable extraction, deadline behavior, and judgment routing without a model.
-2. **Local Strands orchestration:** run deterministic contract nodes, recorded outreach, and a resumable human interrupt. **Complete.**
-3. **Deadline chase loop:** replan open citations, record scheduled follow-ups with replay safety, stop on accepted evidence, and interrupt at the T−2 tradeoff. **Complete locally and through the deployed AgentCore-compatible contract.**
-4. **Evidence assessment:** compare trusted fixtures or normalized real photos to notice-anchored requirements and produce a specific re-request or judgment interrupt. **Complete: the dedicated Strands Evidence Agent forces one validated evidence-decision tool; ambiguous output pauses EventBridge and creates an auditable contractor accept-or-re-request gate.**
-5. **Human interrupts:** pause and resume the graph for ambiguous language and final packet approval. **Complete.**
-6. **Demo interface and packet:** show the recovery timeline, inspectable Run receipt, and citation-to-evidence PDF. **Complete.**
-7. **AWS runtime:** host the graph behind AgentCore's strict session boundary,
-   package it as CodeZip, and define least-privilege deployment and rollback.
-   **Complete: runtime version 15 is deployed, immutable-artifact rollback was
-   exercised on the real demo runtime, and live acceptance covers start,
-   contractor review with zero pre-approval outreach, resume, vision, T−3/T−2
-   chase behavior, replay safety, approval, and PDF integrity in one AgentCore
-   session.**
-8. **Public durability:** user-scoped AgentCore session mapping, idempotency,
-   private packet storage, Cognito authentication, and a CloudFront/Lambda edge.
-   **Deployed behind CloudFront with private origins, WAF, Cognito-protected
-   paid routes, and a public deterministic judge journey.**
-9. **Autonomous wake-up:** create one-time EventBridge schedules, invoke a
-   private worker, reject stale events, and surface failures through a DLQ.
-   **Deployed and verified end to end: a live synthetic workflow advanced from
-   schedule version 1 to version 2, then the follow-on smoke schedule was cancelled.**
-10. **One-way messaging:** keep recording as the safe default and allow Amazon
-    SNS delivery only to a hashed, pre-approved personal demo destination.
-    **Complete in code; AWS messaging enrollment and live-send verification are pending.**
+Local tests cover orchestration, evidence decisions, human approval, ownership,
+checkpoint restoration, idempotency, and stale scheduled events. Signed-in
+browser acceptance has exercised notice intake, photo assessment, final
+approval, reload restoration, and downloaded PDFs with evidence intact.
+
+An accelerated cloud scheduler test exercised scheduled advancement. It does
+not establish overnight real-date behavior, which remains unverified. Recorded
+communication is the default; this project does not claim two-way messaging or
+a contractor field pilot. See [checkpoint verification](recovery-checkpoints.md).
 
 ## Decisions we can reverse later
 

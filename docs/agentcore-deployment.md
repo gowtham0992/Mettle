@@ -4,38 +4,18 @@ Mettle uses direct CodeZip deployment in `us-east-1`. The public repository
 documents the reproducible process while keeping account IDs, runtime IDs,
 bucket names, object-version IDs, session IDs, and workflow IDs out of source.
 
-## Current acceptance status
+## Verification and remaining limits
 
-- Runtime: `MettleRecovery` (resource identifier recorded privately)
-- Version and status: `16`, `READY`
-- Artifact: immutable, private, versioned S3 object
-- Artifact SHA-256:
-  `4d8a1159c1147cf0e6c3e59a7a07dcf83e530885878f219c525f931480298fd8`
-- Runtime lifecycle: 15-minute idle timeout, 8-hour maximum session
-- Log retention: 14 days
+The deployed checkpoint path passed fresh-runtime restoration and signed-in
+browser acceptance through intake, photo assessment, contractor approval,
+reload restoration, and PDF download. See [recovery checkpoints](recovery-checkpoints.md)
+for the recorded acceptance scope. An overnight real-date scheduling test and
+a self-service interface for uncertain-outcome reconciliation remain outstanding.
 
-Version 16 adds private JSON recovery checkpoints. Cloud acceptance started a synthetic recovery with no deliveries, restored its contractor-review interrupt in a fresh runtime session, and completed review with recorded-only outreach. Both web and scheduler code hashes were verified after deployment. The public health endpoint passed and the unauthenticated contractor endpoint returned 401. Full authenticated gateway acceptance and overnight scheduling remain pending; see `recovery-checkpoints.md`.
-
-The version 15 release added the evidence-review operation used when a vision
-assessment requires professional judgment. A bounded deployment check invoked
-that operation with a deliberately unknown workflow and received the expected
-`workflow_not_found` domain response, proving the new contract reached the
-runtime rather than failing request validation.
-
-The version 14 acceptance run used synthetic data. It ran Nova Micro notice
-intake, stopped with zero deliveries for contractor review, resumed the same
-Strands graph, and exercised Nova Lite in both directions: an unrelated logo
-image was rejected before requirement matching, while a relevant measured-panel
-photo was accepted. The run then accepted the remaining bounded evidence
-fixtures, required final contractor approval, and rendered a five-page packet. The PDF passed
-content-type, page-count, recovery-record, base64, and SHA-256 integrity checks
-with digest
-`47d786edbd286bbf0c384a6bfed163480d81fa8cd834b7dcf5cdca1720387b7e`.
-
-Earlier acceptance runs exercised live Nova Lite vision, deadline replanning,
-idempotent replay, stale-event rejection, final approval, packet integrity,
-rollback, and restoration. Their infrastructure and workflow identifiers are
-recorded privately rather than committed.
+The configured runtime lifecycle is a 15-minute idle timeout and an eight-hour
+maximum session. Durable recovery comes from private checkpoints, not from
+keeping that process alive. Keep runtime versions, artifact digests, and private
+deployment identifiers in your own release records.
 
 ## Proven locally
 
@@ -51,16 +31,22 @@ recorded privately rather than committed.
 - AWS Access Analyzer reports zero findings for the checked-in policy shapes.
 - IAM simulation allows Nova Micro and Nova Lite and denies Nova Pro.
 
-## Intended AWS footprint
+## Runtime prerequisites
 
-The one-time private account setup creates only:
+Before the direct runtime update below, an administrator must provision:
 
 1. a private, encrypted, versioned S3 artifact bucket with public access
    blocked;
 2. a runtime execution role scoped to Nova Micro, Nova Lite, logs, traces, and
    namespaced metrics;
 3. a deployment role scoped to the Mettle runtime and artifact prefix; and
-4. a narrow assume-role policy for the local bootstrap identity.
+4. temporary deployment access through a reviewed role.
+
+The update command does not create a runtime. For a first deployment, use the
+[AWS runtime creation guide](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/getting-started-custom.html)
+with the packaged entrypoint and reviewed execution role. The separate web stack
+adds Cognito, API Gateway, Lambda, CloudFront, WAF, DynamoDB, private recovery
+storage, and scheduling resources; follow [AWS setup](aws-access.md) for the order.
 
 Public example policies use sample account identifiers. Replace them through a
 private deployment configuration; never commit real account or resource IDs.
@@ -119,8 +105,10 @@ in a private deployment log.
 4. Submit the review through the same session and verify bounded outreach.
 5. Submit accepted synthetic evidence for all three citations.
 6. Prepare the packet and approve it through the contractor gate.
-7. Render the packet and verify content type, base64, SHA-256, five pages, and
-   the recovery communication record.
+7. Render the packet and verify content type, base64, SHA-256, all expected
+   corrections and photographs, and the recovery communication record. Page
+   count depends on the input; inspect the rendered PDF rather than relying on
+   a fixed number of pages.
 8. Confirm an idempotent replay does not repeat outreach.
 9. Confirm logs contain only safe metadata, not notice text, images, model
    findings, phone numbers, credentials, or packet content.
